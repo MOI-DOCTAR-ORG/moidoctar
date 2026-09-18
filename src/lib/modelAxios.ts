@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { handleLocalRequest } from '../services/localBackend'
 
 const modelClient = axios.create({
-  baseURL: import.meta.env.VITE_MODEL_API_URL ?? 'https://moi-doctar-model.onrender.com/api/v1',
+  adapter: handleLocalRequest,
   headers: {
     'Content-Type': 'application/json',
   },
