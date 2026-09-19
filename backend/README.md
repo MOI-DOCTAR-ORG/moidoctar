@@ -127,3 +127,24 @@ The API will be live at:
 ### Cache Management (`/api/v1/cache`)
 - `GET /stats`: Retrieve triage cache statistics
 - `POST /clear`: Clear cache
+
+---
+
+## Deployment to Pxxl (pxxl.app)
+
+To deploy this backend to [Pxxl](https://pxxl.app):
+
+1. **Connect GitHub**: Import the repository and select the `backend_dev` branch.
+2. **Set Build Settings**:
+   - **Root Directory**: `backend`
+   - **Install Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`
+   *(Or Pxxl will automatically read `backend/pxxl.toml` and `backend/Procfile`).*
+3. **Environment Variables**:
+   In the Pxxl project settings, add:
+   - `SUPABASE_URL`: Your Supabase Project URL (`https://your-project.supabase.co`)
+   - `SUPABASE_KEY`: Your Supabase API Key (`anon` or `service_role`)
+   - `SECRET_KEY`: Random 32+ character JWT secret string
+   - `ENVIRONMENT`: `production`
+   - `CORS_ORIGINS`: `*` (or your frontend deployment URL)
+
