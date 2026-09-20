@@ -18,7 +18,9 @@ except ImportError:
     bcrypt = None
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: Optional[str]) -> bool:
+    if not hashed_password or not isinstance(hashed_password, str):
+        return False
     if bcrypt and (hashed_password.startswith("$2b$") or hashed_password.startswith("$2a$")):
         try:
             return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
@@ -27,10 +29,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
     # Fallback PBKDF2-HMAC verification
     if ":" in hashed_password:
-        salt_hex, key_hex = hashed_password.split(":", 1)
-        salt = bytes.fromhex(salt_hex)
-        key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100000)
-        return hmac.compare_digest(key.hex(), key_hex)
+        try:
+            salt_hex, key_hex = hashed_password.split(":", 1)
+            salt = bytes.fromhex(salt_hex)
+            key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt, 100000)
+            return hmac.compare_digest(key.hex(), key_hex)
+        except Exception:
+            return False
 
     return plain_password == hashed_password
 

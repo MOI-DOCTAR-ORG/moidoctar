@@ -35,6 +35,35 @@ def manual_authentication(req: ManualAuthRequest):
         elif err_msg == "invalid_account":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"err": "invalid_account", "msg": "Invalid email or password"})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"err": "auth_failed", "msg": str(e)})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"err": "server_error", "msg": str(e), "traceback": traceback.format_exc()}
+        )
+
+
+@router.get("/debug")
+def debug_auth(email: str = None):
+    from app.core.supabase import get_supabase_client
+    from app.services.auth_service import _local_users
+    supabase = get_supabase_client()
+    if not supabase:
+        return {"mode": "local_fallback", "users_count": len(_local_users)}
+    try:
+        if email:
+            query = supabase.table("users").select("*").eq("email", email.strip().lower()).execute()
+        else:
+            query = supabase.table("users").select("id, email, user_name, created_at").limit(5).execute()
+        return {
+            "mode": "supabase",
+            "count": len(query.data) if query.data else 0,
+            "data": query.data,
+        }
+    except Exception as e:
+        import traceback
+        return {"mode": "supabase_error", "error": str(e), "traceback": traceback.format_exc()}
 
 
 @router.post("/google", response_model=TokenResponse)

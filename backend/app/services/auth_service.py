@@ -1,8 +1,11 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from app.core.supabase import get_supabase_client
 from app.core.security import get_password_hash, verify_password, create_access_token
+
+logger = logging.getLogger("moidoctar.auth")
 
 # Local in-memory store for fallback if Supabase is not configured
 _local_users: Dict[str, Dict[str, Any]] = {
@@ -61,24 +64,30 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
     hashed = get_password_hash(password)
 
     if supabase:
-        res = supabase.table("users").select("*").eq("email", email_clean).execute()
-        if res.data and len(res.data) > 0:
-            raise ValueError("account_exist")
+        try:
+            res = supabase.table("users").select("*").eq("email", email_clean).execute()
+            matching = [u for u in (res.data or []) if str(u.get("email", "")).strip().lower() == email_clean]
+            if matching:
+                raise ValueError("account_exist")
 
-        new_user = {
-            "id": str(uuid.uuid4()),
-            "email": email_clean,
-            "user_name": name,
-            "hashed_password": hashed,
-            "is_verified": True,
-            "role": "user",
-            "created_at": now_iso,
-            "last_login": now_iso,
-        }
-        ins = supabase.table("users").insert(new_user).execute()
-        created = ins.data[0] if ins.data else new_user
-        token = create_access_token({"sub": created["id"], "email": email_clean})
-        return {"authorization": token, "refreshToken": token, "user": _format_user_out(created)}
+            new_user = {
+                "id": str(uuid.uuid4()),
+                "email": email_clean,
+                "user_name": name,
+                "hashed_password": hashed,
+                "is_verified": True,
+                "role": "user",
+                "created_at": now_iso,
+                "last_login": now_iso,
+            }
+            ins = supabase.table("users").insert(new_user).execute()
+            created = ins.data[0] if (ins.data and len(ins.data) > 0) else new_user
+            token = create_access_token({"sub": created["id"], "email": email_clean})
+            return {"authorization": token, "refreshToken": token, "user": _format_user_out(created)}
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Supabase signup error: {e}. Falling back to local store.")
 
     # Fallback to local store
     if email_clean in _local_users:
@@ -109,21 +118,30 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
     supabase = get_supabase_client()
 
     if supabase:
-        res = supabase.table("users").select("*").eq("email", email_clean).execute()
-        if not res.data or len(res.data) == 0:
-            raise ValueError("invalid_account")
-        user = res.data[0]
-        if not verify_password(password, user.get("hashed_password", "")):
-            raise ValueError("invalid_account")
+        try:
+            res = supabase.table("users").select("*").eq("email", email_clean).execute()
+            matching = [u for u in (res.data or []) if str(u.get("email", "")).strip().lower() == email_clean]
+            if not matching:
+                raise ValueError("invalid_account")
+            user = matching[0]
+            if not verify_password(password, user.get("hashed_password")):
+                raise ValueError("invalid_account")
 
-        now_iso = datetime.now(timezone.utc).isoformat()
-        supabase.table("users").update({"last_login": now_iso}).eq("id", user["id"]).execute()
-        token = create_access_token({"sub": user["id"], "email": email_clean})
-        return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
+            now_iso = datetime.now(timezone.utc).isoformat()
+            try:
+                supabase.table("users").update({"last_login": now_iso}).eq("id", user["id"]).execute()
+            except Exception:
+                pass
+            token = create_access_token({"sub": user["id"], "email": email_clean})
+            return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Supabase authenticate error: {e}. Falling back to local store.")
 
     # Fallback local store
     user = _local_users.get(email_clean)
-    if not user or not verify_password(password, user["hashed_password"]):
+    if not user or not verify_password(password, user.get("hashed_password")):
         # For development ease, allow signin if password is valid format
         if not user:
             return signup_user(email_clean, password)

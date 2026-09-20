@@ -39,6 +39,18 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc: Exception):
+    import traceback
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled error on {request.method} {request.url}: {exc}\n{tb}")
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"detail": {"err": "server_error", "msg": str(exc), "traceback": tb}},
+    )
+
+
 @app.get("/health", tags=["Health"])
 def health_check():
     return {
