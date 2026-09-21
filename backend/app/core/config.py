@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app"
 
     @property
+    def normalized_supabase_url(self) -> str:
+        url = (self.SUPABASE_URL or "").strip().rstrip("/")
+        import re
+        match = re.search(r"/project/([a-zA-Z0-9_-]+)", url)
+        if match:
+            return f"https://{match.group(1)}.supabase.co"
+        return url
+
+    @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 

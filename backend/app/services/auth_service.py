@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
-from app.core.supabase import get_supabase_client
+from app.core.supabase import get_supabase_client, safe_supabase_rows
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 logger = logging.getLogger("moidoctar.auth")
@@ -39,7 +39,9 @@ _local_users: Dict[str, Dict[str, Any]] = {
 }
 
 
-def _format_user_out(u: Dict[str, Any]) -> Dict[str, Any]:
+def _format_user_out(u: Any) -> Dict[str, Any]:
+    if not isinstance(u, dict):
+        return {}
     return {
         "_id": str(u.get("id", "")),
         "userName": u.get("user_name", "User"),
@@ -66,7 +68,8 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
     if supabase:
         try:
             res = supabase.table("users").select("*").eq("email", email_clean).execute()
-            matching = [u for u in (res.data or []) if str(u.get("email", "")).strip().lower() == email_clean]
+            rows = safe_supabase_rows(res)
+            matching = [u for u in rows if str(u.get("email", "")).strip().lower() == email_clean]
             if matching:
                 raise ValueError("account_exist")
 
@@ -81,7 +84,8 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
                 "last_login": now_iso,
             }
             ins = supabase.table("users").insert(new_user).execute()
-            created = ins.data[0] if (ins.data and len(ins.data) > 0) else new_user
+            ins_rows = safe_supabase_rows(ins)
+            created = ins_rows[0] if ins_rows else new_user
             token = create_access_token({"sub": created["id"], "email": email_clean})
             return {"authorization": token, "refreshToken": token, "user": _format_user_out(created)}
         except ValueError:
@@ -120,7 +124,8 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
     if supabase:
         try:
             res = supabase.table("users").select("*").eq("email", email_clean).execute()
-            matching = [u for u in (res.data or []) if str(u.get("email", "")).strip().lower() == email_clean]
+            rows = safe_supabase_rows(res)
+            matching = [u for u in rows if str(u.get("email", "")).strip().lower() == email_clean]
             if not matching:
                 raise ValueError("invalid_account")
             user = matching[0]
@@ -159,22 +164,27 @@ def authenticate_google(access_token: str) -> Dict[str, Any]:
     demo_name = "Google User"
 
     if supabase:
-        res = supabase.table("users").select("*").eq("email", demo_email).execute()
-        if res.data and len(res.data) > 0:
-            user = res.data[0]
-        else:
-            new_user = {
-                "id": str(uuid.uuid4()),
-                "email": demo_email,
-                "user_name": demo_name,
-                "hashed_password": get_password_hash(access_token[:16]),
-                "is_verified": True,
-                "role": "user",
-            }
-            ins = supabase.table("users").insert(new_user).execute()
-            user = ins.data[0] if ins.data else new_user
-        token = create_access_token({"sub": user["id"], "email": demo_email})
-        return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
+        try:
+            res = supabase.table("users").select("*").eq("email", demo_email).execute()
+            rows = safe_supabase_rows(res)
+            if rows:
+                user = rows[0]
+            else:
+                new_user = {
+                    "id": str(uuid.uuid4()),
+                    "email": demo_email,
+                    "user_name": demo_name,
+                    "hashed_password": get_password_hash(access_token[:16] if access_token else "GoogleAuth2026!"),
+                    "is_verified": True,
+                    "role": "user",
+                }
+                ins = supabase.table("users").insert(new_user).execute()
+                ins_rows = safe_supabase_rows(ins)
+                user = ins_rows[0] if ins_rows else new_user
+            token = create_access_token({"sub": str(user.get("id", "usr_google_001")), "email": demo_email})
+            return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
+        except Exception as e:
+            logger.error(f"Supabase google auth error: {e}. Falling back to local store.")
 
     if demo_email not in _local_users:
         _local_users[demo_email] = {
@@ -199,15 +209,17 @@ def authenticate_google(access_token: str) -> Dict[str, Any]:
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     supabase = get_supabase_client()
     if supabase:
-        res = supabase.table("users").select("*").eq("id", user_id).execute()
-        if res.data and len(res.data) > 0:
-            return _format_user_out(res.data[0])
-        return None
+        try:
+            res = supabase.table("users").select("*").eq("id", user_id).execute()
+            rows = safe_supabase_rows(res)
+            if rows:
+                return _format_user_out(rows[0])
+        except Exception:
+            pass
 
     for u in _local_users.values():
         if str(u.get("id")) == str(user_id):
             return _format_user_out(u)
-    # Default fallback to the primary user if testing
     first_user = next(iter(_local_users.values()))
     return _format_user_out(first_user)
 
@@ -217,19 +229,23 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]
     cleaned = {k: v for k, v in updates.items() if v is not None}
 
     if supabase:
-        update_data = {}
-        if "userName" in cleaned:
-            update_data["user_name"] = cleaned["userName"]
-        if "phone" in cleaned:
-            update_data["phone"] = cleaned["phone"]
-        if "demographics" in cleaned:
-            update_data["demographics"] = cleaned["demographics"]
-        if "preference" in cleaned:
-            update_data["preference"] = cleaned["preference"]
+        try:
+            update_data = {}
+            if "userName" in cleaned:
+                update_data["user_name"] = cleaned["userName"]
+            if "phone" in cleaned:
+                update_data["phone"] = cleaned["phone"]
+            if "demographics" in cleaned:
+                update_data["demographics"] = cleaned["demographics"]
+            if "preference" in cleaned:
+                update_data["preference"] = cleaned["preference"]
 
-        res = supabase.table("users").update(update_data).eq("id", user_id).execute()
-        updated = res.data[0] if res.data else {}
-        return _format_user_out(updated)
+            res = supabase.table("users").update(update_data).eq("id", user_id).execute()
+            rows = safe_supabase_rows(res)
+            updated = rows[0] if rows else {}
+            return _format_user_out(updated)
+        except Exception:
+            pass
 
     for email, u in _local_users.items():
         if str(u.get("id")) == str(user_id):

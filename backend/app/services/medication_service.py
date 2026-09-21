@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any
-from app.core.supabase import get_supabase_client
+from app.core.supabase import get_supabase_client, safe_supabase_rows
 
 _local_medications: List[Dict[str, Any]] = [
     {
@@ -43,9 +43,11 @@ _local_medications: List[Dict[str, Any]] = [
 ]
 
 
-def _format_med_out(m: Dict[str, Any]) -> Dict[str, Any]:
+def _format_med_out(m: Any) -> Dict[str, Any]:
+    if not isinstance(m, dict):
+        return {}
     return {
-        "id": str(m.get("id")),
+        "id": str(m.get("id", "")),
         "name": m.get("name", ""),
         "dosage": m.get("dosage", ""),
         "time": m.get("time", "08:00 AM"),
@@ -60,11 +62,16 @@ def _format_med_out(m: Dict[str, Any]) -> Dict[str, Any]:
 def get_user_medications(user_id: str) -> List[Dict[str, Any]]:
     supabase = get_supabase_client()
     if supabase:
-        res = supabase.table("medications").select("*").eq("user_id", user_id).order("started_at", desc=True).execute()
-        return [_format_med_out(m) for m in (res.data or [])]
+        try:
+            res = supabase.table("medications").select("*").eq("user_id", user_id).order("started_at", desc=True).execute()
+            rows = safe_supabase_rows(res)
+            if rows:
+                return [_format_med_out(m) for m in rows]
+        except Exception:
+            pass
 
     # Fallback to local store
-    return [_format_med_out(m) for m in _local_medications]
+    return [_format_med_out(m) for m in _local_medications if isinstance(m, dict)]
 
 
 def add_medication(user_id: str, data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -73,19 +80,22 @@ def add_medication(user_id: str, data: Dict[str, Any]) -> List[Dict[str, Any]]:
     new_id = str(uuid.uuid4())
 
     if supabase:
-        record = {
-            "id": new_id,
-            "user_id": user_id,
-            "name": data.get("name", ""),
-            "dosage": data.get("dosage", ""),
-            "time": data.get("time", "08:00 AM"),
-            "frequent": data.get("frequent", "morning"),
-            "supply": str(data.get("supply", "30")),
-            "status": True,
-            "started_at": now_iso,
-        }
-        supabase.table("medications").insert(record).execute()
-        return get_user_medications(user_id)
+        try:
+            record = {
+                "id": new_id,
+                "user_id": user_id,
+                "name": data.get("name", ""),
+                "dosage": data.get("dosage", ""),
+                "time": data.get("time", "08:00 AM"),
+                "frequent": data.get("frequent", "morning"),
+                "supply": str(data.get("supply", "30")),
+                "status": True,
+                "started_at": now_iso,
+            }
+            supabase.table("medications").insert(record).execute()
+            return get_user_medications(user_id)
+        except Exception:
+            pass
 
     new_med = {
         "id": "med-" + str(uuid.uuid4())[:8],

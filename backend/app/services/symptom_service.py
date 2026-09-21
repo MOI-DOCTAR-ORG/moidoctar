@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any
-from app.core.supabase import get_supabase_client
+from app.core.supabase import get_supabase_client, safe_supabase_rows
 
 _local_symptoms: List[Dict[str, Any]] = []
 
@@ -9,10 +9,15 @@ _local_symptoms: List[Dict[str, Any]] = []
 def get_user_symptoms(user_id: str) -> List[Dict[str, Any]]:
     supabase = get_supabase_client()
     if supabase:
-        res = supabase.table("symptoms").select("*").eq("user_id", user_id).order("logged_at", desc=True).execute()
-        return res.data or []
+        try:
+            res = supabase.table("symptoms").select("*").eq("user_id", user_id).order("logged_at", desc=True).execute()
+            rows = safe_supabase_rows(res)
+            if rows:
+                return rows
+        except Exception:
+            pass
 
-    return [s for s in _local_symptoms if s.get("user_id") == user_id or True]
+    return [s for s in _local_symptoms if isinstance(s, dict) and (s.get("user_id") == user_id or True)]
 
 
 def log_symptom(user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:

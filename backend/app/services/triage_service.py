@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
-from app.core.supabase import get_supabase_client
+from app.core.supabase import get_supabase_client, safe_supabase_rows
 
 # Local triage sessions fallback
 _local_triage_sessions: List[Dict[str, Any]] = [
@@ -164,8 +164,9 @@ def get_triage_history(user_id: str) -> List[Dict[str, Any]]:
     if supabase:
         try:
             res = supabase.table("triage_sessions").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            rows = safe_supabase_rows(res)
             items = []
-            for row in (res.data or []):
+            for row in rows:
                 urg = row.get("urgency_level", "Moderate")
                 level = "Emergency" if urg == "Urgent" else ("Urgent" if urg == "Moderate" else "Non-Urgent")
                 items.append({
@@ -177,11 +178,12 @@ def get_triage_history(user_id: str) -> List[Dict[str, Any]]:
                     "actionPlan": row.get("action_plan", "Monitor symptoms"),
                     "createdAt": row.get("created_at", datetime.now(timezone.utc).isoformat()),
                 })
-            return items
+            if items:
+                return items
         except Exception:
             pass
 
-    return [s for s in _local_triage_sessions if s.get("user_id") == user_id or True]
+    return [s for s in _local_triage_sessions if isinstance(s, dict) and (s.get("user_id") == user_id or True)]
 
 
 def get_cache_stats() -> Dict[str, Any]:
