@@ -1,7 +1,10 @@
 import axios from 'axios'
+import { handleLocalRequest } from '../services/localBackend'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
 
 const apiClient = axios.create({
-  baseURL: 'https://core-backend-azhp.onrender.com/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -10,7 +13,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
 
-  if (token) {
+  if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
 
@@ -19,12 +22,11 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/sign-up') && !window.location.pathname.startsWith('/verify-email')) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+  async (error) => {
+    if (!error.response && error.config) {
+      console.warn('[MoiDoctar] Backend server offline at', error.config.baseURL, '- using local fallback handler.')
+      return handleLocalRequest(error.config)
     }
-
     return Promise.reject(error)
   },
 )

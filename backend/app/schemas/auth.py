@@ -1,0 +1,33 @@
+from typing import Optional, Literal
+from pydantic import BaseModel
+
+
+class ManualAuthRequest(BaseModel):
+    type: Literal["SIGNIN_MANUALLY", "SIGNUP_MANUALLY"]
+    email: str
+    password: str
+    fullName: Optional[str] = None
+
+
+class GoogleAuthRequest(BaseModel):
+    accessToken: str
+
+
+class VerifyEmailRequest(BaseModel):
+    verificationCode: str
+
+
+class RequestPasswordResetRequest(BaseModel):
+    email: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+    verificationCode: str
+    newPassword: str
+
+
+class TokenResponse(BaseModel):
+    msg: Optional[str] = "Success"
+    authorization: str
+    refreshToken: str

@@ -11,4 +11,13 @@ yarn.lock
 pnpm-lock.yaml
 bun.lock
 bun.lockb
-.
+# Python
+backend/.venv
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.db
+backend/.env
