@@ -1,7 +1,16 @@
+import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from app.core.supabase import get_supabase_client, safe_supabase_rows
+
+logger = logging.getLogger("moidoctar.triage")
+
+# Rank used to make sure the AI can never talk a genuinely dangerous,
+# keyword-flagged presentation down to a lower urgency than the deterministic
+# rule engine assigned. The AI may only raise urgency, never lower it.
+_URGENCY_RANK = {"Stable": 0, "Moderate": 1, "Urgent": 2}
 
 # Local triage sessions fallback
 _local_triage_sessions: List[Dict[str, Any]] = [
@@ -21,7 +30,7 @@ _local_triage_sessions: List[Dict[str, Any]] = [
 _cache_stats = {"hits": 24, "misses": 3, "hit_rate": 0.88, "size": 18}
 
 
-def analyze_symptoms_placeholder(symptoms: str) -> Dict[str, Any]:
+def _rule_based_assessment(symptoms: str) -> Dict[str, Any]:
     lower = symptoms.lower()
 
     emergency_keywords = [
@@ -117,6 +126,130 @@ def analyze_symptoms_placeholder(symptoms: str) -> Dict[str, Any]:
             "Breathing difficulty"
         ],
         "disclaimer": "MoiDoctar provides triage guidance, not a medical diagnosis. Consult a physician for clinical decisions."
+    }
+
+
+_TRIAGE_PROMPT_TEMPLATE = """You are the AI symptom-assessment layer inside MoiDoctar, a health triage app.
+A user has described their symptoms in free text below. Produce a structured triage assessment.
+
+Respond with ONLY a single JSON object (no markdown fences, no prose outside the JSON) with exactly these keys:
+- "urgency_level": one of "Stable", "Moderate", "Urgent"
+- "confidence_score": number between 0 and 1
+- "needs_more_info": boolean, true if the description is too vague to be confident
+- "rationale": 1-2 sentence clinical-style explanation for the urgency level
+- "possible_conditions": array of 2-4 short plausible (non-diagnostic) condition names
+- "recommended_actions": array of 2-4 short, concrete next steps for the user
+- "follow_up_questions": array of 1-3 clarifying questions a clinician might ask next
+- "red_flags_to_watch": array of 1-3 warning signs that should prompt escalation to emergency care
+
+Guidance: "Urgent" means symptoms may be life-threatening (e.g. chest pain, severe breathing difficulty,
+stroke signs, severe bleeding). "Moderate" means symptoms warrant clinical review within 24-48 hours.
+"Stable" means supportive self-care and observation are reasonable. Never provide a specific diagnosis,
+medication name, or dosage. Be conservative: if in doubt, prefer the higher urgency level.
+
+User-reported symptoms:
+\"\"\"{symptoms}\"\"\"
+"""
+
+
+def _call_gemini_triage(symptoms: str) -> Optional[Dict[str, Any]]:
+    """Ask Gemini for a structured triage assessment of free-text symptoms.
+
+    Returns None (never raises) if the API key is missing, the network call
+    fails, or the model's response cannot be parsed - callers must always be
+    ready to fall back to the deterministic rule engine.
+    """
+    try:
+        from moi_doctar_ai.gemini import GeminiModel
+        from moi_doctar_ai.loop import ModelError
+    except ImportError:
+        logger.warning("moi_doctar_ai package not importable; skipping AI triage call.")
+        return None
+
+    model = GeminiModel()
+    if not model.api_key:
+        logger.info("GOOGLE_API_KEY not set; using rule-based triage only.")
+        return None
+
+    prompt = _TRIAGE_PROMPT_TEMPLATE.format(symptoms=symptoms[:4000])
+    contents = [{"role": "user", "parts": [{"text": prompt}]}]
+
+    try:
+        import urllib.request
+
+        body = {
+            "contents": contents,
+            "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
+        }
+        request = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model.model}:generateContent",
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json", "x-goog-api-key": model.api_key},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=model.timeout) as response:
+            payload = json.load(response)
+
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            return None
+        parts = ((candidates[0].get("content") or {}).get("parts")) or []
+        text = "".join(p.get("text", "") for p in parts).strip()
+        if not text:
+            return None
+
+        # Defensive: strip accidental markdown fences if the model adds them.
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.lower().startswith("json"):
+                text = text[4:]
+
+        data = json.loads(text)
+
+        required = {"urgency_level", "confidence_score", "needs_more_info", "rationale",
+                    "possible_conditions", "recommended_actions", "follow_up_questions", "red_flags_to_watch"}
+        if not required.issubset(data.keys()):
+            logger.warning(f"Gemini triage response missing keys: {required - data.keys()}")
+            return None
+        if data["urgency_level"] not in _URGENCY_RANK:
+            logger.warning(f"Gemini triage returned unknown urgency_level: {data['urgency_level']}")
+            return None
+
+        return data
+    except Exception as e:
+        logger.warning(f"Gemini triage call failed, falling back to rules: {e}")
+        return None
+
+
+def analyze_symptoms(symptoms: str) -> Dict[str, Any]:
+    """Main triage entry point: AI-assisted assessment with a deterministic safety floor.
+
+    The keyword-based rule engine always runs first and its urgency level acts as a
+    floor - the AI is only ever allowed to raise the urgency, never lower it, and if
+    the AI is unavailable or its response can't be trusted, the rule-based result is
+    used as-is.
+    """
+    rule_based = _rule_based_assessment(symptoms)
+    ai_result = _call_gemini_triage(symptoms)
+
+    if not ai_result:
+        return rule_based
+
+    final_urgency = rule_based["urgency_level"]
+    if _URGENCY_RANK.get(ai_result["urgency_level"], 0) > _URGENCY_RANK.get(final_urgency, 0):
+        final_urgency = ai_result["urgency_level"]
+
+    return {
+        "assessment_id": rule_based["assessment_id"],
+        "needs_more_info": bool(ai_result.get("needs_more_info", rule_based["needs_more_info"])),
+        "urgency_level": final_urgency,
+        "confidence_score": float(ai_result.get("confidence_score", rule_based["confidence_score"])),
+        "rationale": ai_result.get("rationale") or rule_based["rationale"],
+        "possible_conditions": ai_result.get("possible_conditions") or rule_based["possible_conditions"],
+        "recommended_actions": ai_result.get("recommended_actions") or rule_based["recommended_actions"],
+        "follow_up_questions": ai_result.get("follow_up_questions") or rule_based["follow_up_questions"],
+        "red_flags_to_watch": ai_result.get("red_flags_to_watch") or rule_based["red_flags_to_watch"],
+        "disclaimer": rule_based["disclaimer"],
     }
 
 

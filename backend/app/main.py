@@ -1,8 +1,16 @@
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+
+# Make the AI package (backend/ai/moi_doctar_ai) importable regardless of how
+# the app was launched (uvicorn main:app, uvicorn app.main:app, tests, etc.)
+_AI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ai")
+if _AI_DIR not in sys.path:
+    sys.path.insert(0, _AI_DIR)
 from app.core.supabase import get_supabase_client
 from app.api.v1.api import api_router
 
@@ -29,7 +37,7 @@ app = FastAPI(
 # Configure CORS for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list + ["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

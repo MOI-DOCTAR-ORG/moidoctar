@@ -220,8 +220,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     for u in _local_users.values():
         if str(u.get("id")) == str(user_id):
             return _format_user_out(u)
-    first_user = next(iter(_local_users.values()))
-    return _format_user_out(first_user)
+    return None
 
 
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -259,8 +258,7 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]
                 u["preference"] = {**(u.get("preference") or {}), **cleaned["preference"]}
             return _format_user_out(u)
 
-    first = next(iter(_local_users.values()))
-    return _format_user_out(first)
+    raise ValueError("user_not_found")
 
 
 def delete_user_account(user_id: str) -> bool:

@@ -1,34 +1,46 @@
 from typing import Optional, Dict, Any
 from fastapi import Header, HTTPException, status
 from app.core.security import decode_access_token
-from app.services.auth_service import get_user_by_id, _local_users, _format_user_out
+from app.services.auth_service import get_user_by_id
 
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Resolve the authenticated user from the Authorization header.
+
+    Raises 401 whenever no valid, non-expired token is supplied instead of
+    silently substituting a demo account - protected routes must actually
+    be protected.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"err": "not_authenticated", "msg": "Missing or invalid authentication token"},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     if not authorization:
-        # Fallback to demo user for testing ease if no token supplied
-        demo = next(iter(_local_users.values()))
-        return _format_user_out(demo)
+        raise credentials_exception
 
     token = authorization.replace("Bearer ", "").strip()
     payload = decode_access_token(token)
-
     if not payload:
-        # If token was issued by local mock, still allow
-        demo = next(iter(_local_users.values()))
-        return _format_user_out(demo)
+        raise credentials_exception
 
     user_id = payload.get("sub")
-    if user_id:
-        user = get_user_by_id(user_id)
-        if user:
-            return user
+    if not user_id:
+        raise credentials_exception
 
-    demo = next(iter(_local_users.values()))
-    return _format_user_out(demo)
+    user = get_user_by_id(user_id)
+    if not user:
+        raise credentials_exception
+
+    return user
 
 
 async def get_current_admin(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
     user = await get_current_user(authorization)
-    # For local development we allow access, or check user.get("role") == "admin"
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"err": "not_authorized", "msg": "Admin privileges are required for this action"},
+        )
     return user

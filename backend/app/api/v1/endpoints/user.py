@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.user import UserUpdate, UserProfileResponse
 from app.schemas.auth import ForgotPasswordRequest
 from app.services.auth_service import update_user_profile, delete_user_account
@@ -18,7 +18,10 @@ def update_profile(
     updates: UserUpdate,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    updated = update_user_profile(current_user["_id"], updates.model_dump(exclude_unset=True))
+    try:
+        updated = update_user_profile(current_user["_id"], updates.model_dump(exclude_unset=True))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"err": "user_not_found", "msg": "User account could not be found"})
     return UserProfileResponse(msg="Profile updated successfully", data=updated)
 
 

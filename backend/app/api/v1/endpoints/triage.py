@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Form, File, UploadFile
 from app.schemas.triage import TriageResponse, TriageChatResponse, TriageListResponse
 from app.services.triage_service import (
-    analyze_symptoms_placeholder,
+    analyze_symptoms,
     save_triage_session,
     get_triage_history,
 )
@@ -19,7 +19,7 @@ def perform_triage(
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
     full_text = f"{symptoms} {clinical_context or ''}".strip()
-    assessment = analyze_symptoms_placeholder(full_text)
+    assessment = analyze_symptoms(full_text)
     save_triage_session(current_user["_id"], [symptoms], assessment)
 
     return TriageResponse(
@@ -39,7 +39,7 @@ def perform_triage_chat(
     image: Optional[UploadFile] = File(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    assessment = analyze_symptoms_placeholder(symptoms)
+    assessment = analyze_symptoms(symptoms)
     save_triage_session(current_user["_id"], [symptoms], assessment)
 
     return TriageChatResponse(
