@@ -1,9 +1,8 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
-import AppleIcon from '../components/AppleIcon'
 import AuthShell from '../components/auth/AuthShell'
 import {
   authDivider,
@@ -31,7 +30,6 @@ export default function SignUp() {
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null)
   const [shakeKey, setShakeKey] = useState(0)
   const [touched, setTouched] = useState({ name: false, email: false, password: false, confirm: false })
 
@@ -106,16 +104,6 @@ export default function SignUp() {
     }
   }
 
-  const handleApple = useCallback(() => {
-    setOauthLoading('apple')
-    setError('')
-    setTimeout(() => {
-      setOauthLoading(null)
-      setError('Apple sign-in is not yet available.')
-      setShakeKey(k => k + 1)
-    }, 500)
-  }, [])
-
   const requirements = [
     { label: 'At least 8 characters', met: hasMinLen },
     { label: '1 uppercase letter', met: hasUpper },
@@ -144,7 +132,7 @@ export default function SignUp() {
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-3">
           <GoogleLogin
             onSuccess={async (credentialResponse) => {
               setError('')
@@ -164,20 +152,6 @@ export default function SignUp() {
             shape="rectangular"
             width="100%"
           />
-          <button
-            type="button"
-            onClick={handleApple}
-            disabled={oauthLoading !== null}
-            aria-label="Continue with Apple"
-            className={authSecondaryButton}
-          >
-            {oauthLoading === 'apple' ? (
-              <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" aria-hidden="true" />
-            ) : (
-              <AppleIcon size="lg" />
-            )}
-            Apple
-          </button>
         </div>
 
         <div className={authDivider} role="separator" aria-orientation="horizontal">

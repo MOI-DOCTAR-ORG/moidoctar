@@ -17,12 +17,6 @@ export function useGoogleAuth() {
   })
 }
 
-export function useAppleAuth() {
-  return useMutation({
-    mutationFn: (payload: MutationPayload) => apiClient.post('/auth/apple', payload),
-  })
-}
-
 export function useVerify() {
   return useMutation({
     mutationFn: (payload: MutationPayload) => apiClient.post('/auth/verify', payload),

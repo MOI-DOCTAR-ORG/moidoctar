@@ -1,9 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
-import AppleIcon from '../components/AppleIcon'
 import AuthShell from '../components/auth/AuthShell'
 import {
   authDivider,
@@ -29,7 +28,6 @@ export default function SignIn() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null)
   const [shakeKey, setShakeKey] = useState(0)
   const [touched, setTouched] = useState({ email: false, password: false })
 
@@ -60,16 +58,6 @@ export default function SignIn() {
       setShakeKey(k => k + 1)
     }
   }
-
-  const handleApple = useCallback(() => {
-    setOauthLoading('apple')
-    setError('')
-    setTimeout(() => {
-      setOauthLoading(null)
-      setError('Apple sign-in is not yet available.')
-      setShakeKey(k => k + 1)
-    }, 500)
-  }, [])
 
   return (
     <AuthShell
@@ -110,20 +98,6 @@ export default function SignIn() {
             shape="rectangular"
             width="100%"
           />
-          <button
-            type="button"
-            onClick={handleApple}
-            disabled={oauthLoading !== null}
-            aria-label="Continue with Apple"
-            className={authSecondaryButton}
-          >
-            {oauthLoading === 'apple' ? (
-              <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" aria-hidden="true" />
-            ) : (
-              <AppleIcon size="lg" />
-            )}
-            Continue with Apple
-          </button>
         </div>
 
         <div className={authDivider} role="separator" aria-orientation="horizontal">
