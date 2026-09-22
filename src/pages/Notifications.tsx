@@ -142,7 +142,7 @@ export default function Notifications() {
                   </div>
                   <div className="space-y-4">
                     {items.map((n) => (
-                      <div key={n.id} className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-3 md:p-5 flex items-start gap-3 md:gap-4 transition-all hover:border-[var(--neon-primary)]/30 hover:shadow-[0_0_20px_rgba(0,240,255,0.08)] relative group">
+                      <div key={n.id} className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-3 md:p-5 flex items-start gap-3 md:gap-4 transition-all hover:border-[var(--neon-primary)]/30 hover:shadow-[0_0_20px_rgba(148,197,253,0.08)] relative group">
                         <div className={`w-12 h-12 rounded-full ${n.iconBg} flex items-center justify-center shrink-0`}>
                           <Icon icon={n.icon} size="lg" className={n.iconColor} />
                         </div>
@@ -158,7 +158,7 @@ export default function Notifications() {
                           {n.actions && (
                             <div className="flex gap-3">
                               {n.actions.map((a) => a.primary ? (
-                                <button key={a.label} onClick={() => a.to && navigate(a.to)} className="bg-[var(--neon-primary)] text-white px-6 py-2.5 rounded-full font-label-md text-label-md hover:opacity-90 transition-colors min-h-[44px] shadow-[0_0_16px_rgba(0,240,255,0.2)]">
+                                <button key={a.label} onClick={() => a.to && navigate(a.to)} className="bg-[var(--neon-primary)] text-white px-6 py-2.5 rounded-full font-label-md text-label-md hover:opacity-90 transition-colors min-h-[44px] shadow-[0_0_16px_rgba(148,197,253,0.2)]">
                                   {a.label}
                                 </button>
                               ) : (

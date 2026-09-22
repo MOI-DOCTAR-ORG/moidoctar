@@ -84,7 +84,7 @@ export default function TriageFeedback({ assessmentId }: TriageFeedbackProps) {
           />
           <button
             onClick={handleSubmit}
-            className="w-full py-3 bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white rounded-xl font-label-md text-label-md font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all min-h-[44px]"
+            className="w-full py-3 bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white rounded-xl font-label-md text-label-md font-bold hover:shadow-[0_0_20px_rgba(148,197,253,0.3)] transition-all min-h-[44px]"
           >
             Submit Feedback
           </button>

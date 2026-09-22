@@ -37,7 +37,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <Link
             to="/"
             onClick={handleNav}
-            className="flex h-11 items-center gap-2.5 rounded-xl px-2 transition-all duration-300 hover:bg-[rgba(0,240,255,0.04)] group"
+            className="flex h-11 items-center gap-2.5 rounded-xl px-2 transition-all duration-300 hover:bg-[rgba(148,197,253,0.04)] group"
           >
             <img
               src="/moidoctar-logo.svg"
@@ -53,7 +53,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <button
             type="button"
             onClick={onClose}
-            className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl text-secondary hover:bg-[rgba(0,240,255,0.04)] hover:text-[var(--neon-primary)] md:hidden transition-colors"
+            className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl text-secondary hover:bg-[rgba(148,197,253,0.04)] hover:text-[var(--neon-primary)] md:hidden transition-colors"
             aria-label="Close sidebar"
           >
             <Icon icon="close" size="md" />
@@ -72,12 +72,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               aria-current={isActive ? 'page' : undefined}
               className={`sidebar-active-pill flex h-11 shrink-0 items-center gap-2.5 rounded-xl px-2.5 text-sm transition-all duration-200 border-l-2 ${
                 isActive
-                  ? 'border-l-[var(--neon-primary)] bg-[rgba(0,240,255,0.06)] text-[var(--neon-primary)] shadow-[inset_0_0_12px_rgba(0,240,255,0.04)]'
-                  : 'border-l-transparent text-secondary hover:bg-[rgba(0,240,255,0.04)] hover:text-on-surface'
+                  ? 'border-l-[var(--neon-primary)] bg-[rgba(148,197,253,0.06)] text-[var(--neon-primary)] shadow-[inset_0_0_12px_rgba(148,197,253,0.04)]'
+                  : 'border-l-transparent text-secondary hover:bg-[rgba(148,197,253,0.04)] hover:text-on-surface'
               }`}
             >
               <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${
-                isActive ? 'bg-[rgba(0,240,255,0.1)]' : 'bg-transparent'
+                isActive ? 'bg-[rgba(148,197,253,0.1)]' : 'bg-transparent'
               }`}>
                 <Icon icon={item.icon} size="md" />
               </span>
@@ -94,7 +94,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               key={item.label}
               type="button"
               onClick={handleNav}
-              className="flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-[rgba(0,240,255,0.04)] hover:text-on-surface"
+              className="flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-[rgba(148,197,253,0.04)] hover:text-on-surface"
             >
               <span className="grid h-7 w-7 shrink-0 place-items-center">
                 <Icon icon={item.icon} size="md" />

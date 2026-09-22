@@ -79,7 +79,7 @@ export default function Dashboard() {
       <ReminderBanner />
 
       {!savedToday ? (
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl px-4 py-3 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(0,240,255,0.08)]">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl px-4 py-3 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(148,197,253,0.08)]">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 rounded-full bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)]">
               <Icon icon="favorite" size="sm" />
@@ -88,7 +88,7 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-1.5 mb-2">
             {moods.map(m => (
-              <button key={m.label} onClick={() => setMood(m.label)} className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-full border text-xs font-medium transition-all ${mood === m.label ? 'border-[var(--neon-primary)] bg-[var(--neon-primary)]/10 shadow-[0_0_12px_rgba(0,240,255,0.2)]' : 'border-[var(--glass-border)] hover:border-[var(--neon-primary)]/50'}`}>
+              <button key={m.label} onClick={() => setMood(m.label)} className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-full border text-xs font-medium transition-all ${mood === m.label ? 'border-[var(--neon-primary)] bg-[var(--neon-primary)]/10 shadow-[0_0_12px_rgba(148,197,253,0.2)]' : 'border-[var(--glass-border)] hover:border-[var(--neon-primary)]/50'}`}>
                 <Icon icon={m.icon} size="sm" className={m.color} />
                 {m.label}
               </button>
@@ -96,7 +96,7 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-1.5">
             <PremiumInput compact variant="pill" containerClassName="flex-1" className="min-h-9 text-xs" placeholder="Any notes?" value={feeling} onChange={e => setFeeling(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveCheckIn() }} />
-            <button onClick={saveCheckIn} disabled={!mood} className="min-h-[44px] bg-[var(--neon-primary)] text-white px-5 py-2 rounded-full text-xs font-semibold hover:bg-[var(--neon-primary)]/80 transition-all disabled:opacity-40 flex items-center gap-1.5 shrink-0 shadow-[0_0_16px_rgba(0,240,255,0.25)]">
+            <button onClick={saveCheckIn} disabled={!mood} className="min-h-[44px] bg-[var(--neon-primary)] text-white px-5 py-2 rounded-full text-xs font-semibold hover:bg-[var(--neon-primary)]/80 transition-all disabled:opacity-40 flex items-center gap-1.5 shrink-0 shadow-[0_0_16px_rgba(148,197,253,0.25)]">
               <Icon icon="check" size="sm" />
               Save
             </button>
@@ -112,7 +112,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        <div className="lg:col-span-2 rounded-[24px] p-5 sm:p-8 md:p-10 text-on-primary relative overflow-hidden flex flex-col justify-between min-h-[220px] md:min-h-[260px] bg-gradient-to-br from-[var(--neon-primary)]/80 via-[#0040cc] to-[#001a66] border border-[var(--neon-primary)]/20 shadow-[0_0_40px_rgba(0,240,255,0.15)]">
+        <div className="lg:col-span-2 rounded-[24px] p-5 sm:p-8 md:p-10 text-on-primary relative overflow-hidden flex flex-col justify-between min-h-[220px] md:min-h-[260px] bg-gradient-to-br from-[var(--neon-primary)]/80 via-[#2763EB] to-[#1F3A8A] border border-[var(--neon-primary)]/20 shadow-[0_0_40px_rgba(148,197,253,0.15)]">
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
           <div className="absolute right-[-5%] top-[-10%] opacity-10 transform rotate-12">
             <Icon icon="health_and_safety" size="3xl" />
@@ -128,14 +128,14 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="relative z-10">
-            <button onClick={() => navigate('/new-triage')} className="bg-white text-[var(--neon-primary)] hover:bg-white/90 rounded-full px-8 py-3.5 font-label-md text-label-md transition-all shadow-[0_0_24px_rgba(0,240,255,0.3)] flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] w-fit">
+            <button onClick={() => navigate('/new-triage')} className="bg-white text-[var(--neon-primary)] hover:bg-white/90 rounded-full px-8 py-3.5 font-label-md text-label-md transition-all shadow-[0_0_24px_rgba(148,197,253,0.3)] flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] w-fit">
               <Icon icon="add_circle" size="md" className="icon-fill" />
               Start New Triage
             </button>
           </div>
         </div>
 
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[24px] p-4 md:p-6 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(0,240,255,0.08)] flex flex-col justify-between min-h-[200px] md:min-h-[260px]">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[24px] p-4 md:p-6 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(148,197,253,0.08)] flex flex-col justify-between min-h-[200px] md:min-h-[260px]">
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="font-headline-md text-headline-md text-on-surface">Wellness Score</h3>
@@ -146,7 +146,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-end gap-2 mb-4">
-            <span className="text-4xl font-extrabold tracking-tight" style={{ color: 'var(--neon-primary)', textShadow: '0 0 20px rgba(0,240,255,0.5)' }}>
+            <span className="text-4xl font-extrabold tracking-tight" style={{ color: 'var(--neon-primary)', textShadow: '0 0 20px rgba(148,197,253,0.5)' }}>
               {wellnessScore !== null ? wellnessScore : '--'}
             </span>
           </div>
@@ -162,17 +162,17 @@ export default function Dashboard() {
               <svg className="w-full h-full overflow-visible" viewBox="0 0 200 60">
                 <defs>
                   <linearGradient id="neonLineGrad" x1="0%" x2="100%" y1="0%" y2="0%">
-                    <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#00f0ff" stopOpacity="1" />
+                    <stop offset="0%" stopColor="#94C5FD" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#94C5FD" stopOpacity="1" />
                   </linearGradient>
                   <linearGradient id="neonAreaGrad" x1="0%" x2="0%" y1="0%" y2="100%">
-                    <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
+                    <stop offset="0%" stopColor="#94C5FD" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#94C5FD" stopOpacity="0" />
                   </linearGradient>
                 </defs>
                 <path d="M 0,50 C 20,45 40,55 60,40 S 100,20 120,30 S 160,40 180,20 L 200,10 L 200,60 L 0,60 Z" fill="url(#neonAreaGrad)" />
-                <path d="M 0,50 C 20,45 40,55 60,40 S 100,20 120,30 S 160,40 180,20 L 200,10" fill="none" stroke="url(#neonLineGrad)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" style={{ filter: 'drop-shadow(0 0 6px rgba(0,240,255,0.5))' }} />
-                <circle cx="200" cy="10" fill="#00f0ff" r="5" stroke="white" strokeWidth="2" style={{ filter: 'drop-shadow(0 0 8px rgba(0,240,255,0.7))' }} />
+                <path d="M 0,50 C 20,45 40,55 60,40 S 100,20 120,30 S 160,40 180,20 L 200,10" fill="none" stroke="url(#neonLineGrad)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" style={{ filter: 'drop-shadow(0 0 6px rgba(148,197,253,0.5))' }} />
+                <circle cx="200" cy="10" fill="#94C5FD" r="5" stroke="white" strokeWidth="2" style={{ filter: 'drop-shadow(0 0 8px rgba(148,197,253,0.7))' }} />
               </svg>
             )}
           </div>
@@ -180,7 +180,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-5 border border-[var(--glass-border)] shadow-[0_0_16px_rgba(0,240,255,0.06)] flex items-center gap-3 md:gap-4 hover:shadow-[0_0_24px_rgba(0,240,255,0.12)] transition-shadow">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-5 border border-[var(--glass-border)] shadow-[0_0_16px_rgba(148,197,253,0.06)] flex items-center gap-3 md:gap-4 hover:shadow-[0_0_24px_rgba(148,197,253,0.12)] transition-shadow">
           <div className="w-12 h-12 rounded-full bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)] flex-shrink-0">
             <Icon icon="forum" size="xl" className="icon-fill" />
           </div>
@@ -189,7 +189,7 @@ export default function Dashboard() {
             <p className="text-2xl font-bold text-on-surface">{sessions.length}</p>
           </div>
         </div>
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-5 border border-[var(--glass-border)] shadow-[0_0_16px_rgba(0,240,255,0.06)] flex items-center gap-3 md:gap-4 hover:shadow-[0_0_24px_rgba(0,240,255,0.12)] transition-shadow">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-5 border border-[var(--glass-border)] shadow-[0_0_16px_rgba(148,197,253,0.06)] flex items-center gap-3 md:gap-4 hover:shadow-[0_0_24px_rgba(148,197,253,0.12)] transition-shadow">
           <div className="w-12 h-12 rounded-full bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)] flex-shrink-0">
             <Icon icon="vaccines" size="xl" className="icon-fill" />
           </div>
@@ -198,7 +198,7 @@ export default function Dashboard() {
             <p className="text-2xl font-bold text-on-surface">{medCount}</p>
           </div>
         </div>
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-5 border border-[var(--glass-border)] shadow-[0_0_16px_rgba(0,240,255,0.06)] flex items-center gap-3 md:gap-4 hover:shadow-[0_0_24px_rgba(0,240,255,0.12)] transition-shadow">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-5 border border-[var(--glass-border)] shadow-[0_0_16px_rgba(148,197,253,0.06)] flex items-center gap-3 md:gap-4 hover:shadow-[0_0_24px_rgba(148,197,253,0.12)] transition-shadow">
           <div className="w-12 h-12 rounded-full bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)] flex-shrink-0">
             <Icon icon="calendar_today" size="xl" className="icon-fill" />
           </div>
@@ -212,7 +212,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <h3 className="font-headline-md text-headline-md text-on-surface">Recent Sessions</h3>
         {sessions.length > 0 && (
-          <button onClick={() => navigate('/history')} className="text-[var(--neon-primary)] font-label-md flex items-center gap-1 hover:gap-2 transition-all hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">
+          <button onClick={() => navigate('/history')} className="text-[var(--neon-primary)] font-label-md flex items-center gap-1 hover:gap-2 transition-all hover:drop-shadow-[0_0_8px_rgba(148,197,253,0.4)]">
             See all activity{' '}
             <Icon icon="arrow_forward" size="sm" />
           </button>

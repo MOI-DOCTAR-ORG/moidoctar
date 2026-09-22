@@ -256,7 +256,7 @@ export default function Profile() {
         )}
 
         {/* Profile Header Card */}
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-4 md:p-8 shadow-[0_0_20px_rgba(0,240,255,0.08)]">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-4 md:p-8 shadow-[0_0_20px_rgba(148,197,253,0.08)]">
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
             {/* Photo */}
             <div className="relative group">
@@ -656,7 +656,7 @@ export default function Profile() {
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
-            className="flex-1 py-3 px-6 rounded-full bg-[var(--neon-primary)] text-white font-label-md text-label-md hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_16px_rgba(0,240,255,0.2)] min-h-[44px]"
+            className="flex-1 py-3 px-6 rounded-full bg-[var(--neon-primary)] text-white font-label-md text-label-md hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_16px_rgba(148,197,253,0.2)] min-h-[44px]"
           >
             <Icon icon={saving ? 'hourglass_top' : dirty ? 'save' : 'check_circle'} size="md" />
             {saving ? 'Saving...' : dirty ? 'Save Changes' : 'Saved'}
@@ -795,10 +795,10 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-[0_0_20px_rgba(0,240,255,0.08)] overflow-hidden">
+    <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-[0_0_20px_rgba(148,197,253,0.08)] overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-[rgba(0,240,255,0.04)] transition-colors text-left min-h-[44px]"
+        className="w-full flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-[rgba(148,197,253,0.04)] transition-colors text-left min-h-[44px]"
       >
         <Icon icon={icon} size="lg" className="text-[var(--neon-primary)]" />
         <h3 className="font-headline-md text-headline-md text-on-surface flex-1">{title}</h3>

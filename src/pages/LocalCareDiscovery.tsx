@@ -193,7 +193,7 @@ export default function LocalCareDiscovery() {
           return (
             <div
               key={facility.id}
-              className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] p-5 hover:border-[var(--neon-primary)]/20 transition-all hover:shadow-[0_0_20px_rgba(0,240,255,0.08)]"
+              className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] p-5 hover:border-[var(--neon-primary)]/20 transition-all hover:shadow-[0_0_20px_rgba(148,197,253,0.08)]"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">

@@ -97,14 +97,14 @@ export default function AppLayout() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-[rgba(0,240,255,0.04)] hover:text-[var(--neon-primary)]"
+                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-[rgba(148,197,253,0.04)] hover:text-[var(--neon-primary)]"
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               >
                 <Icon icon={isDark ? 'light_mode' : 'dark_mode'} size="lg" />
               </button>
               <Link
                 to="/notifications"
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-[rgba(0,240,255,0.04)] hover:text-[var(--neon-primary)]"
+                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-[rgba(148,197,253,0.04)] hover:text-[var(--neon-primary)]"
                 aria-label="Notifications"
               >
                 <Icon icon="notifications" size="lg" />

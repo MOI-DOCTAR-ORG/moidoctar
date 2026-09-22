@@ -33,7 +33,7 @@ export default function SessionCard({
   const navigate = useNavigate()
 
   return (
-    <div className={`bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-6 border border-l-4 border-[var(--glass-border)] ${severityBorderColors[severity]} hover:shadow-[0_0_24px_rgba(0,240,255,0.15)] transition-all group`}>
+    <div className={`bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-6 border border-l-4 border-[var(--glass-border)] ${severityBorderColors[severity]} hover:shadow-[0_0_24px_rgba(148,197,253,0.15)] transition-all group`}>
       <div className="flex justify-between items-start mb-6">
         <span
           className={`px-3 py-1 rounded-full font-label-md text-xs ${severityBadgeStyles[severity]}`}

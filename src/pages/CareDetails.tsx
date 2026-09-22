@@ -99,7 +99,7 @@ export default function CareDetails() {
       </div>
 
       {/* Symptom Report Form */}
-      <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl p-4 sm:p-6 md:p-8 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(0,240,255,0.08)] mb-gutter">
+      <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl p-4 sm:p-6 md:p-8 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(148,197,253,0.08)] mb-gutter">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-full bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)]">
             <Icon icon="edit_note" size="lg" />
@@ -136,7 +136,7 @@ export default function CareDetails() {
           </div>
         </div>
         <div className="flex justify-end">
-          <button onClick={submitReport} className="w-full sm:w-auto bg-[var(--neon-primary)] text-white px-8 py-3 rounded-full font-label-md hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-[0_0_16px_rgba(0,240,255,0.2)] min-h-[44px]">
+          <button onClick={submitReport} className="w-full sm:w-auto bg-[var(--neon-primary)] text-white px-8 py-3 rounded-full font-label-md hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-[0_0_16px_rgba(148,197,253,0.2)] min-h-[44px]">
             <Icon icon="clinical_notes" size="lg" />
             Submit Report
           </button>
@@ -157,7 +157,7 @@ export default function CareDetails() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
         <div className="lg:col-span-2 space-y-gutter">
-          <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl p-4 md:p-8 lifted-card transition-all duration-700 opacity-100 translate-y-0 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(0,240,255,0.08)]">
+          <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl p-4 md:p-8 lifted-card transition-all duration-700 opacity-100 translate-y-0 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(148,197,253,0.08)]">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-12 h-12 rounded-lg bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)]">
                 <Icon icon="psychology" size="xl" />
@@ -218,7 +218,7 @@ r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-
         </div>
 
         <div className="lg:col-span-1 flex flex-col gap-gutter">
-          <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl p-4 md:p-6 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(0,240,255,0.08)] h-full">
+          <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl p-4 md:p-6 border border-[var(--glass-border)] shadow-[0_0_20px_rgba(148,197,253,0.08)] h-full">
             <div className="flex items-center gap-3 mb-6">
               <Icon icon="assignment_turned_in" size="lg" className="text-[var(--neon-primary)]" />
               <h3 className="font-headline-md text-headline-md">Next Steps</h3>
@@ -260,7 +260,7 @@ r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-
             <p className="text-caption text-secondary">This analysis is AI-driven and for informational purposes only. In case of emergency, call local medical services immediately.</p>
           </div>
         </div>
-        <button onClick={() => navigate('/new-triage')} className="w-full md:w-auto px-10 py-4 bg-[var(--neon-primary)] text-white rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-all transform active:scale-95 shadow-[0_0_20px_rgba(0,240,255,0.25)] min-h-[44px]">
+        <button onClick={() => navigate('/new-triage')} className="w-full md:w-auto px-10 py-4 bg-[var(--neon-primary)] text-white rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-all transform active:scale-95 shadow-[0_0_20px_rgba(148,197,253,0.25)] min-h-[44px]">
           <Icon icon="add" size="md" />
           Start New Triage
         </button>

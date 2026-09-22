@@ -10,7 +10,7 @@ export default function LianaAvatar({ size = 'md' }: { size?: 'sm' | 'md' | 'lg'
         }}
       />
       <div
-        className="relative w-full h-full rounded-full flex items-center justify-center shadow-[0_0_16px_rgba(0,240,255,0.3)] ring-2 ring-[var(--neon-primary)]/50"
+        className="relative w-full h-full rounded-full flex items-center justify-center shadow-[0_0_16px_rgba(148,197,253,0.3)] ring-2 ring-[var(--neon-primary)]/50"
         style={{
           background: 'linear-gradient(135deg, #7C5CFC 0%, #5CA8FC 50%, #5CFCD6 100%)',
         }}

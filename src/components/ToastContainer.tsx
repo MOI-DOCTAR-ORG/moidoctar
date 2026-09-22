@@ -24,7 +24,7 @@ export default function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; 
     },
     info: {
       border: 'border-l-4 border-l-[var(--neon-primary)] border-t-[var(--glass-border)] border-r-[var(--glass-border)] border-b-[var(--glass-border)]',
-      glow: 'shadow-[0_0_20px_rgba(0,240,255,0.15)]',
+      glow: 'shadow-[0_0_20px_rgba(148,197,253,0.15)]',
       icon: 'info',
       iconColor: 'text-[var(--neon-primary)]',
     },

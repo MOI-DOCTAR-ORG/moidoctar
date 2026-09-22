@@ -75,8 +75,8 @@ export default function QuickActions() {
           onDrop={(e) => { e.preventDefault(); setIsDragging(false); fileInputRef.current?.click() }}
           className={`md:col-span-1 p-4 md:p-6 bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] flex flex-col items-center justify-center text-center cursor-pointer transition-all border ${
             isDragging
-              ? 'border-[var(--neon-primary)] shadow-[0_0_24px_rgba(0,240,255,0.25)]'
-              : 'border-[var(--glass-border)] hover:border-[var(--neon-primary)]/40 hover:shadow-[0_0_20px_rgba(0,240,255,0.12)]'
+              ? 'border-[var(--neon-primary)] shadow-[0_0_24px_rgba(148,197,253,0.25)]'
+              : 'border-[var(--glass-border)] hover:border-[var(--neon-primary)]/40 hover:shadow-[0_0_20px_rgba(148,197,253,0.12)]'
           }`}
         >
           <div className="w-10 h-10 md:w-12 md:h-12 bg-[var(--neon-primary)]/15 rounded-full flex items-center justify-center mb-2 md:mb-3 text-[var(--neon-primary)] transition-transform hover:scale-110">
@@ -87,7 +87,7 @@ export default function QuickActions() {
 
         <button
           onClick={() => navigate('/medication-tracker')}
-          className="md:col-span-1 p-4 md:p-6 bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] flex flex-col items-center justify-center text-center cursor-pointer transition-all border border-[var(--glass-border)] hover:border-[var(--neon-primary)]/40 hover:shadow-[0_0_20px_rgba(0,240,255,0.12)]"
+          className="md:col-span-1 p-4 md:p-6 bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] flex flex-col items-center justify-center text-center cursor-pointer transition-all border border-[var(--glass-border)] hover:border-[var(--neon-primary)]/40 hover:shadow-[0_0_20px_rgba(148,197,253,0.12)]"
         >
           <div className="w-10 h-10 md:w-12 md:h-12 bg-[var(--neon-primary)]/15 rounded-full flex items-center justify-center mb-2 md:mb-3 text-[var(--neon-primary)] transition-transform hover:scale-110">
             <Icon icon="pill" size="lg" />
@@ -100,7 +100,7 @@ export default function QuickActions() {
             setShowWearableMsg(true)
             setTimeout(() => setShowWearableMsg(false), 4000)
           }}
-          className="md:col-span-2 p-4 md:p-6 border-2 border-dashed border-[var(--glass-border)] rounded-[16px] flex items-center justify-center gap-3 md:gap-4 text-secondary bg-[var(--glass-bg)]/50 backdrop-blur-sm hover:border-[var(--neon-primary)]/40 hover:bg-[var(--neon-primary)]/5 hover:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all cursor-pointer"
+          className="md:col-span-2 p-4 md:p-6 border-2 border-dashed border-[var(--glass-border)] rounded-[16px] flex items-center justify-center gap-3 md:gap-4 text-secondary bg-[var(--glass-bg)]/50 backdrop-blur-sm hover:border-[var(--neon-primary)]/40 hover:bg-[var(--neon-primary)]/5 hover:shadow-[0_0_20px_rgba(148,197,253,0.1)] transition-all cursor-pointer"
         >
           <Icon icon="add_circle" size="lg" />
           <p className="font-body-md">Connect external wearable data (Apple Health, Fitbit)</p>
@@ -108,14 +108,14 @@ export default function QuickActions() {
       </div>
 
       {showWearableMsg && (
-        <div className="bg-[var(--neon-primary)]/10 border border-[var(--neon-primary)]/30 backdrop-blur-xl rounded-xl px-5 py-3 flex items-center gap-3 text-[var(--neon-primary)] shadow-[0_0_16px_rgba(0,240,255,0.1)]">
+        <div className="bg-[var(--neon-primary)]/10 border border-[var(--neon-primary)]/30 backdrop-blur-xl rounded-xl px-5 py-3 flex items-center gap-3 text-[var(--neon-primary)] shadow-[0_0_16px_rgba(148,197,253,0.1)]">
           <Icon icon="info" size="lg" />
           <p className="font-body-md text-sm">Wearable integration coming soon. Your health data can be imported manually via lab results uploads.</p>
         </div>
       )}
 
       {uploads.length > 0 && (
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-[16px] overflow-hidden shadow-[0_0_16px_rgba(0,240,255,0.06)]">
+        <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-[16px] overflow-hidden shadow-[0_0_16px_rgba(148,197,253,0.06)]">
           <button
             onClick={() => setShowUploads(!showUploads)}
             className="w-full flex items-center justify-between p-4 hover:bg-[var(--neon-primary)]/5 transition-colors"

@@ -5,7 +5,7 @@ export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <div className="rounded-2xl bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] p-3 shadow-[0_8px_32px_rgba(0,240,255,0.08)]">
+    <div className="rounded-2xl bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] p-3 shadow-[0_8px_32px_rgba(148,197,253,0.08)]">
       <button
         type="button"
         onClick={toggleTheme}
@@ -18,7 +18,7 @@ export default function ThemeToggle() {
             style={{
               background: theme === 'dark'
                 ? 'radial-gradient(circle, rgba(255,200,50,0.6) 0%, transparent 70%)'
-                : 'radial-gradient(circle, rgba(0,240,255,0.6) 0%, transparent 70%)',
+                : 'radial-gradient(circle, rgba(148,197,253,0.6) 0%, transparent 70%)',
             }}
           />
         </span>

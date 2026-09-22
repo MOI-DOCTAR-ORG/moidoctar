@@ -109,7 +109,7 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
           <button
             onClick={handleAccept}
             disabled={!acknowledged}
-            className="w-full min-h-14 rounded-2xl font-label-md text-label-md font-bold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white shadow-[0_0_24px_rgba(0,240,255,0.25)] hover:shadow-[0_0_32px_rgba(0,240,255,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+            className="w-full min-h-14 rounded-2xl font-label-md text-label-md font-bold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white shadow-[0_0_24px_rgba(148,197,253,0.25)] hover:shadow-[0_0_32px_rgba(148,197,253,0.35)] hover:-translate-y-0.5 active:translate-y-0"
           >
             <Icon icon="check_circle" size="md" />
             I Understand & Continue

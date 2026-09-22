@@ -29,9 +29,9 @@ export default function ReminderBanner() {
       {reminders.map((r, i) => (
         <div
           key={i}
-          className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] border-l-4 border-l-[var(--neon-accent)] rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 shadow-[0_0_20px_rgba(0,240,255,0.08)]"
+          className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] border-l-4 border-l-[var(--neon-accent)] rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 shadow-[0_0_20px_rgba(148,197,253,0.08)]"
         >
-          <Icon icon="priority_high" size="lg" className="text-[var(--neon-accent)] drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" />
+          <Icon icon="priority_high" size="lg" className="text-[var(--neon-accent)] drop-shadow-[0_0_6px_rgba(148,197,253,0.6)]" />
           <p className="font-body-md flex-1">
             <strong>Reminder:</strong> {r.text}
             {r.date && <span className="text-sm ml-2 opacity-70">({r.date})</span>}
@@ -51,10 +51,10 @@ export default function ReminderBanner() {
               </button>
             </>
           ) : (
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-3 shadow-[0_0_16px_rgba(0,240,255,0.06)]">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-3 shadow-[0_0_16px_rgba(148,197,253,0.06)]">
               <PremiumInput compact containerClassName="flex-1 min-w-0" placeholder="e.g. Drink more water" value={reminderText} onChange={e => setReminderText(e.target.value)} />
               <PremiumDateInput compact containerClassName="min-w-0 sm:min-w-[170px]" value={reminderDate} onChange={e => setReminderDate(e.target.value)} />
-              <button onClick={addReminder} className="bg-[var(--neon-primary)] text-[#050816] px-5 py-2 rounded-lg font-label-md hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all min-h-[44px]">Save</button>
+              <button onClick={addReminder} className="bg-[var(--neon-primary)] text-[#050816] px-5 py-2 rounded-lg font-label-md hover:shadow-[0_0_20px_rgba(148,197,253,0.4)] transition-all min-h-[44px]">Save</button>
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-secondary font-label-md hover:text-[var(--neon-primary)] min-h-[44px]">Cancel</button>
             </div>
           )}

@@ -111,14 +111,14 @@ export default function MedicationTracker() {
             <h2 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface tracking-tight">Medication Tracker</h2>
             <p className="font-body-md text-body-md text-secondary mt-1">Manage your prescriptions and daily schedule.</p>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="bg-[var(--neon-primary)] text-white hover:opacity-90 font-label-md text-label-md py-3 px-6 rounded-full flex items-center justify-center gap-2 transition-colors shadow-[0_0_16px_rgba(0,240,255,0.2)] self-start md:self-auto min-h-[44px]">
+          <button onClick={() => setShowForm(!showForm)} className="bg-[var(--neon-primary)] text-white hover:opacity-90 font-label-md text-label-md py-3 px-6 rounded-full flex items-center justify-center gap-2 transition-colors shadow-[0_0_16px_rgba(148,197,253,0.2)] self-start md:self-auto min-h-[44px]">
             <Icon icon={showForm ? 'close' : 'add'} size="md" />
             {showForm ? 'Cancel' : 'Add Medication'}
           </button>
         </div>
 
         {showForm && (
-          <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-6 shadow-[0_0_20px_rgba(0,240,255,0.08)] mb-6">
+          <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-6 shadow-[0_0_20px_rgba(148,197,253,0.08)] mb-6">
             <h3 className="font-headline-md text-headline-md text-on-surface mb-4">New Medication</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <div className="flex flex-col gap-1">
@@ -163,7 +163,7 @@ export default function MedicationTracker() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
             {/* Today's Schedule */}
             <div className="lg:col-span-4 flex flex-col gap-gutter">
-              <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-4 md:p-6 shadow-[0_0_20px_rgba(0,240,255,0.08)] flex flex-col h-full">
+              <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-4 md:p-6 shadow-[0_0_20px_rgba(148,197,253,0.08)] flex flex-col h-full">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-headline-md text-headline-md text-on-surface">Today's Schedule</h3>
                   <span className="bg-[var(--glass-bg)] text-on-surface font-label-md text-label-md px-3 py-1 rounded-full text-xs border border-[var(--glass-border)]">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
@@ -181,7 +181,7 @@ export default function MedicationTracker() {
                         </h4>
                         <div className="flex flex-col gap-3">
                           {items.map(item => (
-                            <label key={item.id} onClick={() => toggleTaken(item.id)} className="flex items-start gap-3 p-3 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[rgba(0,240,255,0.04)] transition-colors cursor-pointer group">
+                            <label key={item.id} onClick={() => toggleTaken(item.id)} className="flex items-start gap-3 p-3 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[rgba(148,197,253,0.04)] transition-colors cursor-pointer group">
                               <div className="pt-0.5">
                                 <input type="checkbox" checked={!!taken[item.id]} onChange={() => {}} className="w-5 h-5 rounded border-outline text-green-500 focus:ring-[var(--neon-primary)] transition-colors" />
                               </div>
@@ -205,7 +205,7 @@ export default function MedicationTracker() {
                 <h3 className="font-headline-md text-headline-md text-on-surface">Active Prescriptions</h3>
               </div>
               {active.length === 0 ? (
-                <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-12 shadow-[0_0_20px_rgba(0,240,255,0.08)] flex flex-col items-center justify-center text-center">
+                <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-12 shadow-[0_0_20px_rgba(148,197,253,0.08)] flex flex-col items-center justify-center text-center">
                   <Icon icon="medication" size="2xl" className="text-[var(--glass-border)] mb-4" />
                   <p className="font-body-md text-secondary">No active prescriptions yet.</p>
                   <p className="font-caption text-caption text-[var(--glass-border)] mt-1">Add medications to track your prescriptions and refill schedule.</p>
@@ -216,7 +216,7 @@ export default function MedicationTracker() {
                     const supplyNum = parseInt(med.supply) || 0
                     const cfg = freqConfig[med.frequent]
                     return (
-                      <div key={med.id} className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-4 md:p-6 shadow-[0_0_20px_rgba(0,240,255,0.08)] flex flex-col hover:border-[var(--neon-primary)]/50 transition-colors group relative overflow-hidden">
+                      <div key={med.id} className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-4 md:p-6 shadow-[0_0_20px_rgba(148,197,253,0.08)] flex flex-col hover:border-[var(--neon-primary)]/50 transition-colors group relative overflow-hidden">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full bg-[var(--glass-bg)] flex items-center justify-center text-[var(--neon-primary)] group-hover:bg-[var(--neon-primary)] group-hover:text-white transition-colors border border-[var(--glass-border)]">

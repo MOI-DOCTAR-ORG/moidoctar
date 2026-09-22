@@ -6,7 +6,7 @@ export default function NotFound() {
     <div className="min-h-screen flex items-center justify-center bg-surface p-4">
       <div className="text-center max-w-md w-full bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] p-8 md:p-12">
         <div className="relative inline-block mb-6">
-          <h1 className="font-bold text-[80px] sm:text-[100px] md:text-[120px] leading-none text-[var(--neon-primary)]" style={{ textShadow: '0 0 40px rgba(0,240,255,0.3), 0 0 80px rgba(0,240,255,0.15)' }}>
+          <h1 className="font-bold text-[80px] sm:text-[100px] md:text-[120px] leading-none text-[var(--neon-primary)]" style={{ textShadow: '0 0 40px rgba(148,197,253,0.3), 0 0 80px rgba(148,197,253,0.15)' }}>
             404
           </h1>
           <div className="absolute inset-0 bg-[var(--neon-primary)]/5 blur-3xl rounded-full" />
