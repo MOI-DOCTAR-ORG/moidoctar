@@ -1,0 +1,23 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+
+# Package manager lock files
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+pnpm-lock.yaml
+bun.lock
+bun.lockb
+# Python
+backend/.venv
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.db
+backend/.env
