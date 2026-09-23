@@ -2,7 +2,7 @@ import { useLocation, Link } from 'react-router-dom'
 import Icon from './Icon'
 
 const navItems = [
-  { label: 'Home', icon: 'dashboard', to: '/' },
+  { label: 'Home', icon: 'dashboard', to: '/dashboard' },
   { label: 'Triage', icon: 'medical_services', to: '/new-triage' },
   { label: 'Care', icon: 'local_hospital', to: '/local-care' },
   { label: 'History', icon: 'history', to: '/history' },
@@ -12,7 +12,7 @@ const navItems = [
 export default function MobileBottomNav() {
   const { pathname } = useLocation()
 
-  const isActive = (to: string) => to === '/' ? pathname === '/' : pathname.startsWith(to)
+  const isActive = (to: string) => to === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(to)
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden safe-area-bottom">

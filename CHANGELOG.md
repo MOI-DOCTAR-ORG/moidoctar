@@ -1,4 +1,66 @@
-# CHANGELOG — Engineering Polish Pass (Phase 1)
+# CHANGELOG — Engineering Polish Pass (Phase 2)
+
+Phase 2 fixed Google Sign-In end-to-end and added a public landing page with
+brand-accurate colors. See `BUG_FIXES.md` for root-cause detail.
+
+## Google Sign-In — fixed
+
+- **Backend (`backend/app/services/auth_service.py`):** `authenticate_google`
+  previously ignored the token entirely and always logged everyone in as the
+  same hardcoded `google.user@moidoctar.com` account. It now verifies the
+  Google ID token against Google's `tokeninfo` endpoint, checks the audience
+  matches `GOOGLE_CLIENT_ID`, and signs in the real user by their verified
+  email (creating the account on first sign-in). Invalid/expired/forged
+  tokens now correctly return `401` instead of a fake login or a crash.
+- **Config:** added `GOOGLE_CLIENT_ID` to `backend/app/core/config.py` and
+  `backend/.env.example`.
+- **Frontend:** added a root `.env.example` with `VITE_GOOGLE_CLIENT_ID` (this
+  didn't exist before, so the Google button was always initializing with no
+  client id). `GoogleOAuthProvider` no longer crashes when the variable is
+  unset, and the "Continue with Google" button (SignIn + SignUp) now only
+  renders when a real client id is configured, so email/password sign-in is
+  unaffected either way. Added `GOOGLE_AUTH_ENABLED` in
+  `src/lib/constants.ts` to drive this.
+- **You still need to:** create an OAuth Client ID in Google Cloud Console and
+  set the same value as `VITE_GOOGLE_CLIENT_ID` (frontend `.env`) and
+  `GOOGLE_CLIENT_ID` (backend `.env`).
+
+## Landing page
+
+- Added `src/pages/Landing.tsx`: hero, feature grid (triage, nearby care,
+  symptom tracking, medications), trust strip, CTA, footer disclaimer.
+  Auto-redirects signed-in visitors straight to `/dashboard`.
+- Rewired routing: `/` is now the public landing page; the existing
+  Dashboard moved to `/dashboard`. Updated every internal reference that
+  assumed `/` was the dashboard: `AuthLayout`'s post-login redirect,
+  `Sidebar.tsx` (nav link + logo link + active-route check),
+  `MobileBottomNav.tsx` (same), `AppLayout.tsx`'s page-title logic, and the
+  "Dashboard" breadcrumb in `LocalCareDiscovery.tsx`.
+
+## Colors
+
+- Checked the existing Tailwind/CSS color tokens (`src/index.css`) against
+  `public/moidoctar-logo.svg`: they already matched almost exactly
+  (`#2663EB` primary, `#94C5FD` light accent, `#1F3A8A` dark navy), so no
+  token changes were needed. The new Landing page uses these same tokens and
+  the exact logo gradient for its hero/CTA accents, so it's visually
+  consistent with the rest of the app.
+
+## Verified working end-to-end (this pass)
+
+- Google auth: invalid/garbage tokens correctly return `401` (tested via
+  FastAPI TestClient); a real token would now resolve to the real Google
+  account instead of a shared demo user.
+- Full auth + triage flow re-verified after the routing changes (login →
+  protected route → triage) still returns `200` with real assessment data.
+- Frontend type-checks (`tsc -b`) and production-builds (`vite build`)
+  cleanly with the new page and routing changes.
+
+---
+
+See `CHANGELOG` history below for Phase 1 (auth enforcement + AI wiring).
+
+## Phase 1 — Auth enforcement + AI wiring
 
 This pass focused on the highest-severity issues: broken authentication and the
 missing AI integration, plus the bugs that surfaced while verifying those fixes

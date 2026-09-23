@@ -2,7 +2,7 @@ import { useLocation, Link } from 'react-router-dom'
 import Icon from './Icon'
 
 const primaryNav = [
-  { label: 'Dashboard', icon: 'dashboard', to: '/' },
+  { label: 'Dashboard', icon: 'dashboard', to: '/dashboard' },
   { label: 'New Triage', icon: 'medical_services', to: '/new-triage' },
   { label: 'History', icon: 'history', to: '/history' },
   { label: 'Care Details', icon: 'local_hospital', to: '/care-details' },
@@ -28,14 +28,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     onClose()
   }
 
-  const isActiveRoute = (to: string) => to === '/' ? pathname === '/' : pathname.startsWith(to)
+  const isActiveRoute = (to: string) => to === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(to)
 
   const sidebarContent = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="relative px-3 pb-3">
         <div className="flex items-center justify-between">
           <Link
-            to="/"
+            to="/dashboard"
             onClick={handleNav}
             className="flex h-11 items-center gap-2.5 rounded-xl px-2 transition-all duration-300 hover:bg-[rgba(148,197,253,0.04)] group"
           >
