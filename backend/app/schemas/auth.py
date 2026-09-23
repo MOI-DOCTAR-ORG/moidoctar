@@ -15,6 +15,11 @@ class GoogleAuthRequest(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     verificationCode: str
+    email: Optional[str] = None
+
+
+class ResendVerificationRequest(BaseModel):
+    email: Optional[str] = None
 
 
 class RequestPasswordResetRequest(BaseModel):

@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # Server Port
     PORT: int = 3000
 
+    # Resend Email Service (recommended for OTP & transactional emails).
+    # Get your API key from https://resend.com/api-keys
+    RESEND_API_KEY: str = ""
+    RESEND_FROM: str = "MoiDoctar <onboarding@resend.dev>"
+
     # SMTP (outbound email for OTP verification codes / password-reset
     # codes). If SMTP_HOST is left blank, OTP codes are logged to the
     # server console instead of emailed, so signup/verify/reset still work

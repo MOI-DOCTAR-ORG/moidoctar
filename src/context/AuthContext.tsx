@@ -61,8 +61,8 @@ type AuthContextValue = AuthState & {
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>
   signUp: (fullName: string, email: string, password: string) => Promise<SignUpResult>
   signInWithGoogle: (accessToken: string) => Promise<LoginResult>
-  verifyEmail: (code: string) => Promise<boolean>
-  resendVerificationCode: () => Promise<void>
+  verifyEmail: (code: string, email?: string) => Promise<boolean>
+  resendVerificationCode: (email?: string) => Promise<void>
   signOut: () => Promise<void>
   sessions: TriageSession[]
   addSession: (session: TriageSession) => void
@@ -197,9 +197,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const verifyEmail = useCallback(async (code: string): Promise<boolean> => {
+  const verifyEmail = useCallback(async (code: string, email?: string): Promise<boolean> => {
     try {
-      const res = await api.post<VerifyResponse>('/auth/verify', { verificationCode: code })
+      const res = await api.post<VerifyResponse>('/auth/verify', {
+        verificationCode: code,
+        email: email && email !== 'your email' ? email.toLowerCase().trim() : undefined,
+      })
       if (res.authorization && res.refreshToken) {
         setTokens(res.authorization, res.refreshToken)
       }
@@ -212,9 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { return false }
   }, [])
 
-  const resendVerificationCode = useCallback(async () => {
+  const resendVerificationCode = useCallback(async (email?: string) => {
     try {
-      await api.post('/auth/resendVerification', undefined)
+      await api.post('/auth/resendVerification', email && email !== 'your email' ? { email: email.toLowerCase().trim() } : undefined)
     } catch { /* silent — toast is shown by the caller */ }
   }, [])
 

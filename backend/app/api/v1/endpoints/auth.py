@@ -1,9 +1,10 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.schemas.auth import (
     ManualAuthRequest,
     GoogleAuthRequest,
     VerifyEmailRequest,
+    ResendVerificationRequest,
     RequestPasswordResetRequest,
     TokenResponse,
 )
@@ -18,7 +19,7 @@ from app.services.auth_service import (
 from app.services.otp_service import generate_and_store_otp, verify_otp
 from app.core.email import send_otp_email
 from app.core.security import create_access_token
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_optional_current_user
 
 router = APIRouter()
 
@@ -104,21 +105,58 @@ def google_authentication(req: GoogleAuthRequest):
 
 
 @router.post("/verify", response_model=TokenResponse)
-def verify_email(req: VerifyEmailRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
-    email = current_user["email"]
+def verify_email(
+    req: VerifyEmailRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_current_user),
+):
+    email = (req.email or "").strip().lower() if req.email else None
+    user_id = None
+    if current_user:
+        email = current_user.get("email") or email
+        user_id = current_user.get("_id")
+    elif email:
+        user = get_user_by_email(email)
+        if user:
+            user_id = user.get("_id")
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"err": "not_authenticated", "msg": "Session expired or email missing. Please sign in again."},
+        )
+
     if not verify_otp(email, "verify_email", req.verificationCode):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"err": "invalid_code", "msg": "Invalid or expired code. Please try again."},
         )
-    mark_user_verified(current_user["_id"])
-    token = create_access_token({"sub": current_user["_id"], "email": email})
+
+    if user_id:
+        mark_user_verified(user_id)
+        token = create_access_token({"sub": user_id, "email": email})
+    else:
+        token = create_access_token({"sub": "verified", "email": email})
+
     return TokenResponse(msg="Email verified successfully", authorization=token, refreshToken=token)
 
 
 @router.post("/resendVerification")
-def resend_verification(current_user: Dict[str, Any] = Depends(get_current_user)):
-    email = current_user["email"]
+def resend_verification(
+    req: Optional[ResendVerificationRequest] = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_current_user),
+):
+    email = None
+    if current_user and current_user.get("email"):
+        email = current_user["email"]
+    elif req and req.email:
+        email = req.email.strip().lower()
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"err": "missing_email", "msg": "Please provide your email address or sign in to resend code."},
+        )
+
     code = generate_and_store_otp(email, "verify_email")
     send_otp_email(email, code, "verify_email")
     return {"msg": "Verification code resent"}
