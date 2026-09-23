@@ -61,8 +61,8 @@ type AuthContextValue = AuthState & {
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>
   signUp: (fullName: string, email: string, password: string) => Promise<SignUpResult>
   signInWithGoogle: (accessToken: string) => Promise<LoginResult>
-  verifyEmail: (code: string) => Promise<boolean>
-  resendVerificationCode: () => Promise<void>
+  verifyEmail: (code: string, email?: string) => Promise<boolean>
+  resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string } | void>
   signOut: () => Promise<void>
   sessions: TriageSession[]
   addSession: (session: TriageSession) => void
@@ -152,13 +152,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserChangeKey(k => k + 1)
       return { success: true }
     } catch (err) {
-      const e = err as { err?: string; authorization?: string }
+      const e = err as { err?: string; authorization?: string; dev_code?: string; msg?: string }
       if (e?.err === 'account_not_verified' && e.authorization) {
         // Store the temp token so the verify page can call /auth/verify
         setTokens(e.authorization, '')
+        if (e.dev_code) {
+          console.log(
+            `%c[MoiDoctar Dev OTP] 🔑 Verification Code for ${email}: ${e.dev_code}`,
+            'background: #1e3a8a; color: #93c5fd; font-size: 15px; font-weight: bold; padding: 6px 12px; border-radius: 8px;'
+          )
+        }
         return {
           success: false,
-          error: 'Your email is not verified. We\'ve sent a fresh code — check your inbox.',
+          error: e.dev_code
+            ? `Your email is not verified. (Dev Code: ${e.dev_code})`
+            : 'Your email is not verified. We\'ve sent a fresh code — check your inbox.',
           needsVerification: true,
           pendingEmail: email.toLowerCase().trim(),
         }
@@ -197,9 +205,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const verifyEmail = useCallback(async (code: string): Promise<boolean> => {
+  const verifyEmail = useCallback(async (code: string, email?: string): Promise<boolean> => {
     try {
-      const res = await api.post<VerifyResponse>('/auth/verify', { verificationCode: code })
+      const res = await api.post<VerifyResponse>('/auth/verify', {
+        verificationCode: code,
+        email: email && email !== 'your email' ? email.toLowerCase().trim() : undefined,
+      })
       if (res.authorization && res.refreshToken) {
         setTokens(res.authorization, res.refreshToken)
       }
@@ -212,9 +223,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { return false }
   }, [])
 
-  const resendVerificationCode = useCallback(async () => {
+  const resendVerificationCode = useCallback(async (email?: string) => {
     try {
-      await api.post('/auth/resendVerification', undefined)
+      const res = await api.post<{ msg?: string; dev_code?: string }>(
+        '/auth/resendVerification',
+        email && email !== 'your email' ? { email: email.toLowerCase().trim() } : undefined
+      )
+      if (res?.dev_code) {
+        console.log(
+          `%c[MoiDoctar Dev OTP] 🔑 Verification Code: ${res.dev_code}`,
+          'background: #1e3a8a; color: #93c5fd; font-size: 15px; font-weight: bold; padding: 6px 12px; border-radius: 8px;'
+        )
+      }
+      return res
     } catch { /* silent — toast is shown by the caller */ }
   }, [])
 

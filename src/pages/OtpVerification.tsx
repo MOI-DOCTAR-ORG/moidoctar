@@ -91,20 +91,19 @@ export default function OtpVerification() {
 
   const handleResend = useCallback(async () => {
     if (isResending) return
-    if (!getAccessToken()) {
-      addToast('Session expired. Please sign in again.', 'error')
-      navigate('/sign-in', { replace: true })
-      return
-    }
     setIsResending(true)
     setOtp(Array(6).fill(''))
     setIsError(false)
     setErrorMsg('')
-    await resendVerificationCode()
+    const res = await resendVerificationCode(email !== 'your email' ? email : undefined)
     setIsResending(false)
-    addToast('A new code has been sent to your email.', 'success')
+    if (res?.dev_code) {
+      addToast(`Verification code: ${res.dev_code}`, 'info')
+    } else {
+      addToast('A new code has been sent to your email.', 'success')
+    }
     setTimeout(() => focusInput(0), 50)
-  }, [isResending, resendVerificationCode, addToast, navigate, focusInput])
+  }, [isResending, resendVerificationCode, addToast, email, focusInput])
 
   const handleVerify = async () => {
     const code = otp.join('')
@@ -115,7 +114,7 @@ export default function OtpVerification() {
     }
 
     setIsVerifying(true)
-    const ok = await verifyEmail(code)
+    const ok = await verifyEmail(code, email !== 'your email' ? email : undefined)
     if (ok) {
       navigate('/', { replace: true })
     } else {
