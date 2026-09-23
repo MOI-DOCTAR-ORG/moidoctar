@@ -320,17 +320,20 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     return _local_users.get(email_clean)
 
 
-def mark_user_verified(user_id: str) -> None:
+def mark_user_verified(user_id: Optional[str] = None, email: Optional[str] = None) -> None:
     supabase = get_supabase_client()
     if supabase:
         try:
-            supabase.table("users").update({"is_verified": True}).eq("id", user_id).execute()
+            if user_id:
+                supabase.table("users").update({"is_verified": True}).eq("id", str(user_id)).execute()
+            if email:
+                supabase.table("users").update({"is_verified": True}).eq("email", email.strip().lower()).execute()
             return
         except Exception as e:
             logger.error(f"Supabase mark_user_verified error: {e}. Falling back to local store.")
 
     for u in _local_users.values():
-        if str(u.get("id")) == str(user_id):
+        if (user_id and str(u.get("id")) == str(user_id)) or (email and u.get("email") == email.strip().lower()):
             u["is_verified"] = True
             return
 

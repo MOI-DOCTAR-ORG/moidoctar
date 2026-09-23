@@ -116,11 +116,11 @@ def verify_email(
     user_id = None
     if current_user:
         email = current_user.get("email") or email
-        user_id = current_user.get("_id")
+        user_id = current_user.get("_id") or current_user.get("id")
     elif email:
         user = get_user_by_email(email)
         if user:
-            user_id = user.get("_id")
+            user_id = user.get("id") or user.get("_id")
 
     if not email:
         raise HTTPException(
@@ -134,11 +134,9 @@ def verify_email(
             detail={"err": "invalid_code", "msg": "Invalid or expired code. Please try again."},
         )
 
-    if user_id:
-        mark_user_verified(user_id)
-        token = create_access_token({"sub": user_id, "email": email})
-    else:
-        token = create_access_token({"sub": "verified", "email": email})
+    mark_user_verified(user_id=user_id, email=email)
+    sub_id = user_id or "verified"
+    token = create_access_token({"sub": str(sub_id), "email": email})
 
     return TokenResponse(msg="Email verified successfully", authorization=token, refreshToken=token)
 
