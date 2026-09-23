@@ -35,6 +35,13 @@ def get_notifications(current_user: Dict[str, Any] = Depends(get_current_user)):
 
 @router.post("/forgotPassword")
 def forgot_password(req: ForgotPasswordRequest):
+    from app.services.auth_service import reset_user_password
+    success = reset_user_password(req.email, req.newPassword)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"err": "user_not_found", "msg": "No account found with that email address."}
+        )
     return {"msg": "Password reset successfully"}
 
 
