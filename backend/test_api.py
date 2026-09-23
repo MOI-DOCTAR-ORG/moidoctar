@@ -42,16 +42,18 @@ def test_auth_and_user_flow():
     assert res_update.status_code == 200
     assert res_update.json()["data"]["userName"] == "Alex Morgan Updated"
     print("[PASS] /api/v1/user/updateProfile passed")
+    return headers
 
 
-def test_medications():
-    res = client.get("/api/v1/medication")
+def test_medications(headers):
+    res = client.get("/api/v1/medication", headers=headers)
     assert res.status_code == 200
     assert "data" in res.json()
     print("[PASS] GET /api/v1/medication passed")
 
     res_add = client.post(
         "/api/v1/medication/create",
+        headers=headers,
         json={"name": "Amoxicillin", "dosage": "500mg", "time": "09:00 AM", "frequent": "morning", "supply": "20"},
     )
     assert res_add.status_code == 200
@@ -60,10 +62,11 @@ def test_medications():
     print("[PASS] POST /api/v1/medication/create passed")
 
 
-def test_triage():
+def test_triage(headers):
     # Form data for /api/v1/triage/chat
     res = client.post(
         "/api/v1/triage/chat",
+        headers=headers,
         data={"symptoms": "Severe chest pain and shortness of breath", "messages": "[]"},
     )
     assert res.status_code == 200
@@ -83,7 +86,7 @@ def test_triage():
 if __name__ == "__main__":
     print("\nRunning backend test suite...")
     test_health()
-    test_auth_and_user_flow()
-    test_medications()
-    test_triage()
+    auth_headers = test_auth_and_user_flow()
+    test_medications(auth_headers)
+    test_triage(auth_headers)
     print("\nALL BACKEND ENDPOINT TESTS PASSED SUCCESSFULLY!\n")
