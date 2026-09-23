@@ -96,14 +96,15 @@ function seedLocalStorage(user: BackendUser) {
 }
 
 function mapApiError(err: unknown): string {
-  const e = err as { err?: string; status?: number }
-  switch (e?.err) {
+  const e = err as { err?: string; status?: number; msg?: string; detail?: { err?: string; msg?: string } }
+  const code = e?.err || e?.detail?.err
+  switch (code) {
     case 'account_exist': return 'This email is already registered. Log in instead?'
-    case 'invalid_account': return 'Incorrect email or password'
+    case 'invalid_account': return 'Incorrect email or password. If you do not have an account yet, please sign up first.'
     case 'invalid_google_token': return 'Google sign-in failed. Please try again or use email login.'
     case 'account_restricted': return 'Your account has been restricted. Contact support.'
     case 'account_not_verified': return 'Please verify your email before signing in.'
-    default: return 'Something went wrong. Please try again.'
+    default: return e?.msg || e?.detail?.msg || 'Something went wrong. Please try again.'
   }
 }
 
