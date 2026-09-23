@@ -46,6 +46,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-triage" element={<NewTriage />} />
+        <Route path="/new_triage" element={<NewTriage />} />
         <Route path="/history" element={<History />} />
         <Route path="/care-details" element={<CareDetails />} />
         <Route path="/local-care" element={<LocalCareDiscovery />} />

@@ -135,6 +135,44 @@ def _rule_based_assessment(symptoms: str) -> Dict[str, Any]:
     }
 
 
+def _is_greeting_or_chitchat(text: str) -> bool:
+    clean = re.sub(r"[^\w\s]", "", text.strip().lower())
+    words = clean.split()
+    greetings = {
+        "hi", "hello", "hey", "hui", "heyy", "hiya", "howdy", "sup", "yo",
+        "morning", "good morning", "good afternoon", "good evening", "greetings",
+        "who are you", "what can you do", "help", "test", "ok", "okay", "thanks", "thank you"
+    }
+    if clean in greetings:
+        return True
+    if len(words) <= 3 and any(w in greetings for w in words):
+        symptom_triggers = ["pain", "hurt", "ache", "fever", "cough", "sick", "bleed", "dizzy", "nausea", "vomit", "rash", "breath"]
+        if not any(st in clean for st in symptom_triggers):
+            return True
+    return False
+
+
+def _rule_based_chat_greeting() -> Dict[str, Any]:
+    return {
+        "assessment_id": "tri_" + uuid.uuid4().hex[:10],
+        "reply": "Hello there! I'm LIANA, your personal health assistant here at MoiDoctar. How are you feeling today? Please feel free to share any symptoms, discomfort, or health questions you have.",
+        "has_symptoms": False,
+        "is_conversational": True,
+        "needs_more_info": False,
+        "urgency_level": "Stable",
+        "confidence_score": 0.99,
+        "rationale": "Patient initiated a friendly greeting.",
+        "possible_conditions": [],
+        "recommended_actions": [],
+        "follow_up_questions": [
+            "How are you feeling today?",
+            "Are you experiencing any physical discomfort or symptoms?"
+        ],
+        "red_flags_to_watch": [],
+        "disclaimer": "MoiDoctar provides triage guidance, not a medical diagnosis."
+    }
+
+
 _TRIAGE_PROMPT_TEMPLATE = """You are the AI symptom-assessment layer inside MoiDoctar, a health triage app.
 A user has described their symptoms in free text below. Produce a structured triage assessment.
 
@@ -155,6 +193,34 @@ medication name, or dosage. Be conservative: if in doubt, prefer the higher urge
 
 User-reported symptoms:
 \"\"\"{symptoms}\"\"\"
+"""
+
+
+_CHAT_PROMPT_TEMPLATE = """You are LIANA, an empathetic, caring, and clinically knowledgeable personal health assistant inside MoiDoctar.
+The user is speaking with you in a chat interface. They may greet you, chat casually, ask questions, or describe health symptoms and medical complaints.
+
+Your goals:
+1. Determine if the user is just greeting/chitchatting/asking general questions, or if they are describing actual physical or mental health symptoms, pain, or illness.
+2. In "reply": Write a direct, warm, natural conversational reply to the user as LIANA.
+   - If the user greets you or says something like "hi", "hello", "hui", "hey", "how are you": Greet them warmly, ask how they are feeling today, and invite them to share if they have any symptoms or health questions on their mind.
+   - If the user asks general questions: Give a helpful, friendly explanation.
+   - If the user describes symptoms: Respond empathetically, provide supportive guidance, and ask 1-2 clarifying questions.
+3. In "has_symptoms": Set to true ONLY if the user has actually described physical/mental symptoms, bodily pain, or medical concerns. Set to false for greetings, typos of greetings, chitchat, or general inquiries without symptom details.
+
+Respond with ONLY a single JSON object (no markdown fences) with these keys:
+- "reply": string (your direct conversational message to the user)
+- "has_symptoms": boolean
+- "urgency_level": one of "Stable", "Moderate", "Urgent" (use "Stable" if no symptoms)
+- "confidence_score": number between 0 and 1
+- "needs_more_info": boolean
+- "rationale": string (brief clinical explanation if symptoms present, else empty or brief note)
+- "possible_conditions": array of 2-4 strings (empty array [] if has_symptoms is false)
+- "recommended_actions": array of 2-4 strings (empty array [] if has_symptoms is false)
+- "follow_up_questions": array of 1-3 strings
+- "red_flags_to_watch": array of strings (empty array [] if has_symptoms is false)
+
+Conversation history / user message:
+\"\"\"{conversation}\"\"\"
 """
 
 
@@ -251,6 +317,149 @@ def _call_gemini_triage(symptoms: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _call_gemini_triage_chat(conversation: str) -> Optional[Dict[str, Any]]:
+    """Ask Gemini for conversational interaction and triage analysis."""
+    api_key = (settings.GOOGLE_API_KEY or os.environ.get("GOOGLE_API_KEY", "")).strip()
+    if not api_key:
+        logger.info("GOOGLE_API_KEY not set; using rule-based triage only.")
+        return None
+
+    configured_model = (settings.GEMINI_MODEL or os.environ.get("GEMINI_MODEL", "")).strip()
+    candidate_models: List[str] = []
+    if configured_model:
+        candidate_models.append(configured_model)
+    for fm in _FALLBACK_MODELS:
+        if fm not in candidate_models:
+            candidate_models.append(fm)
+
+    prompt = _CHAT_PROMPT_TEMPLATE.format(conversation=conversation[:5000])
+    contents = [{"role": "user", "parts": [{"text": prompt}]}]
+    body_bytes = json.dumps({
+        "contents": contents,
+        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
+    }).encode("utf-8")
+
+    for model_name in candidate_models:
+        for attempt in range(2):
+            try:
+                request = urllib.request.Request(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent",
+                    data=body_bytes,
+                    headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=12) as response:
+                    payload = json.load(response)
+
+                candidates = payload.get("candidates") or []
+                if not candidates:
+                    break
+                parts = ((candidates[0].get("content") or {}).get("parts")) or []
+                text = "".join(p.get("text", "") for p in parts).strip()
+                if not text:
+                    break
+
+                match = re.search(r"\{.*\}", text, re.DOTALL)
+                if not match:
+                    break
+                data = json.loads(match.group(0))
+
+                # Normalize response keys
+                data["has_symptoms"] = bool(data.get("has_symptoms", False))
+                data["is_conversational"] = not data["has_symptoms"]
+                if not data.get("reply"):
+                    data["reply"] = data.get("rationale") or "Hello! I'm LIANA, your personal health assistant. How are you feeling today?"
+                if "urgency_level" not in data or data["urgency_level"] not in _URGENCY_RANK:
+                    data["urgency_level"] = "Stable"
+                if "possible_conditions" not in data or not isinstance(data["possible_conditions"], list):
+                    data["possible_conditions"] = []
+                if "recommended_actions" not in data or not isinstance(data["recommended_actions"], list):
+                    data["recommended_actions"] = []
+                if "follow_up_questions" not in data or not isinstance(data["follow_up_questions"], list):
+                    data["follow_up_questions"] = []
+                if "red_flags_to_watch" not in data or not isinstance(data["red_flags_to_watch"], list):
+                    data["red_flags_to_watch"] = []
+
+                logger.info(f"Gemini chat response generated using {model_name} (has_symptoms={data['has_symptoms']})")
+                return data
+
+            except urllib.error.HTTPError as exc:
+                if exc.code in (503, 429) and attempt == 0:
+                    time.sleep(0.5)
+                    continue
+                logger.warning(f"Gemini chat model {model_name} HTTP {exc.code}, trying fallback model...")
+                break
+            except Exception as exc:
+                if attempt == 0:
+                    time.sleep(0.5)
+                    continue
+                logger.warning(f"Gemini chat model {model_name} failed: {exc}, trying fallback model...")
+                break
+
+    logger.warning("All Gemini chat candidate models failed; falling back to rule engine.")
+    return None
+
+
+def analyze_symptoms_chat(symptoms: str, messages_raw: Optional[str] = None) -> Dict[str, Any]:
+    """Conversational triage entry point: supports casual greetings, questions, and symptom reporting."""
+    clean_symptoms = symptoms.strip() if symptoms else "Hello"
+
+    # Construct conversation transcript from history if provided
+    transcript = ""
+    if messages_raw:
+        try:
+            parsed = json.loads(messages_raw)
+            if isinstance(parsed, list):
+                for m in parsed[-8:]:
+                    role = "Patient" if m.get("role") == "user" else "LIANA"
+                    txt = m.get("content") or m.get("text") or ""
+                    if txt:
+                        transcript += f"{role}: {txt}\n"
+        except Exception:
+            pass
+
+    if not transcript:
+        transcript = f"Patient: {clean_symptoms}"
+    elif clean_symptoms not in transcript:
+        transcript += f"Patient: {clean_symptoms}\n"
+
+    ai_result = _call_gemini_triage_chat(transcript)
+    if ai_result:
+        assessment_id = "tri_" + uuid.uuid4().hex[:10]
+        # Safety floor: if patient mentions critical emergency words, ensure urgency is elevated
+        rule_eval = _rule_based_assessment(clean_symptoms)
+        urgency = ai_result.get("urgency_level", "Stable")
+        if ai_result.get("has_symptoms"):
+            if _URGENCY_RANK.get(rule_eval["urgency_level"], 0) > _URGENCY_RANK.get(urgency, 0):
+                urgency = rule_eval["urgency_level"]
+
+        return {
+            "assessment_id": assessment_id,
+            "reply": ai_result.get("reply", "Hello! How can I help you today?"),
+            "has_symptoms": bool(ai_result.get("has_symptoms", False)),
+            "is_conversational": bool(ai_result.get("is_conversational", not ai_result.get("has_symptoms"))),
+            "needs_more_info": bool(ai_result.get("needs_more_info", False)),
+            "urgency_level": urgency,
+            "confidence_score": float(ai_result.get("confidence_score", 0.9)),
+            "rationale": ai_result.get("rationale") or "",
+            "possible_conditions": ai_result.get("possible_conditions") or [],
+            "recommended_actions": ai_result.get("recommended_actions") or [],
+            "follow_up_questions": ai_result.get("follow_up_questions") or [],
+            "red_flags_to_watch": ai_result.get("red_flags_to_watch") or [],
+            "disclaimer": "MoiDoctar provides triage guidance, not a medical diagnosis. Consult a physician for clinical decisions.",
+        }
+
+    # Rule-based fallback if Gemini is completely unavailable
+    if _is_greeting_or_chitchat(clean_symptoms):
+        return _rule_based_chat_greeting()
+
+    rule_based = _rule_based_assessment(clean_symptoms)
+    rule_based["reply"] = f"Thank you for sharing your symptoms. Based on our clinical review, your presentation appears {rule_based['urgency_level'].lower()}: {rule_based['rationale']}"
+    rule_based["has_symptoms"] = True
+    rule_based["is_conversational"] = False
+    return rule_based
+
+
 def analyze_symptoms(symptoms: str) -> Dict[str, Any]:
     """Main triage entry point: AI-assisted assessment with a deterministic safety floor.
 
@@ -284,6 +493,10 @@ def analyze_symptoms(symptoms: str) -> Dict[str, Any]:
 
 
 def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str, Any]) -> None:
+    # Do not save pure greetings or non-symptom chats into clinical history records
+    if not assessment.get("has_symptoms", True):
+        return
+
     supabase = get_supabase_client()
     now_iso = datetime.now(timezone.utc).isoformat()
     raw_id = assessment.get("assessment_id") or ("tri_" + uuid.uuid4().hex[:10])

@@ -31,57 +31,59 @@ export default function NewTriage() {
   const [assessment, setAssessment] = useState<TriageChatResponse | null>(null)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const turnCountRef = useRef(0)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const bodyMapContext = hasAreas
     ? '\n[Affected body areas: ' + selectedAreas.map(a => `${a.label} (${a.severity}${a.notes ? ', ' + a.notes : ''})`).join('; ') + ']'
     : ''
 
-  const userSymptoms = messages.filter(m => m.role === 'user').map(m => m.text).join('\n') + bodyMapContext
-  const messagesJson = JSON.stringify(messages.map(m => ({ role: m.role, content: m.text })))
-
-  const triggerAssessment = useCallback(() => {
-    if (userSymptoms.length < 1) return
-    createTriage.mutate(
-      {
-        symptoms: userSymptoms,
-        messages: messagesJson,
-        image: selectedImage ?? undefined,
-      },
-      {
-        onSuccess: (res) => {
-          setAssessment(res.data)
-        },
-      },
-    )
-  }, [userSymptoms, messagesJson, selectedImage])
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, createTriage.isPending, assessment])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) setSelectedImage(file)
   }
 
-  useEffect(() => {
-    if (selectedSeverity && userSymptoms.length >= 1 && turnCountRef.current === 0) {
-      turnCountRef.current = 1
-      triggerAssessment()
-    }
-  }, [selectedSeverity, messages.length])
-
-  useEffect(() => {
-    if (turnCountRef.current > 1) {
-      triggerAssessment()
-    }
-  }, [messages.length])
-
   const handleSend = (text?: string) => {
     const msg = (text ?? inputValue).trim()
-    if (!msg) return
-    setMessages(prev => [...prev, { role: 'user', text: msg, time: 'Just now' }])
+    if (!msg || createTriage.isPending) return
+
+    const userMsg = { role: 'user', text: msg, time: 'Just now' }
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
     setInputValue('')
-    if (assessment) {
-      turnCountRef.current++
-    }
+
+    const messagesJson = JSON.stringify(updatedMessages.map(m => ({ role: m.role, content: m.text })))
+    const fullSymptomContext = msg + bodyMapContext
+
+    createTriage.mutate(
+      {
+        symptoms: fullSymptomContext,
+        messages: messagesJson,
+        image: selectedImage ?? undefined,
+      },
+      {
+        onSuccess: (res) => {
+          const data = res.data
+          // 1. Add LIANA's AI response message into the chat stream!
+          const replyText = data.reply || (data.has_symptoms ? data.rationale : "Hello! How can I help you today? Please feel free to share any symptoms or health questions.")
+          setMessages(prev => [...prev, {
+            role: 'ai',
+            text: replyText,
+            time: 'Just now',
+          }])
+
+          // 2. Only show the clinical assessment card & severity if actual symptoms were detected
+          if (data.has_symptoms && data.possible_conditions && data.possible_conditions.length > 0) {
+            setAssessment(data)
+          } else {
+            setAssessment(null)
+          }
+        },
+      }
+    )
   }
 
   const handleFollowUpClick = (question: string) => {
@@ -223,8 +225,26 @@ export default function NewTriage() {
             )
           ))}
 
-          {/* AI Message with Severity Triage */}
-          {messages.length > 1 && (
+          {/* LIANA Typing indicator */}
+          {createTriage.isPending && (
+            <div className="flex gap-4 max-w-[calc(100vw-2rem)] md:max-w-2xl">
+              <div className="shrink-0 relative">
+                <div className="absolute -inset-1 rounded-full bg-[var(--neon-primary)] opacity-30 blur-md" />
+                <LianaAvatar size="sm" />
+              </div>
+              <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] border-l-[3px] border-l-[var(--neon-primary)] rounded-2xl rounded-tl-none p-4 shadow-lg shadow-[var(--neon-primary)]/5 flex items-center gap-3">
+                <div className="flex gap-1.5 py-1">
+                  <span className="w-2 h-2 rounded-full bg-[var(--neon-primary)] animate-bounce" />
+                  <span className="w-2 h-2 rounded-full bg-[var(--neon-primary)] animate-bounce [animation-delay:0.2s]" />
+                  <span className="w-2 h-2 rounded-full bg-[var(--neon-primary)] animate-bounce [animation-delay:0.4s]" />
+                </div>
+                <span className="text-caption text-secondary font-label-md">LIANA is thinking...</span>
+              </div>
+            </div>
+          )}
+
+          {/* AI Message with Severity Triage - only when symptoms are detected */}
+          {assessment && assessment.has_symptoms && (
             <div className="flex gap-4 max-w-[calc(100vw-2rem)] md:max-w-2xl">
               <div className="shrink-0 relative">
                 <div className="absolute -inset-1 rounded-full bg-[var(--neon-primary)] opacity-30 blur-md" />
@@ -232,7 +252,7 @@ export default function NewTriage() {
               </div>
               <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] border-l-[3px] border-l-[var(--neon-primary)] rounded-2xl rounded-tl-none p-4 shadow-lg shadow-[var(--neon-primary)]/5 space-y-4">
                 <p className="font-body-md text-on-surface">
-                  I understand. On a scale of severity, how would you classify these symptoms right now?
+                  On a scale of severity, how would you classify these symptoms right now?
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   {severityOptions.map((opt) => (
@@ -254,38 +274,15 @@ export default function NewTriage() {
             </div>
           )}
 
-          {/* Triage Result Card */}
-          {messages.length > 1 && selectedSeverity && (
+          {/* Triage Result Card - only when symptoms are detected */}
+          {assessment && assessment.has_symptoms && (
             <div className="flex gap-4 max-w-[calc(100vw-2rem)] md:max-w-2xl">
               <div className="shrink-0 relative">
                 <div className="absolute -inset-1 rounded-full bg-[var(--neon-primary)] opacity-30 blur-md" />
                 <LianaAvatar size="sm" />
               </div>
               <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl rounded-tl-none p-6 shadow-xl shadow-[var(--neon-primary)]/5 w-full border-l-4 border-l-[var(--neon-primary)]">
-                {createTriage.isPending ? (
-                  <div className="flex flex-col items-center py-8">
-                    <div className="w-8 h-8 border-4 border-[var(--neon-primary)] border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_12px_var(--neon-primary)]" />
-                    <p className="font-body-md text-on-surface-variant">Analyzing your symptoms...</p>
-                  </div>
-                ) : createTriage.isError ? (
-                  <div className="flex flex-col items-center py-6">
-                    <Icon icon="error" size="lg" />
-                    <p className="font-body-md text-on-surface-variant mt-3 mb-4">
-                      Unable to complete assessment. Please try again.
-                    </p>
-                    <button
-                      className="bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white px-6 py-2 rounded-xl font-label-md text-label-md min-h-[44px] shadow-[0_0_16px_var(--neon-primary)]/30"
-                      onClick={() => {
-                        createTriage.reset()
-                        triggerAssessment()
-                      }}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : assessment ? (
-                  <>
-                    <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-4">
                       <h4 className="font-headline-md text-headline-md text-on-surface bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] bg-clip-text text-transparent">Preliminary Assessment</h4>
                       <div className="flex items-center gap-2">
                         <span className={`px-3 py-1 rounded-full text-caption font-label-md uppercase tracking-wide ${urgencyColor(assessment.urgency_level)}`}>
@@ -409,11 +406,10 @@ export default function NewTriage() {
                         <Icon icon="share" size="md" />
                       </button>
                     </div>
-                  </>
-                ) : null}
               </div>
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Bottom Input Bar */}

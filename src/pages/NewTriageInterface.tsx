@@ -18,53 +18,48 @@ export default function NewTriageInterface() {
   const [assessment, setAssessment] = useState<TriageChatResponse | null>(null)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const turnCountRef = useRef(0)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const userSymptoms = messages.filter(m => m.role === 'user').map(m => m.text).join('\n')
-  const messagesJson = JSON.stringify(messages.map(m => ({ role: m.role, content: m.text })))
-
-  const triggerAssessment = useCallback(() => {
-    if (userSymptoms.length < 1) return
-    createTriage.mutate(
-      {
-        symptoms: userSymptoms,
-        messages: messagesJson,
-        image: selectedImage ?? undefined,
-      },
-      {
-        onSuccess: (res) => {
-          setAssessment(res.data)
-        },
-      },
-    )
-  }, [userSymptoms, messagesJson, selectedImage])
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, createTriage.isPending, assessment])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) setSelectedImage(file)
   }
 
-  useEffect(() => {
-    if (userSymptoms.length >= 1 && turnCountRef.current === 0) {
-      turnCountRef.current = 1
-      triggerAssessment()
-    }
-  }, [messages.length])
-
-  useEffect(() => {
-    if (turnCountRef.current > 1) {
-      triggerAssessment()
-    }
-  }, [messages.length])
-
   const handleSend = (text?: string) => {
     const msg = (text ?? inputValue).trim()
-    if (!msg) return
-    setMessages(prev => [...prev, { role: 'user', text: msg }])
+    if (!msg || createTriage.isPending) return
+
+    const userMsg = { role: 'user', text: msg }
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
     setInputValue('')
-    if (assessment) {
-      turnCountRef.current++
-    }
+
+    const messagesJson = JSON.stringify(updatedMessages.map(m => ({ role: m.role, content: m.text })))
+
+    createTriage.mutate(
+      {
+        symptoms: msg,
+        messages: messagesJson,
+        image: selectedImage ?? undefined,
+      },
+      {
+        onSuccess: (res) => {
+          const data = res.data
+          const replyText = data.reply || (data.has_symptoms ? data.rationale : "Hello! How can I help you today? Please feel free to share any symptoms or questions.")
+          setMessages(prev => [...prev, { role: 'ai', text: replyText }])
+
+          if (data.has_symptoms && data.possible_conditions && data.possible_conditions.length > 0) {
+            setAssessment(data)
+          } else {
+            setAssessment(null)
+          }
+        },
+      }
+    )
   }
 
   const handleFollowUpClick = (question: string) => {
@@ -144,29 +139,26 @@ export default function NewTriageInterface() {
               )
             ))}
 
-            {messages.filter(m => m.role === 'user').length >= 1 && (
+            {createTriage.isPending && (
+              <div className="flex gap-3 md:gap-4 max-w-[90%] md:max-w-[85%]">
+                <div className="mt-1">
+                  <LianaAvatar size="sm" />
+                </div>
+                <div className="bg-surface-container-low p-4 rounded-2xl rounded-tl-sm border border-outline-variant/20 shadow-sm flex items-center gap-3">
+                  <div className="flex gap-1.5 py-1">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-bounce" />
+                    <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:0.2s]" />
+                    <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                  <span className="text-caption text-secondary font-label-md">LIANA is thinking...</span>
+                </div>
+              </div>
+            )}
+
+            {assessment && assessment.has_symptoms && (
               <div className="mt-4 mb-2 mx-auto w-full max-w-md bg-surface-container-lowest rounded-xl p-5 border border-outline-variant shadow-[0px_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden group">
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-tertiary-container" />
-                {createTriage.isPending ? (
-                  <div className="flex flex-col items-center py-4">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-                    <p className="font-body-md text-on-surface-variant">Analyzing your symptoms...</p>
-                  </div>
-                ) : createTriage.isError ? (
-                  <div className="flex flex-col items-center py-4">
-                    <Icon icon="error" size="md" />
-                    <p className="font-body-md text-on-surface-variant mt-2 mb-3">Unable to complete assessment.</p>
-                    <button
-                      className="bg-primary text-on-primary px-5 py-2 rounded-lg font-label-md text-label-md"
-                      onClick={() => {
-                        createTriage.reset()
-                        triggerAssessment()
-                      }}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : assessment ? (
+                {assessment ? (
                   <>
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -282,6 +274,7 @@ export default function NewTriageInterface() {
               </div>
             )}
 
+            <div ref={messagesEndRef} />
             <div className="h-4" />
           </div>
 

@@ -32,6 +32,9 @@ class TriageChatResponse(BaseModel):
     follow_up_questions: List[str]
     red_flags_to_watch: List[str]
     disclaimer: str
+    reply: Optional[str] = None
+    has_symptoms: Optional[bool] = False
+    is_conversational: Optional[bool] = False
 
 
 class BackendTriageStatus(BaseModel):

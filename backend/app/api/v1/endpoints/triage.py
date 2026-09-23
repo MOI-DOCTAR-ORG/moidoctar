@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, UploadFile
 from app.schemas.triage import TriageResponse, TriageChatResponse, TriageListResponse
 from app.services.triage_service import (
     analyze_symptoms,
+    analyze_symptoms_chat,
     save_triage_session,
     get_triage_history,
 )
@@ -83,23 +84,27 @@ async def perform_triage_chat(
 ):
     symptoms, _, messages, _ = await _extract_triage_data(request)
     if not symptoms:
-        symptoms = "General symptom assessment"
+        symptoms = "Hello"
 
-    assessment = analyze_symptoms(symptoms)
+    assessment = analyze_symptoms_chat(symptoms, messages)
     user_id = current_user.get("_id") or current_user.get("id") or "user"
-    save_triage_session(user_id, [symptoms], assessment)
+    if assessment.get("has_symptoms", True):
+        save_triage_session(user_id, [symptoms], assessment)
 
     return TriageChatResponse(
         assessment_id=assessment["assessment_id"],
-        needs_more_info=assessment["needs_more_info"],
-        urgency_level=assessment["urgency_level"],
-        confidence_score=assessment["confidence_score"],
-        rationale=assessment["rationale"],
-        possible_conditions=assessment["possible_conditions"],
-        recommended_actions=assessment["recommended_actions"],
-        follow_up_questions=assessment["follow_up_questions"],
-        red_flags_to_watch=assessment["red_flags_to_watch"],
-        disclaimer=assessment["disclaimer"],
+        needs_more_info=assessment.get("needs_more_info", False),
+        urgency_level=assessment.get("urgency_level", "Stable"),
+        confidence_score=assessment.get("confidence_score", 0.9),
+        rationale=assessment.get("rationale", ""),
+        possible_conditions=assessment.get("possible_conditions", []),
+        recommended_actions=assessment.get("recommended_actions", []),
+        follow_up_questions=assessment.get("follow_up_questions", []),
+        red_flags_to_watch=assessment.get("red_flags_to_watch", []),
+        disclaimer=assessment.get("disclaimer", "MoiDoctar provides triage guidance, not a medical diagnosis."),
+        reply=assessment.get("reply") or assessment.get("rationale", ""),
+        has_symptoms=bool(assessment.get("has_symptoms", False)),
+        is_conversational=bool(assessment.get("is_conversational", False)),
     )
 
 

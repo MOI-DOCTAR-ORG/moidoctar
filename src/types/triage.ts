@@ -30,6 +30,9 @@ export type TriageChatResponse = {
   follow_up_questions: string[]
   red_flags_to_watch: string[]
   disclaimer: string
+  reply?: string
+  has_symptoms?: boolean
+  is_conversational?: boolean
 }
 
 export type CacheStats = {
