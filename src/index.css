@@ -198,6 +198,27 @@ body.dark .glass-panel {
   border: 1px solid rgba(148, 197, 253, 0.08);
 }
 
+/* ===== NAV CHROME (Sidebar / Mobile Bottom Nav) =====
+   These panels intentionally stay visually "solid" (not the lighter
+   --glass-bg used by floating cards), so they get their own token that
+   preserves the existing dark-mode look exactly and adds a matching
+   light-mode value, instead of reusing --glass-bg's different opacity. */
+.sidebar-surface {
+  background: rgba(10, 15, 30, 0.85);
+}
+
+body.light .sidebar-surface {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.bottom-nav-surface {
+  background: rgba(10, 15, 30, 0.9);
+}
+
+body.light .bottom-nav-surface {
+  background: rgba(255, 255, 255, 0.9);
+}
+
 /* ===== SAFE AREA INSETS ===== */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);

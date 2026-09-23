@@ -25,7 +25,7 @@ export default function MobileBottomNav() {
       />
 
       {/* Glass bar */}
-      <div className="bg-[rgba(10,15,30,0.9)] backdrop-blur-2xl border-t border-[var(--glass-border)]">
+      <div className="bottom-nav-surface backdrop-blur-2xl border-t border-[var(--glass-border)]">
         <div className="flex items-center justify-around px-2 py-1">
           {navItems.map((item) => {
             const active = isActive(item.to)

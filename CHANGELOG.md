@@ -1,4 +1,113 @@
-# CHANGELOG — Engineering Polish Pass (Phase 2)
+# CHANGELOG — Engineering Polish Pass (Phase 4)
+
+Phase 4 covered two things: a light-mode contrast bug on the Dashboard, and
+making email verification / password reset actually real (they were
+previously accept-anything stubs with no email sending at all).
+
+## Dashboard light-mode contrast — fixed
+
+- **Sidebar / mobile bottom nav:** `src/components/Sidebar.tsx` and
+  `src/components/MobileBottomNav.tsx` hardcoded their background to a
+  literal dark-navy `rgba(10,15,30,0.85/0.9)` that never changed with the
+  theme, instead of the theme-aware `var(--glass-bg)` pattern the rest of
+  the layout uses. Nav item text *did* follow the theme correctly, so in
+  light mode it resolved to dark, near-black colors placed on a
+  background that stayed dark — contrast as low as 1.08:1. Added
+  theme-aware `.sidebar-surface` / `.bottom-nav-surface` classes to
+  `src/index.css` (dark value unchanged, new light value added via
+  `body.light`) and swapped both components to use them.
+- **Hero card paragraph:** `src/pages/Dashboard.tsx`'s "Feeling unwell?"
+  card description used `text-primary-fixed-dim`, a token that's
+  deliberately identical in both themes, instead of the correct
+  `text-on-primary-fixed-variant` token (which already existed, unused,
+  and differs correctly per theme — white in light mode). Measured
+  contrast went from 2.87:1 to 5.16–10.34:1 in light mode; dark mode is
+  pixel-identical since both tokens already resolved to the same value
+  there.
+- **Reminder "Save" button:** `src/components/ReminderBanner.tsx`
+  hardcoded `text-[#050816]` (the dark-mode value) instead of
+  `text-on-primary`. Same fix, same reasoning.
+- See `BUG_FIXES.md` #11–13 for full root-cause detail.
+
+## Email verification / password reset — made real
+
+- Both flows were previously stubs: `/auth/verify` accepted any code,
+  `/auth/resendVerification` and `/auth/requestPasswordReset` were
+  no-ops, and `/user/forgotPassword` "succeeded" without checking the
+  code or changing the password. The frontend was already fully built
+  for a real, gated flow — it just had nothing real behind it.
+- Added `backend/app/services/otp_service.py` (6-digit codes, 10-minute
+  expiry, 5-attempt limit, single-use, in-memory) and
+  `backend/app/core/email.py` (SMTP sending via new `SMTP_*` settings in
+  `backend/app/core/config.py` / `backend/.env.example`; falls back to
+  logging the code to the console when SMTP isn't configured, so
+  local/demo use keeps working without real credentials).
+- Signup now creates unverified accounts and emails a code immediately.
+  `/auth/verify` validates it and flips `is_verified` + issues a real
+  token. Signing in to an unverified account is now correctly blocked
+  (`401 account_not_verified`, with a fresh code sent) instead of
+  silently logging in. `/user/forgotPassword` now actually verifies the
+  reset code and changes the password.
+- See `BUG_FIXES.md` #14 for full detail, including a local-fallback
+  dev shortcut that had to be removed for the verification gate to be
+  meaningful.
+- **You still need to:** set `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD`
+  in `backend/.env` for codes to actually be emailed (see
+  `backend/.env.example` for a Gmail App Password example). Without it,
+  codes print to the backend console so the flow is still testable.
+
+## Verified
+
+- Full signup → blocked-signin-while-unverified → wrong-code-rejected →
+  correct-code-verifies → signin-now-succeeds flow, and the full
+  request-reset → wrong-code-rejected → correct-code-resets → signin
+  -with-new-password flow, both exercised end-to-end via FastAPI
+  TestClient.
+- Frontend type-checks (`tsc -b`) and production-builds (`vite build`)
+  cleanly after the contrast changes.
+
+---
+
+See below for Phase 3 (auth panel background), Phase 2 (Google Sign-In +
+landing page), and Phase 1 (auth enforcement + AI wiring).
+
+## Phase 3 — Auth panel background
+
+Phase 3 fixed a real visual bug reported from the live deployment: the
+sign-in/sign-up form panel rendered as a washed-out grey instead of the
+intended dark-navy theme, while the adjacent visual panel rendered
+correctly.
+
+## Grey auth panel — fixed
+
+- **Where:** `src/components/auth/AuthShell.tsx`
+- **Root cause:** The visual side of the auth screen (`<aside>`) paints its
+  own solid dark gradient background directly on itself. The form side
+  (`<section>`) had no background of its own at all — it relied entirely on
+  the parent card's translucent `rgba(10,15,30,0.55)` overlay plus
+  `backdrop-blur-xl` to read as dark navy. That composition wasn't
+  rendering reliably in production (a `backdrop-filter` compositing
+  difference between the local dev environment and the deployed
+  Vercel/browser combination), so the form panel came out flat grey instead
+  of navy while the visual panel — which doesn't depend on backdrop-blur —
+  looked correct.
+- **Fix:** Gave the form `<section>` its own solid gradient background
+  (`linear-gradient(165deg,#0a0f1e_0%,#0d1a2d_60%,#0a1628_100%)`), matching
+  the same approach the visual panel already used, instead of depending on
+  backdrop compositing. This affects every screen that uses `AuthShell`:
+  sign in, sign up, forgot password, OTP verification, age selection, body
+  map, pinpoint pain.
+
+## Verified
+
+- Frontend type-checks (`tsc -b`) and production-builds (`vite build`)
+  cleanly after the change.
+
+---
+
+See below for Phase 2 (Google Sign-In + landing page) and Phase 1 (auth
+enforcement + AI wiring).
+
 
 Phase 2 fixed Google Sign-In end-to-end and added a public landing page with
 brand-accurate colors. See `BUG_FIXES.md` for root-cause detail.

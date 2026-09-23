@@ -123,7 +123,7 @@ export default function Dashboard() {
               <span className="text-sm font-medium tracking-wide">AI-Powered Assessment</span>
             </div>
             <h3 className="font-headline-lg-mobile md:text-headline-lg mb-2 md:mb-3">Feeling unwell?</h3>
-            <p className="font-body-md text-body-md text-primary-fixed-dim mb-4 md:mb-6 opacity-90 leading-relaxed">
+            <p className="font-body-md text-body-md text-on-primary-fixed-variant mb-4 md:mb-6 opacity-90 leading-relaxed">
               Start a new triage session to evaluate your symptoms instantly and receive medical-grade guidance on your next steps.
             </p>
           </div>

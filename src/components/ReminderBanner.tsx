@@ -54,7 +54,7 @@ export default function ReminderBanner() {
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] p-3 shadow-[0_0_16px_rgba(148,197,253,0.06)]">
               <PremiumInput compact containerClassName="flex-1 min-w-0" placeholder="e.g. Drink more water" value={reminderText} onChange={e => setReminderText(e.target.value)} />
               <PremiumDateInput compact containerClassName="min-w-0 sm:min-w-[170px]" value={reminderDate} onChange={e => setReminderDate(e.target.value)} />
-              <button onClick={addReminder} className="bg-[var(--neon-primary)] text-[#050816] px-5 py-2 rounded-lg font-label-md hover:shadow-[0_0_20px_rgba(148,197,253,0.4)] transition-all min-h-[44px]">Save</button>
+              <button onClick={addReminder} className="bg-[var(--neon-primary)] text-on-primary px-5 py-2 rounded-lg font-label-md hover:shadow-[0_0_20px_rgba(148,197,253,0.4)] transition-all min-h-[44px]">Save</button>
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-secondary font-label-md hover:text-[var(--neon-primary)] min-h-[44px]">Cancel</button>
             </div>
           )}

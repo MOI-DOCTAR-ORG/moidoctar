@@ -2,7 +2,8 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.user import UserUpdate, UserProfileResponse
 from app.schemas.auth import ForgotPasswordRequest
-from app.services.auth_service import update_user_profile, delete_user_account
+from app.services.auth_service import update_user_profile, delete_user_account, reset_user_password
+from app.services.otp_service import verify_otp
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -35,6 +36,16 @@ def get_notifications(current_user: Dict[str, Any] = Depends(get_current_user)):
 
 @router.post("/forgotPassword")
 def forgot_password(req: ForgotPasswordRequest):
+    if not verify_otp(req.email, "reset_password", req.verificationCode):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"err": "user_not_found", "msg": "Invalid or expired code. Please try again."},
+        )
+    if not reset_user_password(req.email, req.newPassword):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"err": "user_not_found", "msg": "Account not found."},
+        )
     return {"msg": "Password reset successfully"}
 
 
