@@ -321,3 +321,22 @@ def delete_user_account(user_id: str) -> bool:
             del _local_users[email]
             return True
     return True
+
+
+def reset_user_password(email: str, new_password: str) -> bool:
+    email_clean = email.strip().lower()
+    hashed = get_password_hash(new_password)
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = supabase.table("users").update({"hashed_password": hashed}).eq("email", email_clean).execute()
+            rows = safe_supabase_rows(res)
+            return len(rows) > 0
+        except Exception as e:
+            logger.error(f"Supabase password reset error: {e}")
+
+    if email_clean in _local_users:
+        _local_users[email_clean]["hashed_password"] = hashed
+        return True
+    return False
+
