@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import sys
@@ -18,11 +19,69 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger("moidoctar")
 
 
+async def _forward_stream(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    try:
+        while True:
+            data = await reader.read(8192)
+            if not data:
+                break
+            writer.write(data)
+            await writer.drain()
+    except Exception:
+        pass
+    finally:
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
+
+
+async def _proxy_connection(local_reader: asyncio.StreamReader, local_writer: asyncio.StreamWriter, target_port: int):
+    try:
+        remote_reader, remote_writer = await asyncio.open_connection("127.0.0.1", target_port)
+        await asyncio.gather(
+            _forward_stream(local_reader, remote_writer),
+            _forward_stream(remote_reader, local_writer),
+            return_exceptions=True,
+        )
+    except Exception:
+        pass
+    finally:
+        try:
+            local_writer.close()
+            await local_writer.wait_closed()
+        except Exception:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing MoiDoctar FastAPI backend...")
     get_supabase_client()
+
+    # Dual-port bridge: ensure both port 3000 and port 8000 respond,
+    # regardless of which port uvicorn is running on or which port Pxxl/platform probes.
+    aux_servers = []
+    current_port = int(os.environ.get("PORT", 3000))
+    for p in (3000, 8000):
+        if p != current_port:
+            try:
+                server = await asyncio.start_server(
+                    lambda r, w, tp=current_port: _proxy_connection(r, w, tp),
+                    "0.0.0.0",
+                    p,
+                )
+                aux_servers.append(server)
+                logger.info(f"Dual-port listener active on port {p} -> forwarding to active port {current_port}")
+            except Exception as e:
+                logger.debug(f"Could not bind aux port {p}: {e}")
+
     yield
+
+    for s in aux_servers:
+        s.close()
+        await s.wait_closed()
     logger.info("Shutting down MoiDoctar FastAPI backend.")
 
 

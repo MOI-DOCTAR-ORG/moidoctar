@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     # a Google ID token was actually issued for this app before trusting it.
     GOOGLE_CLIENT_ID: str = ""
 
+    # Google Gemini AI Triage (API Key from Google AI Studio).
+    GOOGLE_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+
+    # Server Port
+    PORT: int = 3000
+
     # SMTP (outbound email for OTP verification codes / password-reset
     # codes). If SMTP_HOST is left blank, OTP codes are logged to the
     # server console instead of emailed, so signup/verify/reset still work
