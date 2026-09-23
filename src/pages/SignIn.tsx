@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
+import { GOOGLE_AUTH_ENABLED } from '../lib/constants'
 import AuthShell from '../components/auth/AuthShell'
 import {
   authDivider,
@@ -79,30 +80,34 @@ export default function SignIn() {
         )}
 
         <div className="flex flex-col gap-3">
-          <GoogleLogin
-            onSuccess={async (credentialResponse) => {
-              setError('')
-              const result = await signInWithGoogle(credentialResponse.credential ?? '')
-              if (!result.success) {
-                setError(result.error)
+          {GOOGLE_AUTH_ENABLED ? (
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                setError('')
+                const result = await signInWithGoogle(credentialResponse.credential ?? '')
+                if (!result.success) {
+                  setError(result.error)
+                  setShakeKey(k => k + 1)
+                }
+              }}
+              onError={() => {
+                setError('Google sign-in failed. Please try again.')
                 setShakeKey(k => k + 1)
-              }
-            }}
-            onError={() => {
-              setError('Google sign-in failed. Please try again.')
-              setShakeKey(k => k + 1)
-            }}
-            theme="outline"
-            size="large"
-            text="continue_with"
-            shape="rectangular"
-            width="100%"
-          />
+              }}
+              theme="outline"
+              size="large"
+              text="continue_with"
+              shape="rectangular"
+              width="100%"
+            />
+          ) : null}
         </div>
 
-        <div className={authDivider} role="separator" aria-orientation="horizontal">
-          or continue with email
-        </div>
+        {GOOGLE_AUTH_ENABLED && (
+          <div className={authDivider} role="separator" aria-orientation="horizontal">
+            or continue with email
+          </div>
+        )}
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <div className={authField}>

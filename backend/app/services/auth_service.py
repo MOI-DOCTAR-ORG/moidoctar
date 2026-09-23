@@ -157,41 +157,89 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
     return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
 
 
+def _verify_google_id_token(id_token: str) -> Dict[str, Any]:
+    """Verify a Google ID token (the `credential` from @react-oauth/google's
+    GoogleLogin) against Google's tokeninfo endpoint and return its claims.
+
+    Raises ValueError("invalid_google_token") on any failure: missing token,
+    network error, expired token, or an audience that doesn't match our
+    configured GOOGLE_CLIENT_ID (which would mean the token was issued for a
+    *different* app and must not be trusted).
+    """
+    import json
+    import urllib.request
+    import urllib.error
+    from app.core.config import settings
+
+    if not id_token:
+        raise ValueError("invalid_google_token")
+
+    try:
+        url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+        with urllib.request.urlopen(url, timeout=10) as response:
+            claims = json.load(response)
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError):
+        raise ValueError("invalid_google_token")
+    except Exception as e:
+        logger.error(f"Unexpected error verifying Google token: {e}")
+        raise ValueError("invalid_google_token")
+
+    if settings.GOOGLE_CLIENT_ID and claims.get("aud") != settings.GOOGLE_CLIENT_ID:
+        logger.warning("Google token audience mismatch - rejecting.")
+        raise ValueError("invalid_google_token")
+
+    if not claims.get("email"):
+        raise ValueError("invalid_google_token")
+
+    if str(claims.get("email_verified")).lower() not in ("true", "1"):
+        raise ValueError("invalid_google_token")
+
+    return claims
+
+
 def authenticate_google(access_token: str) -> Dict[str, Any]:
-    # Development / production Google Auth validation
+    """Sign in (or sign up) with a verified Google account.
+
+    `access_token` here is actually the Google ID token supplied by the
+    frontend's GoogleLogin `onSuccess` callback. We verify it with Google,
+    then find-or-create the corresponding real user by their verified email
+    - never a shared placeholder account.
+    """
+    claims = _verify_google_id_token(access_token)
+    email_clean = claims["email"].strip().lower()
+    full_name = claims.get("name") or email_clean.split("@")[0]
+
     supabase = get_supabase_client()
-    demo_email = "google.user@moidoctar.com"
-    demo_name = "Google User"
 
     if supabase:
         try:
-            res = supabase.table("users").select("*").eq("email", demo_email).execute()
+            res = supabase.table("users").select("*").eq("email", email_clean).execute()
             rows = safe_supabase_rows(res)
             if rows:
                 user = rows[0]
             else:
                 new_user = {
                     "id": str(uuid.uuid4()),
-                    "email": demo_email,
-                    "user_name": demo_name,
-                    "hashed_password": get_password_hash(access_token[:16] if access_token else "GoogleAuth2026!"),
+                    "email": email_clean,
+                    "user_name": full_name,
+                    "hashed_password": get_password_hash(str(uuid.uuid4())),
                     "is_verified": True,
                     "role": "user",
                 }
                 ins = supabase.table("users").insert(new_user).execute()
                 ins_rows = safe_supabase_rows(ins)
                 user = ins_rows[0] if ins_rows else new_user
-            token = create_access_token({"sub": str(user.get("id", "usr_google_001")), "email": demo_email})
+            token = create_access_token({"sub": str(user.get("id")), "email": email_clean})
             return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
         except Exception as e:
             logger.error(f"Supabase google auth error: {e}. Falling back to local store.")
 
-    if demo_email not in _local_users:
-        _local_users[demo_email] = {
-            "id": "usr_google_001",
-            "email": demo_email,
-            "user_name": demo_name,
-            "hashed_password": get_password_hash("GoogleAuth2026!"),
+    if email_clean not in _local_users:
+        _local_users[email_clean] = {
+            "id": f"usr_google_{uuid.uuid4().hex[:10]}",
+            "email": email_clean,
+            "user_name": full_name,
+            "hashed_password": get_password_hash(str(uuid.uuid4())),
             "is_verified": True,
             "role": "user",
             "phone": None,
@@ -201,8 +249,9 @@ def authenticate_google(access_token: str) -> Dict[str, Any]:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_login": datetime.now(timezone.utc).isoformat(),
         }
-    user = _local_users[demo_email]
-    token = create_access_token({"sub": user["id"], "email": demo_email})
+    user = _local_users[email_clean]
+    user["last_login"] = datetime.now(timezone.utc).isoformat()
+    token = create_access_token({"sub": user["id"], "email": email_clean})
     return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
 
 

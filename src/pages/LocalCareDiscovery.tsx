@@ -132,7 +132,7 @@ export default function LocalCareDiscovery() {
       <header className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <nav className="flex items-center gap-2 text-secondary mb-2">
-            <button onClick={() => navigate('/')} className="text-caption font-caption hover:text-[var(--neon-primary)] transition-colors">Dashboard</button>
+            <button onClick={() => navigate('/dashboard')} className="text-caption font-caption hover:text-[var(--neon-primary)] transition-colors">Dashboard</button>
             <Icon icon="chevron_right" size="sm" />
             <span className="text-caption font-caption text-[var(--neon-primary)] font-bold">Nearby Care</span>
           </nav>

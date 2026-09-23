@@ -68,12 +68,18 @@ def debug_auth(email: str = None):
 
 @router.post("/google", response_model=TokenResponse)
 def google_authentication(req: GoogleAuthRequest):
-    res = authenticate_google(req.accessToken)
-    return TokenResponse(
-        msg="Google authentication successful",
-        authorization=res["authorization"],
-        refreshToken=res["refreshToken"],
-    )
+    try:
+        res = authenticate_google(req.accessToken)
+        return TokenResponse(
+            msg="Google authentication successful",
+            authorization=res["authorization"],
+            refreshToken=res["refreshToken"],
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"err": "invalid_google_token", "msg": "Google sign-in failed. Please try again or use email login."},
+        )
 
 
 @router.post("/verify")

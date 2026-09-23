@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
+    # Google Sign-In (OAuth Client ID from Google Cloud Console).
+    # Must match the frontend's VITE_GOOGLE_CLIENT_ID - used to verify that
+    # a Google ID token was actually issued for this app before trusting it.
+    GOOGLE_CLIENT_ID: str = ""
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app"
 

@@ -22,10 +22,14 @@ import AdminCache from './pages/AdminCache'
 import NotFound from './pages/NotFound'
 import ForgotPassword from './pages/ForgotPassword'
 import LocalCareDiscovery from './pages/LocalCareDiscovery'
+import Landing from './pages/Landing'
 
 export default function App() {
   return (
     <Routes>
+      {/* Public landing page - redirects to /dashboard automatically if already signed in */}
+      <Route path="/" element={<Landing />} />
+
       {/* Auth pages - no sidebar, redirect to app if authenticated */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<SignIn />} />
@@ -40,7 +44,7 @@ export default function App() {
 
       {/* App pages - with sidebar, require auth */}
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-triage" element={<NewTriage />} />
         <Route path="/history" element={<History />} />
         <Route path="/care-details" element={<CareDetails />} />

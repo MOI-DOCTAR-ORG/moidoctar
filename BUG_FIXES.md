@@ -79,9 +79,58 @@
 - **Fix:** Both entry points now add `backend/ai` to `sys.path` on startup,
   so the import succeeds however the server is launched.
 
+## 7. Google Sign-In was completely fake (backend never verified anything)
+
+- **Where:** `backend/app/services/auth_service.py` (`authenticate_google`)
+- **Root cause:** The function never validated the token it received from
+  the frontend against Google at all. It just checked/created a single
+  hardcoded account (`google.user@moidoctar.com`) and logged whoever called
+  it in as that same account, regardless of what token — real, expired, or
+  completely made up — was sent.
+- **Fix:** Added `_verify_google_id_token`, which sends the token to
+  Google's `tokeninfo` endpoint, confirms the audience (`aud`) matches the
+  configured `GOOGLE_CLIENT_ID`, and confirms the email is verified.
+  `authenticate_google` now finds-or-creates the *real* user by their
+  verified email instead of a shared placeholder. The endpoint
+  (`backend/app/api/v1/endpoints/auth.py`) now catches the resulting
+  `ValueError` and returns `401` instead of letting it fall through as an
+  unhandled `500`.
+
+## 8. Google Sign-In was unusable on the frontend (no client id was ever configured)
+
+- **Where:** `src/main.tsx`, `src/pages/SignIn.tsx`, `src/pages/SignUp.tsx`
+- **Root cause:** There was no `.env.example` anywhere in the repo, so
+  `VITE_GOOGLE_CLIENT_ID` was always `undefined`. `GoogleOAuthProvider`
+  received `undefined` as its `clientId`, and the `GoogleLogin` button
+  rendered against a Google Identity Services client that was never
+  correctly initialized.
+- **Fix:** Added a root `.env.example` documenting `VITE_GOOGLE_CLIENT_ID`
+  (and the existing `VITE_API_BASE_URL` / `VITE_MODEL_API_URL`, which also
+  had no documented example before). `GoogleOAuthProvider` now falls back to
+  a placeholder string so it doesn't throw when unset, and the "Continue
+  with Google" button only renders once a real client id is present
+  (`GOOGLE_AUTH_ENABLED` in `src/lib/constants.ts`), so the rest of sign-in
+  works normally either way.
+
+## 9. `/` assumed to be the dashboard in several places after adding the landing page
+
+- **Where:** `src/layouts/AuthLayout.tsx`, `src/components/Sidebar.tsx`,
+  `src/components/MobileBottomNav.tsx`, `src/layouts/AppLayout.tsx`,
+  `src/pages/LocalCareDiscovery.tsx`
+- **Root cause:** Adding a public landing page at `/` meant every place that
+  previously treated `/` as "the authenticated dashboard" needed updating:
+  the post-login redirect, the sidebar's Dashboard link and active-route
+  check, the mobile bottom nav's Home tab, the page-title lookup, and a
+  breadcrumb link literally labeled "Dashboard".
+- **Fix:** Dashboard now lives at `/dashboard`; all five references above
+  were updated to point there instead of `/`. `Landing.tsx` itself
+  auto-redirects an already-authenticated visitor straight to `/dashboard`,
+  so any link that still points at `/` (e.g. `NotFound.tsx`'s "back home"
+  link) still resolves correctly either way.
+
 ---
 
-All six fixes were exercised against a running instance of the backend
+All nine fixes were exercised against a running instance of the backend
 (via FastAPI's `TestClient`) and the frontend was type-checked and
-production-built after the change to `modelAxios.ts`; see `CHANGELOG.md`
-for the specific checks run.
+production-built after each round of changes; see `CHANGELOG.md` for the
+specific checks run.

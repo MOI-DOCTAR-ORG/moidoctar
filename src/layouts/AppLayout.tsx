@@ -24,7 +24,7 @@ const pageTitles = [
 ]
 
 function getPageTitle(pathname: string) {
-  if (pathname === '/') return 'Dashboard'
+  if (pathname === '/dashboard') return 'Dashboard'
   return pageTitles.find(page => pathname.startsWith(page.path))?.label || 'MoiDoctar'
 }
 
