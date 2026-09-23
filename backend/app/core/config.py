@@ -21,9 +21,21 @@ class Settings(BaseSettings):
     # a Google ID token was actually issued for this app before trusting it.
     GOOGLE_CLIENT_ID: str = ""
 
-    # Google Gemini AI Triage (API Key from Google AI Studio).
-    GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.6-flash"
+    # SMTP (outbound email for OTP verification codes / password-reset
+    # codes). If SMTP_HOST is left blank, OTP codes are logged to the
+    # server console instead of emailed, so signup/verify/reset still work
+    # end-to-end in local dev without real SMTP credentials configured.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    # Optional. Falls back to SMTP_USER when unset.
+    SMTP_FROM: str = ""
+    # STARTTLS on a plaintext connection (typical for port 587). Ignored
+    # when SMTP_USE_SSL is true.
+    SMTP_USE_TLS: bool = True
+    # Implicit TLS from the first byte (typical for port 465).
+    SMTP_USE_SSL: bool = False
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app"

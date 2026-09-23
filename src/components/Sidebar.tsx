@@ -119,7 +119,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-[85vw] max-w-[236px] bg-[rgba(10,15,30,0.85)] backdrop-blur-2xl flex flex-col py-3 border-r border-[var(--glass-border)] z-50 transition-transform duration-300 md:hidden ${
+        className={`sidebar-surface fixed top-0 left-0 h-screen w-[85vw] max-w-[236px] backdrop-blur-2xl flex flex-col py-3 border-r border-[var(--glass-border)] z-50 transition-transform duration-300 md:hidden ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -127,7 +127,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed top-0 left-0 h-screen w-[var(--spacing-sidebar-width,232px)] bg-[rgba(10,15,30,0.85)] backdrop-blur-2xl hidden md:flex flex-col py-4 border-r border-[var(--glass-border)] z-50">
+      <aside className="sidebar-surface fixed top-0 left-0 h-screen w-[var(--spacing-sidebar-width,232px)] backdrop-blur-2xl hidden md:flex flex-col py-4 border-r border-[var(--glass-border)] z-50">
         {sidebarContent}
       </aside>
     </>

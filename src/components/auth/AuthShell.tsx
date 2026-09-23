@@ -79,7 +79,7 @@ export default function AuthShell({
       <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(148,197,253,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,197,253,0.08)_1px,transparent_1px)] [background-size:42px_42px]" />
 
       <div className={`relative mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1240px] overflow-hidden rounded-[28px] border border-[rgba(148,197,253,0.12)] bg-[rgba(10,15,30,0.55)] shadow-[0_30px_90px_rgba(0,0,0,0.4),0_0_80px_rgba(148,197,253,0.04)] backdrop-blur-xl sm:min-h-[calc(100dvh-2.5rem)] lg:min-h-[calc(100dvh-3rem)] ${gridClass}`}>
-        <section className={`relative flex min-h-full items-start justify-center overflow-y-auto px-4 py-6 sm:px-8 sm:py-8 lg:px-11 ${formOrderClass}`}>
+        <section className={`relative flex min-h-full items-start justify-center overflow-y-auto bg-[linear-gradient(165deg,#0a0f1e_0%,#0d1a2d_60%,#0a1628_100%)] px-4 py-6 sm:px-8 sm:py-8 lg:px-11 ${formOrderClass}`}>
           <div className={`w-full ${maxWidthClass} motion-safe:animate-[auth-rise-in_520ms_cubic-bezier(0.16,1,0.3,1)_both]`}>
             <header className="mb-6 flex flex-col gap-5 sm:mb-7">
               <div className="flex items-center justify-between gap-4">

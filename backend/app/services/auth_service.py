@@ -4,8 +4,21 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from app.core.supabase import get_supabase_client, safe_supabase_rows
 from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.email import send_otp_email
+from app.services.otp_service import generate_and_store_otp
 
 logger = logging.getLogger("moidoctar.auth")
+
+
+class AccountNotVerifiedError(Exception):
+    """Raised by authenticate_user when the password is correct but the
+    account hasn't completed email verification yet. Carries a fresh temp
+    access token so the frontend can call /auth/verify and
+    /auth/resendVerification for this user without a second sign-in."""
+
+    def __init__(self, authorization: str):
+        self.authorization = authorization
+        super().__init__("account_not_verified")
 
 # Local in-memory store for fallback if Supabase is not configured
 _local_users: Dict[str, Dict[str, Any]] = {
@@ -57,6 +70,11 @@ def _format_user_out(u: Any) -> Dict[str, Any]:
     }
 
 
+def _send_verification_otp(email: str) -> None:
+    code = generate_and_store_otp(email, "verify_email")
+    send_otp_email(email, code, "verify_email")
+
+
 def signup_user(email: str, password: str, full_name: Optional[str] = None) -> Dict[str, Any]:
     email_clean = email.strip().lower()
     name = full_name.strip() if full_name else email_clean.split("@")[0].title()
@@ -78,7 +96,7 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
                 "email": email_clean,
                 "user_name": name,
                 "hashed_password": hashed,
-                "is_verified": True,
+                "is_verified": False,
                 "role": "user",
                 "created_at": now_iso,
                 "last_login": now_iso,
@@ -86,6 +104,7 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
             ins = supabase.table("users").insert(new_user).execute()
             ins_rows = safe_supabase_rows(ins)
             created = ins_rows[0] if ins_rows else new_user
+            _send_verification_otp(email_clean)
             token = create_access_token({"sub": created["id"], "email": email_clean})
             return {"authorization": token, "refreshToken": token, "user": _format_user_out(created)}
         except ValueError:
@@ -103,7 +122,7 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
         "email": email_clean,
         "user_name": name,
         "hashed_password": hashed,
-        "is_verified": True,
+        "is_verified": False,
         "role": "user",
         "phone": None,
         "demographics": {},
@@ -113,6 +132,7 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
         "last_login": now_iso,
     }
     _local_users[email_clean] = user_entry
+    _send_verification_otp(email_clean)
     token = create_access_token({"sub": new_id, "email": email_clean})
     return {"authorization": token, "refreshToken": token, "user": _format_user_out(user_entry)}
 
@@ -132,6 +152,11 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
             if not verify_password(password, user.get("hashed_password")):
                 raise ValueError("invalid_account")
 
+            if not user.get("is_verified", True):
+                _send_verification_otp(email_clean)
+                temp_token = create_access_token({"sub": user["id"], "email": email_clean})
+                raise AccountNotVerifiedError(temp_token)
+
             now_iso = datetime.now(timezone.utc).isoformat()
             try:
                 supabase.table("users").update({"last_login": now_iso}).eq("id", user["id"]).execute()
@@ -139,7 +164,7 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
                 pass
             token = create_access_token({"sub": user["id"], "email": email_clean})
             return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
-        except ValueError:
+        except (ValueError, AccountNotVerifiedError):
             raise
         except Exception as e:
             logger.error(f"Supabase authenticate error: {e}. Falling back to local store.")
@@ -147,10 +172,12 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
     # Fallback local store
     user = _local_users.get(email_clean)
     if not user or not verify_password(password, user.get("hashed_password")):
-        # For development ease, allow signin if password is valid format
-        if not user:
-            return signup_user(email_clean, password)
         raise ValueError("invalid_account")
+
+    if not user.get("is_verified", True):
+        _send_verification_otp(email_clean)
+        temp_token = create_access_token({"sub": user["id"], "email": email_clean})
+        raise AccountNotVerifiedError(temp_token)
 
     user["last_login"] = datetime.now(timezone.utc).isoformat()
     token = create_access_token({"sub": user["id"], "email": email_clean})
@@ -270,6 +297,64 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         if str(u.get("id")) == str(user_id):
             return _format_user_out(u)
     return None
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Look up a user by email and return the raw internal record (not the
+    public-formatted shape) for use by OTP/password-reset flows, which
+    need the exact stored email and id. Returns None if no account exists
+    - callers must not use this to reveal account existence to the client."""
+    email_clean = email.strip().lower()
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = supabase.table("users").select("*").eq("email", email_clean).execute()
+            rows = safe_supabase_rows(res)
+            matching = [u for u in rows if str(u.get("email", "")).strip().lower() == email_clean]
+            if matching:
+                return matching[0]
+        except Exception as e:
+            logger.error(f"Supabase get_user_by_email error: {e}. Falling back to local store.")
+
+    return _local_users.get(email_clean)
+
+
+def mark_user_verified(user_id: str) -> None:
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            supabase.table("users").update({"is_verified": True}).eq("id", user_id).execute()
+            return
+        except Exception as e:
+            logger.error(f"Supabase mark_user_verified error: {e}. Falling back to local store.")
+
+    for u in _local_users.values():
+        if str(u.get("id")) == str(user_id):
+            u["is_verified"] = True
+            return
+
+
+def reset_user_password(email: str, new_password: str) -> bool:
+    """Set a new password for `email`. Returns False if no such account
+    exists (should only happen if the account was deleted mid-reset)."""
+    email_clean = email.strip().lower()
+    hashed = get_password_hash(new_password)
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = supabase.table("users").select("id").eq("email", email_clean).execute()
+            rows = safe_supabase_rows(res)
+            if rows:
+                supabase.table("users").update({"hashed_password": hashed}).eq("id", rows[0]["id"]).execute()
+                return True
+        except Exception as e:
+            logger.error(f"Supabase reset_user_password error: {e}. Falling back to local store.")
+
+    user = _local_users.get(email_clean)
+    if not user:
+        return False
+    user["hashed_password"] = hashed
+    return True
 
 
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Any, Dict
+from fastapi import APIRouter, HTTPException, status, Depends
 from app.schemas.auth import (
     ManualAuthRequest,
     GoogleAuthRequest,
@@ -6,7 +7,18 @@ from app.schemas.auth import (
     RequestPasswordResetRequest,
     TokenResponse,
 )
-from app.services.auth_service import signup_user, authenticate_user, authenticate_google
+from app.services.auth_service import (
+    signup_user,
+    authenticate_user,
+    authenticate_google,
+    AccountNotVerifiedError,
+    get_user_by_email,
+    mark_user_verified,
+)
+from app.services.otp_service import generate_and_store_otp, verify_otp
+from app.core.email import send_otp_email
+from app.core.security import create_access_token
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
@@ -17,7 +29,7 @@ def manual_authentication(req: ManualAuthRequest):
         if req.type == "SIGNUP_MANUALLY":
             res = signup_user(req.email, req.password, req.fullName)
             return TokenResponse(
-                msg="Account created successfully",
+                msg="Account created. Check your email for a verification code.",
                 authorization=res["authorization"],
                 refreshToken=res["refreshToken"],
             )
@@ -28,6 +40,15 @@ def manual_authentication(req: ManualAuthRequest):
                 authorization=res["authorization"],
                 refreshToken=res["refreshToken"],
             )
+    except AccountNotVerifiedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "err": "account_not_verified",
+                "msg": "Please verify your email before signing in. We've sent a fresh code.",
+                "authorization": e.authorization,
+            },
+        )
     except ValueError as e:
         err_msg = str(e)
         if err_msg == "account_exist":
@@ -82,17 +103,24 @@ def google_authentication(req: GoogleAuthRequest):
         )
 
 
-@router.post("/verify")
-def verify_email(req: VerifyEmailRequest):
-    return {
-        "msg": "Email verified successfully",
-        "authorization": f"local_jwt_verified_{req.verificationCode}",
-        "refreshToken": f"local_refresh_verified_{req.verificationCode}",
-    }
+@router.post("/verify", response_model=TokenResponse)
+def verify_email(req: VerifyEmailRequest, current_user: Dict[str, Any] = Depends(get_current_user)):
+    email = current_user["email"]
+    if not verify_otp(email, "verify_email", req.verificationCode):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"err": "invalid_code", "msg": "Invalid or expired code. Please try again."},
+        )
+    mark_user_verified(current_user["_id"])
+    token = create_access_token({"sub": current_user["_id"], "email": email})
+    return TokenResponse(msg="Email verified successfully", authorization=token, refreshToken=token)
 
 
 @router.post("/resendVerification")
-def resend_verification():
+def resend_verification(current_user: Dict[str, Any] = Depends(get_current_user)):
+    email = current_user["email"]
+    code = generate_and_store_otp(email, "verify_email")
+    send_otp_email(email, code, "verify_email")
     return {"msg": "Verification code resent"}
 
 
@@ -103,4 +131,12 @@ def logout():
 
 @router.post("/requestPasswordReset")
 def request_password_reset(req: RequestPasswordResetRequest):
-    return {"msg": "Password reset code sent to email"}
+    # Look the account up but always return the same generic response,
+    # whether or not the email is registered, so this endpoint can't be
+    # used to enumerate accounts. Only a *real* account actually gets an
+    # email/OTP generated.
+    user = get_user_by_email(req.email)
+    if user:
+        code = generate_and_store_otp(user["email"], "reset_password")
+        send_otp_email(user["email"], code, "reset_password")
+    return {"msg": "If an account exists for this email, a reset code has been sent."}
