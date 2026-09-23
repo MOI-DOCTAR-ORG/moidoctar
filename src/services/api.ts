@@ -48,9 +48,12 @@ async function request<T>(
     return res.data
   } catch (error) {
     const maybeError = error as { response?: { status?: number; data?: Record<string, unknown> } }
+    const data = (maybeError.response?.data ?? {}) as Record<string, unknown>
+    const detail = typeof data.detail === 'object' && data.detail !== null ? (data.detail as Record<string, unknown>) : {}
     const err: ApiError = {
       status: maybeError.response?.status ?? 0,
-      ...(maybeError.response?.data ?? {}),
+      ...data,
+      ...detail,
     }
     throw err
   }
