@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # a Google ID token was actually issued for this app before trusting it.
     GOOGLE_CLIENT_ID: str = ""
 
+    # Google Gemini AI Triage (API Key from Google AI Studio).
+    GOOGLE_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app"
 
