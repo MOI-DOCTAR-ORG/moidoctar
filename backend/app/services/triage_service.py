@@ -1,8 +1,10 @@
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+from app.core.config import settings
 from app.core.supabase import get_supabase_client, safe_supabase_rows
 
 logger = logging.getLogger("moidoctar.triage")
@@ -163,10 +165,20 @@ def _call_gemini_triage(symptoms: str) -> Optional[Dict[str, Any]]:
         from moi_doctar_ai.gemini import GeminiModel
         from moi_doctar_ai.loop import ModelError
     except ImportError:
-        logger.warning("moi_doctar_ai package not importable; skipping AI triage call.")
-        return None
+        import sys
+        ai_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ai")
+        if os.path.isdir(ai_dir) and ai_dir not in sys.path:
+            sys.path.insert(0, ai_dir)
+        try:
+            from moi_doctar_ai.gemini import GeminiModel
+            from moi_doctar_ai.loop import ModelError
+        except ImportError:
+            logger.warning("moi_doctar_ai package not importable; skipping AI triage call.")
+            return None
 
-    model = GeminiModel()
+    api_key = (settings.GOOGLE_API_KEY or os.environ.get("GOOGLE_API_KEY", "")).strip()
+    gemini_model = (settings.GEMINI_MODEL or os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")).strip()
+    model = GeminiModel(api_key=api_key, model=gemini_model)
     if not model.api_key:
         logger.info("GOOGLE_API_KEY not set; using rule-based triage only.")
         return None

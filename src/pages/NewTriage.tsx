@@ -232,7 +232,7 @@ export default function NewTriage() {
               </div>
               <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] border-l-[3px] border-l-[var(--neon-primary)] rounded-2xl rounded-tl-none p-4 shadow-lg shadow-[var(--neon-primary)]/5 space-y-4">
                 <p className="font-body-md text-on-surface">
-                  I understand. On a scale of severity, how would you classify this pain right now?
+                  I understand. On a scale of severity, how would you classify these symptoms right now?
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   {severityOptions.map((opt) => (
