@@ -109,18 +109,16 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> T
     if _smtp_configured():
         return _send_via_smtp(to_email, subject, html_body, text_body)
 
-    # 3. Graceful degradation: Log email content to console
+    # 3. Graceful degradation: Log email delivery attempt without leaking OTP
     logger.warning(
-        "No email service configured (set RESEND_API_KEY in environment).\n"
-        f"Simulated email to: {to_email}\nSubject: {subject}\n{text_body}"
+        f"No email service configured (set RESEND_API_KEY in environment). Simulated email delivery for: {to_email}"
     )
     return False, "Logged to console (no email service active)"
 
 
 def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
     """Send a 6-digit OTP code for either 'verify_email' or 'reset_password'."""
-    # Always log the OTP code so developers/testers can find it in server logs
-    logger.info(f"[OTP] Generated 6-digit verification code for {to_email} ({purpose}): {code}")
+    logger.info(f"[OTP] Verification code generated for {to_email} ({purpose})")
 
     if purpose == "reset_password":
         subject = "Your MoiDoctar password reset code"

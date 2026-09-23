@@ -1,6 +1,10 @@
 import json
 import logging
 import os
+import re
+import time
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
@@ -154,83 +158,97 @@ User-reported symptoms:
 """
 
 
+_FALLBACK_MODELS = [
+    "gemini-flash-lite-latest",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+]
+
+
 def _call_gemini_triage(symptoms: str) -> Optional[Dict[str, Any]]:
     """Ask Gemini for a structured triage assessment of free-text symptoms.
 
-    Returns None (never raises) if the API key is missing, the network call
-    fails, or the model's response cannot be parsed - callers must always be
-    ready to fall back to the deterministic rule engine.
+    Uses a prioritized candidate model list with automatic fallbacks and
+    transient retry to ensure resilience against Google API 503/429/timeout spikes.
+    Returns None (never raises) if all models fail - callers will fall back
+    to the deterministic rule engine.
     """
-    try:
-        from moi_doctar_ai.gemini import GeminiModel
-        from moi_doctar_ai.loop import ModelError
-    except ImportError:
-        import sys
-        ai_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ai")
-        if os.path.isdir(ai_dir) and ai_dir not in sys.path:
-            sys.path.insert(0, ai_dir)
-        try:
-            from moi_doctar_ai.gemini import GeminiModel
-            from moi_doctar_ai.loop import ModelError
-        except ImportError:
-            logger.warning("moi_doctar_ai package not importable; skipping AI triage call.")
-            return None
-
     api_key = (settings.GOOGLE_API_KEY or os.environ.get("GOOGLE_API_KEY", "")).strip()
-    gemini_model = (settings.GEMINI_MODEL or os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")).strip()
-    model = GeminiModel(api_key=api_key, model=gemini_model)
-    if not model.api_key:
+    if not api_key:
         logger.info("GOOGLE_API_KEY not set; using rule-based triage only.")
         return None
 
+    configured_model = (settings.GEMINI_MODEL or os.environ.get("GEMINI_MODEL", "")).strip()
+    candidate_models: List[str] = []
+    if configured_model:
+        candidate_models.append(configured_model)
+    for fm in _FALLBACK_MODELS:
+        if fm not in candidate_models:
+            candidate_models.append(fm)
+
     prompt = _TRIAGE_PROMPT_TEMPLATE.format(symptoms=symptoms[:4000])
     contents = [{"role": "user", "parts": [{"text": prompt}]}]
+    body_bytes = json.dumps({
+        "contents": contents,
+        "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
+    }).encode("utf-8")
 
-    try:
-        import urllib.request
+    for model_name in candidate_models:
+        for attempt in range(2):
+            try:
+                request = urllib.request.Request(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent",
+                    data=body_bytes,
+                    headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=12) as response:
+                    payload = json.load(response)
 
-        body = {
-            "contents": contents,
-            "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
-        }
-        request = urllib.request.Request(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model.model}:generateContent",
-            data=json.dumps(body).encode(),
-            headers={"Content-Type": "application/json", "x-goog-api-key": model.api_key},
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=model.timeout) as response:
-            payload = json.load(response)
+                candidates = payload.get("candidates") or []
+                if not candidates:
+                    break
+                parts = ((candidates[0].get("content") or {}).get("parts")) or []
+                text = "".join(p.get("text", "") for p in parts).strip()
+                if not text:
+                    break
 
-        candidates = payload.get("candidates") or []
-        if not candidates:
-            return None
-        parts = ((candidates[0].get("content") or {}).get("parts")) or []
-        text = "".join(p.get("text", "") for p in parts).strip()
-        if not text:
-            return None
+                # Extract JSON using robust regex matching
+                match = re.search(r"\{.*\}", text, re.DOTALL)
+                if not match:
+                    break
+                data = json.loads(match.group(0))
 
-        # Defensive: strip accidental markdown fences if the model adds them.
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lower().startswith("json"):
-                text = text[4:]
+                required = {
+                    "urgency_level", "confidence_score", "needs_more_info", "rationale",
+                    "possible_conditions", "recommended_actions", "follow_up_questions", "red_flags_to_watch"
+                }
+                if not required.issubset(data.keys()):
+                    logger.warning(f"Gemini ({model_name}) response missing required keys: {required - data.keys()}")
+                    break
+                if data["urgency_level"] not in _URGENCY_RANK:
+                    logger.warning(f"Gemini ({model_name}) returned unknown urgency_level: {data['urgency_level']}")
+                    break
 
-        data = json.loads(text)
+                logger.info(f"Gemini triage assessment successfully generated using {model_name}")
+                return data
 
-        required = {"urgency_level", "confidence_score", "needs_more_info", "rationale",
-                    "possible_conditions", "recommended_actions", "follow_up_questions", "red_flags_to_watch"}
-        if not required.issubset(data.keys()):
-            logger.warning(f"Gemini triage response missing keys: {required - data.keys()}")
-            return None
-        if data["urgency_level"] not in _URGENCY_RANK:
-            logger.warning(f"Gemini triage returned unknown urgency_level: {data['urgency_level']}")
-            return None
+            except urllib.error.HTTPError as exc:
+                if exc.code in (503, 429) and attempt == 0:
+                    time.sleep(0.5)
+                    continue
+                logger.warning(f"Gemini model {model_name} HTTP {exc.code}, trying fallback model...")
+                break
+            except Exception as exc:
+                if attempt == 0:
+                    time.sleep(0.5)
+                    continue
+                logger.warning(f"Gemini model {model_name} failed: {exc}, trying fallback model...")
+                break
 
-        return data
-    except Exception as e:
-        logger.warning(f"Gemini triage call failed, falling back to rules: {e}")
-        return None
+    logger.warning("All Gemini candidate models failed; falling back to deterministic rule engine.")
+    return None
 
 
 def analyze_symptoms(symptoms: str) -> Dict[str, Any]:
@@ -268,47 +286,64 @@ def analyze_symptoms(symptoms: str) -> Dict[str, Any]:
 def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str, Any]) -> None:
     supabase = get_supabase_client()
     now_iso = datetime.now(timezone.utc).isoformat()
-    new_id = assessment.get("assessment_id") or ("tri_" + uuid.uuid4().hex[:10])
+    raw_id = assessment.get("assessment_id") or ("tri_" + uuid.uuid4().hex[:10])
 
     urgency = assessment.get("urgency_level", "Moderate")
     status_level = "Emergency" if urgency == "Urgent" else ("Urgent" if urgency == "Moderate" else "Non-Urgent")
     severity = "Severe" if urgency == "Urgent" else ("Moderate" if urgency == "Moderate" else "Mild")
+    action_plan = (assessment.get("recommended_actions") or ["Monitor symptoms"])[0]
+    symptoms_list = symptoms if isinstance(symptoms, list) else [str(symptoms)]
 
-    record = {
-        "id": new_id,
-        "user_id": user_id,
-        "symptoms": symptoms,
-        "duration": "Recent",
-        "severity": severity,
-        "urgency_level": urgency,
-        "action_plan": (assessment.get("recommended_actions") or ["Monitor symptoms"])[0],
-        "created_at": now_iso,
-    }
+    user_is_uuid = False
+    try:
+        uuid.UUID(str(user_id))
+        user_is_uuid = True
+    except (ValueError, TypeError, AttributeError):
+        user_is_uuid = False
 
-    if supabase:
+    session_uuid = str(uuid.uuid4())
+
+    if supabase and user_is_uuid:
+        record = {
+            "id": session_uuid,
+            "user_id": str(user_id),
+            "symptoms": symptoms_list,
+            "duration": "Recent",
+            "severity": severity,
+            "urgency_level": urgency,
+            "action_plan": action_plan,
+            "created_at": now_iso,
+        }
         try:
             supabase.table("triage_sessions").insert(record).execute()
-            return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Could not insert triage session into Supabase: {e}")
 
     _local_triage_sessions.insert(0, {
-        "_id": new_id,
-        "user_id": user_id,
-        "symptoms": symptoms,
+        "_id": raw_id,
+        "id": session_uuid,
+        "user_id": str(user_id),
+        "symptoms": symptoms_list,
         "duration": "Recent",
         "severity": severity,
         "triageStatus": {"level": status_level},
-        "actionPlan": record["action_plan"],
+        "actionPlan": action_plan,
         "createdAt": now_iso,
     })
 
 
 def get_triage_history(user_id: str) -> List[Dict[str, Any]]:
     supabase = get_supabase_client()
-    if supabase:
+    user_is_uuid = False
+    try:
+        uuid.UUID(str(user_id))
+        user_is_uuid = True
+    except (ValueError, TypeError, AttributeError):
+        user_is_uuid = False
+
+    if supabase and user_is_uuid:
         try:
-            res = supabase.table("triage_sessions").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            res = supabase.table("triage_sessions").select("*").eq("user_id", str(user_id)).order("created_at", desc=True).execute()
             rows = safe_supabase_rows(res)
             items = []
             for row in rows:
@@ -325,10 +360,10 @@ def get_triage_history(user_id: str) -> List[Dict[str, Any]]:
                 })
             if items:
                 return items
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Could not retrieve triage history from Supabase: {e}")
 
-    return [s for s in _local_triage_sessions if isinstance(s, dict) and (s.get("user_id") == user_id or True)]
+    return [s for s in _local_triage_sessions if isinstance(s, dict) and (str(s.get("user_id")) == str(user_id) or str(user_id) in ("user", "usr_demo_001"))]
 
 
 def get_cache_stats() -> Dict[str, Any]:

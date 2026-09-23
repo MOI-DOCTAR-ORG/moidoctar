@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Google Gemini AI Triage (API Key from Google AI Studio).
     GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
     # Server Port
     PORT: int = 3000
