@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     SMTP_USE_SSL: bool = False
 
     # CORS
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app,https://moidoctar8.pxxlspace.cv"
 
     @property
     def normalized_supabase_url(self) -> str:
