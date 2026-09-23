@@ -95,13 +95,9 @@ export default function OtpVerification() {
     setOtp(Array(6).fill(''))
     setIsError(false)
     setErrorMsg('')
-    const res = await resendVerificationCode(email !== 'your email' ? email : undefined)
+    await resendVerificationCode(email !== 'your email' ? email : undefined)
     setIsResending(false)
-    if (res?.dev_code) {
-      addToast(`Verification code: ${res.dev_code}`, 'info')
-    } else {
-      addToast('A new code has been sent to your email.', 'success')
-    }
+    addToast('A new code has been sent to your email.', 'success')
     setTimeout(() => focusInput(0), 50)
   }, [isResending, resendVerificationCode, addToast, email, focusInput])
 

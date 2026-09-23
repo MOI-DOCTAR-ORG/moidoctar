@@ -77,11 +77,17 @@ export function useStopMedication() {
 export function useCreateTriage() {
   return useMutation({
     mutationFn: (payload: TriageRequest) => {
-      const fd = new FormData()
-      fd.append('symptoms', payload.symptoms)
-      if (payload.clinical_context) fd.append('clinical_context', payload.clinical_context)
-      if (payload.image) fd.append('image', payload.image)
-      return modelClient.post<TriageResponse>('/triage', fd)
+      if (payload.image) {
+        const fd = new FormData()
+        fd.append('symptoms', payload.symptoms)
+        if (payload.clinical_context) fd.append('clinical_context', payload.clinical_context)
+        fd.append('image', payload.image)
+        return modelClient.post<TriageResponse>('/triage', fd)
+      }
+      return modelClient.post<TriageResponse>('/triage', {
+        symptoms: payload.symptoms,
+        clinical_context: payload.clinical_context,
+      })
     },
   })
 }
@@ -89,11 +95,17 @@ export function useCreateTriage() {
 export function useCreateTriageChat() {
   return useMutation({
     mutationFn: (payload: TriageChatRequest) => {
-      const fd = new FormData()
-      fd.append('symptoms', payload.symptoms)
-      fd.append('messages', payload.messages ?? '[]')
-      if (payload.image) fd.append('image', payload.image)
-      return modelClient.post<TriageChatResponse>('/triage/chat', fd)
+      if (payload.image) {
+        const fd = new FormData()
+        fd.append('symptoms', payload.symptoms)
+        fd.append('messages', payload.messages ?? '[]')
+        fd.append('image', payload.image)
+        return modelClient.post<TriageChatResponse>('/triage/chat', fd)
+      }
+      return modelClient.post<TriageChatResponse>('/triage/chat', {
+        symptoms: payload.symptoms,
+        messages: payload.messages ?? '[]',
+      })
     },
   })
 }
