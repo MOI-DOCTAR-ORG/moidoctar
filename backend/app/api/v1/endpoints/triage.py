@@ -1,5 +1,7 @@
+import json
+import logging
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile
 from app.schemas.triage import TriageResponse, TriageChatResponse, TriageListResponse
 from app.services.triage_service import (
     analyze_symptoms,
@@ -8,19 +10,61 @@ from app.services.triage_service import (
 )
 from app.api.deps import get_current_user
 
+logger = logging.getLogger("moidoctar.triage")
 router = APIRouter()
 
 
+async def _extract_triage_data(request: Request):
+    """Gracefully accept triage payloads in JSON, FormData, or URL-encoded form."""
+    content_type = (request.headers.get("content-type") or "").lower()
+    symptoms = ""
+    clinical_context = ""
+    messages = "[]"
+    image: Optional[UploadFile] = None
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                symptoms = str(body.get("symptoms") or "").strip()
+                clinical_context = str(body.get("clinical_context") or "").strip()
+                msgs = body.get("messages")
+                if isinstance(msgs, (list, dict)):
+                    messages = json.dumps(msgs)
+                elif isinstance(msgs, str):
+                    messages = msgs
+        except Exception as e:
+            logger.debug(f"Could not parse JSON body: {e}")
+    else:
+        try:
+            form = await request.form()
+            symptoms = str(form.get("symptoms") or "").strip()
+            clinical_context = str(form.get("clinical_context") or "").strip()
+            msgs = form.get("messages")
+            if isinstance(msgs, str):
+                messages = msgs
+            img = form.get("image")
+            if isinstance(img, UploadFile):
+                image = img
+        except Exception as e:
+            logger.debug(f"Could not parse form body: {e}")
+
+    return symptoms, clinical_context, messages, image
+
+
 @router.post("", response_model=TriageResponse)
-def perform_triage(
-    symptoms: str = Form(...),
-    clinical_context: Optional[str] = Form(None),
-    image: Optional[UploadFile] = File(None),
+async def perform_triage(
+    request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    full_text = f"{symptoms} {clinical_context or ''}".strip()
+    symptoms, clinical_context, _, _ = await _extract_triage_data(request)
+    full_text = f"{symptoms} {clinical_context}".strip()
+    if not full_text:
+        full_text = "General symptom assessment"
+
     assessment = analyze_symptoms(full_text)
-    save_triage_session(current_user["_id"], [symptoms], assessment)
+    user_id = current_user.get("_id") or current_user.get("id") or "user"
+    save_triage_session(user_id, [symptoms or full_text], assessment)
 
     return TriageResponse(
         assessment_id=assessment["assessment_id"],
@@ -33,14 +77,17 @@ def perform_triage(
 
 
 @router.post("/chat", response_model=TriageChatResponse)
-def perform_triage_chat(
-    symptoms: str = Form(...),
-    messages: Optional[str] = Form("[]"),
-    image: Optional[UploadFile] = File(None),
+async def perform_triage_chat(
+    request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
+    symptoms, _, messages, _ = await _extract_triage_data(request)
+    if not symptoms:
+        symptoms = "General symptom assessment"
+
     assessment = analyze_symptoms(symptoms)
-    save_triage_session(current_user["_id"], [symptoms], assessment)
+    user_id = current_user.get("_id") or current_user.get("id") or "user"
+    save_triage_session(user_id, [symptoms], assessment)
 
     return TriageChatResponse(
         assessment_id=assessment["assessment_id"],
@@ -59,5 +106,6 @@ def perform_triage_chat(
 @router.get("/list", response_model=TriageListResponse)
 @router.get("/history", response_model=TriageListResponse)
 def list_triage_history(current_user: Dict[str, Any] = Depends(get_current_user)):
-    history = get_triage_history(current_user["_id"])
+    user_id = current_user.get("_id") or current_user.get("id") or "user"
+    history = get_triage_history(user_id)
     return TriageListResponse(msg="Triage history retrieved", data=history)

@@ -152,21 +152,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserChangeKey(k => k + 1)
       return { success: true }
     } catch (err) {
-      const e = err as { err?: string; authorization?: string; dev_code?: string; msg?: string }
+      const e = err as { err?: string; authorization?: string; msg?: string }
       if (e?.err === 'account_not_verified' && e.authorization) {
         // Store the temp token so the verify page can call /auth/verify
         setTokens(e.authorization, '')
-        if (e.dev_code) {
-          console.log(
-            `%c[MoiDoctar Dev OTP] 🔑 Verification Code for ${email}: ${e.dev_code}`,
-            'background: #1e3a8a; color: #93c5fd; font-size: 15px; font-weight: bold; padding: 6px 12px; border-radius: 8px;'
-          )
-        }
         return {
           success: false,
-          error: e.dev_code
-            ? `Your email is not verified. (Dev Code: ${e.dev_code})`
-            : 'Your email is not verified. We\'ve sent a fresh code — check your inbox.',
+          error: "Your email is not verified. We've sent a fresh code — check your inbox.",
           needsVerification: true,
           pendingEmail: email.toLowerCase().trim(),
         }
@@ -229,12 +221,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         '/auth/resendVerification',
         email && email !== 'your email' ? { email: email.toLowerCase().trim() } : undefined
       )
-      if (res?.dev_code) {
-        console.log(
-          `%c[MoiDoctar Dev OTP] 🔑 Verification Code: ${res.dev_code}`,
-          'background: #1e3a8a; color: #93c5fd; font-size: 15px; font-weight: bold; padding: 6px 12px; border-radius: 8px;'
-        )
-      }
       return res
     } catch { /* silent — toast is shown by the caller */ }
   }, [])
