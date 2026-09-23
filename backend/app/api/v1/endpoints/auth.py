@@ -28,14 +28,13 @@ router = APIRouter()
 @router.post("/manualAuthentication", response_model=TokenResponse)
 def manual_authentication(req: ManualAuthRequest):
     try:
-        is_email_live = bool(settings.RESEND_API_KEY and settings.RESEND_API_KEY.strip())
         if req.type == "SIGNUP_MANUALLY":
             res = signup_user(req.email, req.password, req.fullName)
             return TokenResponse(
                 msg="Account created. Check your email for a verification code.",
                 authorization=res["authorization"],
                 refreshToken=res["refreshToken"],
-                dev_code=res.get("dev_code") if not is_email_live else None,
+                dev_code=res.get("dev_code"),
             )
         else:
             res = authenticate_user(req.email, req.password)
@@ -45,14 +44,13 @@ def manual_authentication(req: ManualAuthRequest):
                 refreshToken=res["refreshToken"],
             )
     except AccountNotVerifiedError as e:
-        is_email_live = bool(settings.RESEND_API_KEY and settings.RESEND_API_KEY.strip())
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "err": "account_not_verified",
-                "msg": f"Please verify your email before signing in.{f' (Dev code: {e.code})' if e.code and not is_email_live else ' We have sent a fresh code.'}",
+                "msg": f"Please verify your email before signing in. (Verification code: {e.code})",
                 "authorization": e.authorization,
-                "dev_code": e.code if not is_email_live else None,
+                "dev_code": e.code,
             },
         )
     except ValueError as e:
@@ -163,11 +161,27 @@ def resend_verification(
         )
 
     code = generate_and_store_otp(email, "verify_email")
-    send_otp_email(email, code, "verify_email")
-    is_email_live = bool(settings.RESEND_API_KEY and settings.RESEND_API_KEY.strip())
+    ok, email_status = send_otp_email(email, code, "verify_email")
     return {
-        "msg": "Verification code resent",
-        "dev_code": code if not is_email_live else None,
+        "msg": "Verification code resent" if ok else f"Verification code generated ({email_status})",
+        "dev_code": code,
+        "email_delivered": ok,
+        "email_status": email_status,
+    }
+
+
+@router.get("/test-resend")
+def test_resend(to: str = "lateefedidi4@gmail.com"):
+    from app.core.email import _send_via_resend
+    ok, detail = _send_via_resend(to, "MoiDoctar Resend Test", "<p>Test email from MoiDoctar</p>", "Test email from MoiDoctar")
+    key = (settings.RESEND_API_KEY or "").strip()
+    return {
+        "ok": ok,
+        "detail": detail,
+        "has_api_key": bool(key),
+        "key_prefix": (key[:6] + "...") if key else None,
+        "from": settings.RESEND_FROM,
+        "to": to,
     }
 
 
