@@ -36,3 +36,4 @@ class TokenResponse(BaseModel):
     msg: Optional[str] = "Success"
     authorization: str
     refreshToken: str
+    dev_code: Optional[str] = None
