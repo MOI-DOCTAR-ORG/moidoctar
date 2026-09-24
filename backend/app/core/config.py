@@ -60,6 +60,27 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app,https://moidoctar8.pxxlspace.cv"
 
     @property
+    def effective_resend_api_key(self) -> str:
+        key = (
+            os.getenv("RESEND_API_KEY")
+            or os.getenv("RESEND_KEY")
+            or os.getenv("RESEND_TOKEN")
+            or self.RESEND_API_KEY
+            or ""
+        ).strip().strip("'\" \t\r\n")
+        return key
+
+    @property
+    def effective_resend_from(self) -> str:
+        addr = (
+            os.getenv("RESEND_FROM")
+            or os.getenv("RESEND_SENDER")
+            or self.RESEND_FROM
+            or "MoiDoctar <onboarding@resend.dev>"
+        ).strip().strip("'\" \t\r\n")
+        return addr
+
+    @property
     def normalized_supabase_url(self) -> str:
         url = (self.SUPABASE_URL or "").strip().rstrip("/")
         import re

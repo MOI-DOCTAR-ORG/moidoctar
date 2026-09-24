@@ -47,13 +47,14 @@ export type TriageSession = {
   rationale?: string
 }
 
-type AuthTokens = { authorization: string; refreshToken: string }
+type AuthTokens = { authorization: string; refreshToken: string; email_delivered?: boolean; email_error?: string }
 type VerifyResponse = { msg: string; authorization?: string; refreshToken?: string }
 
 type LoginResult =
   | { success: true }
-  | { success: false; error: string; needsVerification?: true; pendingEmail?: string }
-type SignUpResult = { success: true } | { success: false; error: string }
+  | { success: false; error: string; needsVerification?: true; pendingEmail?: string; emailDelivered?: boolean }
+type SignUpResult = { success: true; emailDelivered?: boolean } | { success: false; error: string }
+
 
 type AuthState = {
   user: BackendUser | null
@@ -66,7 +67,7 @@ type AuthContextValue = AuthState & {
   signUp: (fullName: string, email: string, password: string) => Promise<SignUpResult>
   signInWithGoogle: (token: string, tokenType?: 'id_token' | 'access_token') => Promise<LoginResult>
   verifyEmail: (code: string, email?: string) => Promise<boolean>
-  resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string } | void>
+  resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string; email_delivered?: boolean } | void>
   signOut: () => Promise<void>
   sessions: TriageSession[]
   addSession: (session: TriageSession) => void
@@ -213,15 +214,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void refreshSessions()
       return { success: true }
     } catch (err) {
-      const e = err as { err?: string; authorization?: string; msg?: string }
+      const e = err as { err?: string; authorization?: string; msg?: string; email_delivered?: boolean }
       if (e?.err === 'account_not_verified' && e.authorization) {
         // Store the temp token so the verify page can call /auth/verify
         setTokens(e.authorization, '')
         return {
           success: false,
-          error: "Your email is not verified. We've sent a fresh code — check your inbox.",
+          error: e.email_delivered
+            ? "Your email is not verified. We've sent a fresh code — check your inbox."
+            : "Your email is not verified. A code has been generated — contact support if you don't receive the email.",
           needsVerification: true,
           pendingEmail: email.toLowerCase().trim(),
+          emailDelivered: e.email_delivered ?? false,
         }
       }
       return { success: false, error: mapApiError(err) }
@@ -237,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName,
       }, null)
       setTokens(res.authorization, res.refreshToken)
-      return { success: true }
+      return { success: true, emailDelivered: res.email_delivered ?? false }
     } catch (err) {
       return { success: false, error: mapApiError(err) }
     }
@@ -280,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resendVerificationCode = useCallback(async (email?: string) => {
     try {
-      const res = await api.post<{ msg?: string; dev_code?: string }>(
+      const res = await api.post<{ msg?: string; dev_code?: string; email_delivered?: boolean; email_status?: string }>(
         '/auth/resendVerification',
         email && email !== 'your email' ? { email: email.toLowerCase().trim() } : undefined
       )

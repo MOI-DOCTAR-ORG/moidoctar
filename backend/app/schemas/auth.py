@@ -38,3 +38,6 @@ class TokenResponse(BaseModel):
     authorization: str
     refreshToken: str
     dev_code: Optional[str] = None
+    email_delivered: Optional[bool] = None
+    email_error: Optional[str] = None
+

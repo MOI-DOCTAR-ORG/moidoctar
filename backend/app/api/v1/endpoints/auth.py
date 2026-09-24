@@ -30,11 +30,15 @@ def manual_authentication(req: ManualAuthRequest):
     try:
         if req.type == "SIGNUP_MANUALLY":
             res = signup_user(req.email, req.password, req.fullName)
+            email_delivered = res.get("email_delivered", False)
+            email_status = res.get("email_status", "")
             return TokenResponse(
-                msg="Account created. Check your email for a verification code.",
+                msg="Account created. Check your email for a verification code." if email_delivered else f"Account created. ({email_status})",
                 authorization=res["authorization"],
                 refreshToken=res["refreshToken"],
                 dev_code=res.get("dev_code"),
+                email_delivered=email_delivered,
+                email_error=None if email_delivered else email_status,
             )
         else:
             res = authenticate_user(req.email, req.password)
@@ -48,9 +52,11 @@ def manual_authentication(req: ManualAuthRequest):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "err": "account_not_verified",
-                "msg": f"Please verify your email before signing in. (Verification code: {e.code})",
+                "msg": "Please verify your email before signing in. Check your inbox for your code." if e.email_delivered else f"Please verify your email. ({e.email_error or 'Code generated'})",
                 "authorization": e.authorization,
                 "dev_code": e.code,
+                "email_delivered": e.email_delivered,
+                "email_error": e.email_error,
             },
         )
     except ValueError as e:
@@ -134,11 +140,21 @@ def verify_email(
             detail={"err": "invalid_code", "msg": "Invalid or expired code. Please try again."},
         )
 
+    if not user_id and email:
+        user = get_user_by_email(email)
+        if user:
+            user_id = user.get("id") or user.get("_id")
+
     mark_user_verified(user_id=user_id, email=email)
     sub_id = user_id or "verified"
     token = create_access_token({"sub": str(sub_id), "email": email})
 
-    return TokenResponse(msg="Email verified successfully", authorization=token, refreshToken=token)
+    return TokenResponse(
+        msg="Email verified successfully",
+        authorization=token,
+        refreshToken=token,
+        email_delivered=True,
+    )
 
 
 @router.post("/resendVerification")
@@ -161,7 +177,7 @@ def resend_verification(
     code = generate_and_store_otp(email, "verify_email")
     ok, email_status = send_otp_email(email, code, "verify_email")
     return {
-        "msg": "Verification code resent" if ok else f"Verification code generated ({email_status})",
+        "msg": "Verification code resent to your email" if ok else f"Verification code generated ({email_status})",
         "dev_code": code,
         "email_delivered": ok,
         "email_status": email_status,
@@ -172,13 +188,13 @@ def resend_verification(
 def test_resend(to: str = "lateefedidi4@gmail.com"):
     from app.core.email import _send_via_resend
     ok, detail = _send_via_resend(to, "MoiDoctar Resend Test", "<p>Test email from MoiDoctar</p>", "Test email from MoiDoctar")
-    key = (settings.RESEND_API_KEY or "").strip()
+    key = settings.effective_resend_api_key
     return {
         "ok": ok,
         "detail": detail,
         "has_api_key": bool(key),
         "key_prefix": (key[:6] + "...") if key else None,
-        "from": settings.RESEND_FROM,
+        "from": settings.effective_resend_from,
         "to": to,
     }
 

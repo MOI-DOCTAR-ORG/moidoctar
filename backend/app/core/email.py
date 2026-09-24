@@ -18,16 +18,17 @@ def _send_via_resend(to_email: str, subject: str, html_body: str, text_body: str
     
     Returns (success, detail_message).
     """
-    api_key = (settings.RESEND_API_KEY or "").strip()
+    api_key = settings.effective_resend_api_key
     if not api_key:
         return False, "RESEND_API_KEY is not set"
 
     url = "https://api.resend.com/emails"
-    from_addr = (settings.RESEND_FROM or "MoiDoctar <onboarding@resend.dev>").strip()
+    from_addr = settings.effective_resend_from
+    recipient = to_email.strip().lower()
 
     payload = {
         "from": from_addr,
-        "to": [to_email],
+        "to": [recipient],
         "subject": subject,
         "html": html_body,
         "text": text_body,
@@ -48,14 +49,29 @@ def _send_via_resend(to_email: str, subject: str, html_body: str, text_body: str
         with urllib.request.urlopen(req, timeout=10) as response:
             res_data = json.load(response)
             email_id = res_data.get("id")
-            logger.info(f"Email successfully delivered via Resend to {to_email} (id: {email_id})")
+            logger.info(f"Email successfully delivered via Resend to {recipient} (id: {email_id})")
             return True, f"Delivered (id: {email_id})"
     except urllib.error.HTTPError as exc:
-        err_detail = exc.read().decode("utf-8", "replace")[:400]
-        logger.error(f"Resend API HTTP error {exc.code} for {to_email}: {err_detail}")
-        return False, f"HTTP {exc.code}: {err_detail}"
+        err_raw = exc.read().decode("utf-8", "replace")
+        try:
+            err_json = json.loads(err_raw)
+            err_msg = err_json.get("message") or err_json.get("name") or err_raw
+        except Exception:
+            err_msg = err_raw[:300]
+
+        # Specific diagnosis for Resend testing domain (onboarding@resend.dev)
+        if "only send testing emails to your own email address" in err_msg.lower():
+            logger.warning(
+                f"[Resend Sandbox Restriction] Cannot deliver email to {recipient}. "
+                f"Resend's free default domain (onboarding@resend.dev) only allows sending to the Resend account owner. "
+                f"To send to any recipient, verify your domain at resend.com/domains and set RESEND_FROM."
+            )
+            return False, f"Resend sandbox restriction: {err_msg}"
+
+        logger.error(f"Resend API HTTP error {exc.code} for {recipient}: {err_msg}")
+        return False, f"HTTP {exc.code}: {err_msg}"
     except Exception as exc:
-        logger.error(f"Resend network/request error for {to_email}: {exc}")
+        logger.error(f"Resend network/request error for {recipient}: {exc}")
         return False, str(exc)
 
 
@@ -66,11 +82,12 @@ def _smtp_configured() -> bool:
 def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
     """Send an email via standard SMTP."""
     from_addr = settings.SMTP_FROM.strip() or settings.SMTP_USER
+    recipient = to_email.strip().lower()
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = from_addr
-    msg["To"] = to_email
+    msg["To"] = recipient
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
@@ -79,7 +96,7 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, context=context, timeout=10) as server:
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(from_addr, [to_email], msg.as_string())
+                server.sendmail(from_addr, [recipient], msg.as_string())
         else:
             with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
                 server.ehlo()
@@ -88,37 +105,49 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
                     server.starttls(context=context)
                     server.ehlo()
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(from_addr, [to_email], msg.as_string())
-        logger.info(f"Email successfully sent via SMTP to {to_email}")
+                server.sendmail(from_addr, [recipient], msg.as_string())
+        logger.info(f"Email successfully sent via SMTP to {recipient}")
         return True, "Delivered via SMTP"
     except Exception as e:
-        logger.error(f"Failed to send email via SMTP to {to_email}: {e}")
+        logger.error(f"Failed to send email via SMTP to {recipient}: {e}")
         return False, f"SMTP Error: {e}"
 
 
 def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
     """Send an email via Resend (preferred) or SMTP fallback."""
+    recipient = to_email.strip().lower()
+    last_error = ""
+
     # 1. Try Resend if configured
-    if settings.RESEND_API_KEY:
-        ok, detail = _send_via_resend(to_email, subject, html_body, text_body)
+    if settings.effective_resend_api_key:
+        ok, detail = _send_via_resend(recipient, subject, html_body, text_body)
         if ok:
             return True, detail
-        logger.warning(f"Resend delivery failed ({detail}); checking for SMTP fallback...")
+        last_error = detail
+        logger.warning(f"Resend delivery failed for {recipient} ({detail}); checking for SMTP fallback...")
 
     # 2. Try SMTP fallback if configured
     if _smtp_configured():
-        return _send_via_smtp(to_email, subject, html_body, text_body)
+        ok, detail = _send_via_smtp(recipient, subject, html_body, text_body)
+        if ok:
+            return True, detail
+        last_error = f"{last_error} | SMTP: {detail}" if last_error else detail
 
-    # 3. Graceful degradation: Log email delivery attempt without leaking OTP
+    # 3. If an email service failed, return its detailed message
+    if last_error:
+        logger.error(f"Email delivery could not be completed for {recipient}: {last_error}")
+        return False, last_error
+
     logger.warning(
-        f"No email service configured (set RESEND_API_KEY in environment). Simulated email delivery for: {to_email}"
+        f"No email service configured (set RESEND_API_KEY in environment). Simulated email delivery for: {recipient}"
     )
-    return False, "Logged to console (no email service active)"
+    return False, "No email service configured"
 
 
 def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
     """Send a 6-digit OTP code for either 'verify_email' or 'reset_password'."""
-    logger.info(f"[OTP] Verification code generated for {to_email} ({purpose})")
+    recipient = to_email.strip().lower()
+    logger.info(f"[OTP] Verification code generated for {recipient} ({purpose})")
 
     if purpose == "reset_password":
         subject = "Your MoiDoctar password reset code"
@@ -149,4 +178,7 @@ def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
   <p style="color: #9ca3af; font-size: 12px; margin: 0;">MoiDoctar &middot; AI-powered clinical symptom triage & health navigation</p>
 </div>
 """
-    return send_email(to_email, subject, html_body, text_body)
+    ok, detail = send_email(recipient, subject, html_body, text_body)
+    if not ok:
+        logger.warning(f"[OTP Fallback] Email delivery not completed for {recipient}. Code: {code}. Reason: {detail}")
+    return ok, detail

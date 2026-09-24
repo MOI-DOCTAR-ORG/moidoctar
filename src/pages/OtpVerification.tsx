@@ -18,7 +18,11 @@ export default function OtpVerification() {
   const { verifyEmail, resendVerificationCode, isAuthenticated } = useAuth()
   const { addToast } = useToastContext()
 
-  const email = (location.state as { email?: string } | null)?.email || 'your email'
+  const state = location.state as { email?: string; emailDelivered?: boolean } | null
+  const email = state?.email || 'your email'
+  // If the backend explicitly told us email_delivered=false, warn the user
+  const emailDelivered = state?.emailDelivered !== false // undefined = assume delivered
+
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''))
   const [isVerifying, setIsVerifying] = useState(false)
   const [isResending, setIsResending] = useState(false)
@@ -33,6 +37,7 @@ export default function OtpVerification() {
   ].join(' ')
 
   useEffect(() => {
+
     inputRefs.current[0]?.focus()
   }, [])
 
@@ -95,9 +100,15 @@ export default function OtpVerification() {
     setOtp(Array(6).fill(''))
     setIsError(false)
     setErrorMsg('')
-    await resendVerificationCode(email !== 'your email' ? email : undefined)
+    const res = await resendVerificationCode(email !== 'your email' ? email : undefined)
     setIsResending(false)
-    addToast('A new code has been sent to your email.', 'success')
+    if (res && res.email_delivered === false) {
+      addToast('Code generated, but email delivery is restricted — see note below.', 'info')
+    } else if (res && res.email_delivered) {
+      addToast('A new code has been sent to your email.', 'success')
+    } else {
+      addToast('Code resent — check your inbox.', 'success')
+    }
     setTimeout(() => focusInput(0), 50)
   }, [isResending, resendVerificationCode, addToast, email, focusInput])
 
@@ -125,11 +136,23 @@ export default function OtpVerification() {
       title="Verify your email"
       subtitle={
         <>
-          Enter the verification code sent to <span className="font-semibold text-on-surface">{email}</span>.
+          {emailDelivered
+            ? <>Enter the verification code sent to <span className="font-semibold text-on-surface">{email}</span>.</>
+            : <>A code was generated for <span className="font-semibold text-on-surface">{email}</span>. Email delivery is currently limited — click <strong>Resend Code</strong> to try again.</>
+          }
         </>
       }
     >
       <div className={`${authFormStack} gap-6`}>
+        {!emailDelivered && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-3 text-sm leading-5 text-amber-800 dark:bg-amber-900/20 dark:border-amber-500/30 dark:text-amber-300" role="alert">
+            <Icon icon="warning" size="lg" className="mt-0.5 shrink-0" aria-hidden="true" />
+            <p className="flex-1">
+              Email delivery is restricted on the free Resend domain — only the registered Resend account can receive test emails. Click <strong>Resend Code</strong> to retry, or ask your admin to verify a custom domain on <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline font-semibold">resend.com/domains</a>.
+            </p>
+          </div>
+        )}
+
         <div className="flex justify-center gap-2 sm:gap-3 w-full">
           {otp.map((digit, i) => (
             <input
@@ -193,3 +216,4 @@ export default function OtpVerification() {
     </AuthShell>
   )
 }
+

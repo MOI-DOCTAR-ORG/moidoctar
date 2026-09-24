@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from app.core.supabase import get_supabase_client, safe_supabase_rows
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.core.email import send_otp_email
@@ -13,11 +13,19 @@ logger = logging.getLogger("moidoctar.auth")
 class AccountNotVerifiedError(Exception):
     """Raised by authenticate_user when the password is correct but the
     account hasn't completed email verification yet. Carries a fresh temp
-    access token and optional dev code."""
+    access token, dev code, and email delivery status."""
 
-    def __init__(self, authorization: str, code: Optional[str] = None):
+    def __init__(
+        self,
+        authorization: str,
+        code: Optional[str] = None,
+        email_delivered: bool = False,
+        email_error: Optional[str] = None,
+    ):
         self.authorization = authorization
         self.code = code
+        self.email_delivered = email_delivered
+        self.email_error = email_error
         super().__init__("account_not_verified")
 
 # Local in-memory store for fallback if Supabase is not configured
@@ -75,10 +83,10 @@ def _format_user_out(u: Any) -> Dict[str, Any]:
     }
 
 
-def _send_verification_otp(email: str) -> str:
+def _send_verification_otp(email: str) -> Tuple[str, bool, str]:
     code = generate_and_store_otp(email, "verify_email")
-    send_otp_email(email, code, "verify_email")
-    return code
+    ok, status_msg = send_otp_email(email, code, "verify_email")
+    return code, ok, status_msg
 
 
 def signup_user(email: str, password: str, full_name: Optional[str] = None) -> Dict[str, Any]:
@@ -110,9 +118,16 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
             ins = supabase.table("users").insert(new_user).execute()
             ins_rows = safe_supabase_rows(ins)
             created = ins_rows[0] if ins_rows else new_user
-            code = _send_verification_otp(email_clean)
+            code, ok, status_msg = _send_verification_otp(email_clean)
             token = create_access_token({"sub": created["id"], "email": email_clean})
-            return {"authorization": token, "refreshToken": token, "user": _format_user_out(created), "dev_code": code}
+            return {
+                "authorization": token,
+                "refreshToken": token,
+                "user": _format_user_out(created),
+                "dev_code": code,
+                "email_delivered": ok,
+                "email_status": status_msg,
+            }
         except ValueError:
             raise
         except Exception as e:
@@ -138,9 +153,16 @@ def signup_user(email: str, password: str, full_name: Optional[str] = None) -> D
         "last_login": now_iso,
     }
     _local_users[email_clean] = user_entry
-    code = _send_verification_otp(email_clean)
+    code, ok, status_msg = _send_verification_otp(email_clean)
     token = create_access_token({"sub": new_id, "email": email_clean})
-    return {"authorization": token, "refreshToken": token, "user": _format_user_out(user_entry), "dev_code": code}
+    return {
+        "authorization": token,
+        "refreshToken": token,
+        "user": _format_user_out(user_entry),
+        "dev_code": code,
+        "email_delivered": ok,
+        "email_status": status_msg,
+    }
 
 
 def authenticate_user(email: str, password: str) -> Dict[str, Any]:
@@ -159,9 +181,14 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
                 raise ValueError("invalid_account")
 
             if not user.get("is_verified", True):
-                code = _send_verification_otp(email_clean)
+                code, ok, status_msg = _send_verification_otp(email_clean)
                 temp_token = create_access_token({"sub": user["id"], "email": email_clean})
-                raise AccountNotVerifiedError(temp_token, code)
+                raise AccountNotVerifiedError(
+                    temp_token,
+                    code,
+                    email_delivered=ok,
+                    email_error=None if ok else status_msg,
+                )
 
             now_iso = datetime.now(timezone.utc).isoformat()
             try:
@@ -181,9 +208,14 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
         raise ValueError("invalid_account")
 
     if not user.get("is_verified", True):
-        code = _send_verification_otp(email_clean)
+        code, ok, status_msg = _send_verification_otp(email_clean)
         temp_token = create_access_token({"sub": user["id"], "email": email_clean})
-        raise AccountNotVerifiedError(temp_token, code)
+        raise AccountNotVerifiedError(
+            temp_token,
+            code,
+            email_delivered=ok,
+            email_error=None if ok else status_msg,
+        )
 
     user["last_login"] = datetime.now(timezone.utc).isoformat()
     token = create_access_token({"sub": user["id"], "email": email_clean})
