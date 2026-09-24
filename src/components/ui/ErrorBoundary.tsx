@@ -19,19 +19,29 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <div className="text-center max-w-md p-8 rounded-3xl bg-surface border border-outline-variant">
               <span className="relative inline-block">
                 <Icon icon="error" size="3xl" className="text-error" />
               </span>
               <h1 className="font-headline-lg text-headline-lg text-on-surface mt-4 mb-2">Something went wrong</h1>
-              <p className="font-body-md text-secondary mb-6">{this.state.error?.message}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 bg-primary text-on-primary rounded-full font-label-md transition-all min-h-[44px]"
-              >
-                Reload Page
-              </button>
+              <p className="font-body-md text-secondary mb-6">
+                We hit a snag showing this page. Nothing was lost, and this doesn't affect any of your health information.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-3 bg-primary text-on-primary rounded-full font-label-md transition-all min-h-[44px]"
+                >
+                  Try again
+                </button>
+                <button
+                  onClick={() => { window.location.href = '/dashboard' }}
+                  className="px-6 py-3 border border-outline text-on-surface rounded-full font-label-md transition-all min-h-[44px] hover:bg-surface-container"
+                >
+                  Go to Dashboard
+                </button>
+              </div>
             </div>
           </div>
         )
