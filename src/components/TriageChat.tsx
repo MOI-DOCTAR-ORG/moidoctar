@@ -288,7 +288,7 @@ export default function TriageChat() {
 
         <div className="border-t border-outline-variant bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
           <div className="mx-auto w-full max-w-3xl">
-            {userTurns > 0 && (
+            {userTurns > 0 && chat.latest?.has_symptoms && (
               <div className="mb-2 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs text-on-surface-variant">
                 <span className="shrink-0">How bad is it?</span>
                 {severityOptions.map((s) => (

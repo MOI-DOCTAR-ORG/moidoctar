@@ -60,11 +60,7 @@ type AuthState = {
 type AuthContextValue = AuthState & {
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>
   signUp: (fullName: string, email: string, password: string) => Promise<SignUpResult>
-<<<<<<< HEAD
-  signInWithGoogle: (accessToken: string) => Promise<LoginResult>
-=======
   signInWithGoogle: (token: string, tokenType?: 'id_token' | 'access_token') => Promise<LoginResult>
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
   verifyEmail: (code: string, email?: string) => Promise<boolean>
   resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string } | void>
   signOut: () => Promise<void>

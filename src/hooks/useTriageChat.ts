@@ -66,9 +66,16 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
           image: img ?? undefined,
         })
         const data = res.data
+        const hasSymptoms = Boolean(data.has_symptoms && data.possible_conditions && data.possible_conditions.length > 0)
         setMessages((prev) => [
           ...prev,
-          { id: nextId(), role: 'ai', time: nowLabel(), text: data.reply || data.rationale, result: data },
+          {
+            id: nextId(),
+            role: 'ai',
+            time: nowLabel(),
+            text: data.reply || data.rationale || "Hello! How can I help you today? Please feel free to share any symptoms or health questions.",
+            result: hasSymptoms ? data : undefined,
+          },
         ])
       } catch (err) {
         setError(errorText(err))

@@ -44,13 +44,10 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-triage" element={<NewTriage />} />
-<<<<<<< HEAD
         <Route path="/new_triage" element={<NewTriage />} />
-=======
         <Route path="/age-selection" element={<AgeSelection />} />
         <Route path="/body-map" element={<BodyMap />} />
         <Route path="/pinpoint-pain" element={<PinpointPain />} />
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
         <Route path="/history" element={<History />} />
         <Route path="/care-details" element={<CareDetails />} />
         <Route path="/local-care" element={<LocalCareDiscovery />} />

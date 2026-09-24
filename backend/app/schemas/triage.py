@@ -34,16 +34,12 @@ class TriageChatResponse(BaseModel):
     follow_up_questions: List[str]
     red_flags_to_watch: List[str]
     disclaimer: str
-<<<<<<< HEAD
-    reply: Optional[str] = None
+    reply: Optional[str] = ""
     has_symptoms: Optional[bool] = False
     is_conversational: Optional[bool] = False
-=======
-    reply: str = ""
     ai_source: str = "rules"  # "gemini" | "rules"
     ai_notice: str = ""
     memory_notes: List[str] = []
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
 
 
 class BackendTriageStatus(BaseModel):

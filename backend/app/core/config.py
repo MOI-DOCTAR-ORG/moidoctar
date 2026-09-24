@@ -23,18 +23,14 @@ class Settings(BaseSettings):
 
     # Google Gemini AI Triage (API Key from Google AI Studio).
     GOOGLE_API_KEY: str = ""
-<<<<<<< HEAD
-    GEMINI_MODEL: str = "gemini-flash-lite-latest"
-=======
     # Any number of extra keys, comma / space / newline separated. The pool
     # rotates through them and skips keys that are rate limited or invalid.
     GOOGLE_API_KEYS: str = ""
-    GEMINI_MODEL: str = "gemini-flash-latest"
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
     # Emails that are treated as admins (can manage AI API keys), in addition
     # to users whose role is "admin". Comma separated.
     ADMIN_EMAILS: str = ""
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
 
     # Server Port
     PORT: int = 3000
