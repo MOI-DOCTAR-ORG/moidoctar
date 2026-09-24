@@ -436,9 +436,14 @@ def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str,
         "symptoms": symptoms_list,
         "duration": "Recent",
         "severity": severity,
+        "urgency_level": urgency,
         "triageStatus": {"level": status_level},
         "actionPlan": action_plan,
         "createdAt": now_iso,
+        "notes": assessment.get("rationale", ""),
+        "possible_conditions": assessment.get("possible_conditions", []),
+        "recommended_actions": assessment.get("recommended_actions", []),
+        "rationale": assessment.get("rationale", ""),
     })
 
 
@@ -467,6 +472,11 @@ def get_triage_history(user_id: str) -> List[Dict[str, Any]]:
                     "triageStatus": {"level": level},
                     "actionPlan": row.get("action_plan", "Monitor symptoms"),
                     "createdAt": row.get("created_at", datetime.now(timezone.utc).isoformat()),
+                    "notes": row.get("notes", "") or row.get("rationale", ""),
+                    "possible_conditions": row.get("possible_conditions") or [],
+                    "recommended_actions": row.get("recommended_actions") or [],
+                    "urgency_level": urg,
+                    "rationale": row.get("rationale", "") or row.get("action_plan", ""),
                 })
             if items:
                 return items

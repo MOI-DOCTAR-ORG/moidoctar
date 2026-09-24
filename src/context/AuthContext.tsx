@@ -41,6 +41,10 @@ export type TriageSession = {
   summary?: string
   severityClass?: string
   severityIcon?: string
+  conditions?: string[]
+  recommendedActions?: string[]
+  redFlags?: string[]
+  rationale?: string
 }
 
 type AuthTokens = { authorization: string; refreshToken: string }
@@ -67,6 +71,7 @@ type AuthContextValue = AuthState & {
   sessions: TriageSession[]
   addSession: (session: TriageSession) => void
   removeSession: (id: string) => void
+  refreshSessions: () => Promise<void>
   userChangeKey: number
 }
 
@@ -117,6 +122,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<TriageSession[]>(loadSessions)
   const [userChangeKey, setUserChangeKey] = useState(0)
 
+  const refreshSessions = useCallback(async () => {
+    try {
+      const res = await api.get<{ msg: string; data: Array<{
+        _id: string
+        symptoms: string[]
+        duration?: string
+        severity?: 'Mild' | 'Moderate' | 'Severe' | string
+        notes?: string
+        triageStatus?: { level: string }
+        actionPlan?: string
+        createdAt?: string
+        possible_conditions?: string[]
+        recommended_actions?: string[]
+        urgency_level?: string
+        rationale?: string
+      }> }>('/triage/list')
+
+      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+        const fetched: TriageSession[] = res.data.map(item => {
+          const urg = item.urgency_level || (item.triageStatus?.level === 'Emergency' ? 'Urgent' : item.triageStatus?.level === 'Urgent' ? 'Moderate' : 'Stable')
+          const sev: 'Urgent' | 'Moderate' | 'Stable' = urg === 'Urgent' ? 'Urgent' : urg === 'Moderate' ? 'Moderate' : 'Stable'
+          const dateObj = item.createdAt ? new Date(item.createdAt) : new Date()
+          return {
+            id: item._id,
+            date: dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+            condition: Array.isArray(item.symptoms) && item.symptoms.length > 0 ? item.symptoms.join(', ') : 'Reported symptoms',
+            description: item.rationale || item.actionPlan || item.notes || 'Triage completed',
+            severity: sev,
+            statusLabel: item.triageStatus?.level || urg,
+            statusIcon: sev === 'Urgent' ? 'warning' : 'clinical_notes',
+            tags: item.possible_conditions?.length ? item.possible_conditions : [item.severity || 'Evaluated'],
+            conditions: item.possible_conditions,
+            recommendedActions: item.recommended_actions,
+            rationale: item.rationale || item.notes,
+          }
+        })
+
+        setSessions(prev => {
+          const map = new Map<string, TriageSession>()
+          fetched.forEach(s => map.set(s.id, s))
+          prev.forEach(s => {
+            if (!map.has(s.id)) map.set(s.id, s)
+          })
+          const merged = Array.from(map.values())
+          saveSessions(merged)
+          return merged
+        })
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   // Restore session on mount
   useEffect(() => {
     const token = getAccessToken()
@@ -128,12 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user?.isVerified) {
         seedLocalStorage(user)
         setState({ user, isAuthenticated: true, isLoading: false })
+        void refreshSessions()
       } else {
         clearTokens()
         setState({ user: null, isAuthenticated: false, isLoading: false })
       }
     })
-  }, [])
+  }, [refreshSessions])
 
   useEffect(() => { saveSessions(sessions) }, [sessions])
 
@@ -150,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       seedLocalStorage(user)
       setState({ user, isAuthenticated: true, isLoading: false })
       setUserChangeKey(k => k + 1)
+      void refreshSessions()
       return { success: true }
     } catch (err) {
       const e = err as { err?: string; authorization?: string; msg?: string }
@@ -191,11 +252,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       seedLocalStorage(user)
       setState({ user, isAuthenticated: true, isLoading: false })
       setUserChangeKey(k => k + 1)
+      void refreshSessions()
       return { success: true }
     } catch (err) {
       return { success: false, error: mapApiError(err) }
     }
-  }, [])
+  }, [refreshSessions])
 
   const verifyEmail = useCallback(async (code: string, email?: string): Promise<boolean> => {
     try {
@@ -211,9 +273,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       seedLocalStorage(user)
       setState({ user, isAuthenticated: true, isLoading: false })
       setUserChangeKey(k => k + 1)
+      void refreshSessions()
       return true
     } catch { return false }
-  }, [])
+  }, [refreshSessions])
 
   const resendVerificationCode = useCallback(async (email?: string) => {
     try {
@@ -245,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, signInWithGoogle, verifyEmail, resendVerificationCode, signOut, sessions, addSession, removeSession, userChangeKey }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, signInWithGoogle, verifyEmail, resendVerificationCode, signOut, sessions, addSession, removeSession, refreshSessions, userChangeKey }}>
       {children}
     </AuthContext.Provider>
   )

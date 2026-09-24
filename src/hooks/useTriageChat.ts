@@ -104,5 +104,22 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
     if (lastSent.current && !chat.isPending) void run(lastSent.current.history, lastSent.current.image)
   }, [run, chat.isPending])
 
-  return { messages, latest, pending: chat.isPending, error, retry, send, severity, setSeverity, image, setImage }
+  const reset = useCallback(() => {
+    setMessages([
+      {
+        id: nextId(),
+        role: 'ai',
+        time: nowLabel(),
+        text: bodyAreas.length
+          ? `Hi, I'm Liana. I can see you marked ${bodyAreas.map((a) => a.label.toLowerCase()).join(', ')}. What does it feel like, and when did it start?`
+          : GREETING,
+      },
+    ])
+    setError(null)
+    setSeverity(null)
+    setImage(null)
+    lastSent.current = null
+  }, [bodyAreas])
+
+  return { messages, latest, pending: chat.isPending, error, retry, send, reset, severity, setSeverity, image, setImage }
 }

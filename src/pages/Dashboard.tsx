@@ -126,10 +126,14 @@ export default function Dashboard() {
               Start a new triage session to evaluate your symptoms instantly and receive medical-grade guidance on your next steps.
             </p>
           </div>
-          <div className="relative z-10">
-            <button onClick={() => navigate('/new-triage')} className="bg-primary text-on-primary hover:opacity-90 rounded-full px-8 py-3.5 font-label-md text-label-md transition-all flex items-center gap-2 w-fit">
+          <div className="relative z-10 flex flex-wrap gap-3">
+            <button onClick={() => navigate('/new-triage')} className="bg-primary text-on-primary hover:opacity-90 rounded-full px-6 py-3.5 font-label-md text-label-md transition-all flex items-center gap-2 w-fit">
               <Icon icon="add_circle" size="md" className="icon-fill" />
               Start New Triage
+            </button>
+            <button onClick={() => navigate('/history')} className="border border-white/25 hover:bg-white/10 text-white rounded-full px-5 py-3.5 font-label-md text-label-md transition-all flex items-center gap-2 w-fit">
+              <Icon icon="history" size="md" />
+              Previous Triages
             </button>
           </div>
         </div>

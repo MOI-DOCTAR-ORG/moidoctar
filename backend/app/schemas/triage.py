@@ -55,6 +55,10 @@ class BackendTriageItem(BaseModel):
     triageStatus: BackendTriageStatus
     actionPlan: str
     createdAt: str
+    possible_conditions: Optional[List[str]] = []
+    recommended_actions: Optional[List[str]] = []
+    urgency_level: Optional[str] = None
+    rationale: Optional[str] = ""
 
 
 class TriageListResponse(BaseModel):

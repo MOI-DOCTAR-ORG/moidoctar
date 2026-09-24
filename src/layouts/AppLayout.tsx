@@ -101,6 +101,14 @@ export default function AppLayout() {
                 <Icon icon={isDark ? 'light_mode' : 'dark_mode'} size="lg" />
               </button>
               <Link
+                to="/history"
+                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+                aria-label="Previous Triages and History"
+                title="Previous Triages"
+              >
+                <Icon icon="history" size="lg" />
+              </Link>
+              <Link
                 to="/notifications"
                 className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
                 aria-label="Notifications"
