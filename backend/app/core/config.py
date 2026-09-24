@@ -91,9 +91,24 @@ class Settings(BaseSettings):
     @property
     def effective_smtp_password(self) -> str:
         # App passwords often have spaces like "abcd efgh ijkl mnop", keep or remove spaces as needed
-        raw = (os.getenv("SMTP_PASSWORD") or self.SMTP_PASSWORD or "").strip().strip("'\" \t\r\n")
+        raw = (
+            os.getenv("SMTP_PASSWORD")
+            or os.getenv("SMTP_PASS")
+            or os.getenv("SMTP_KEY")
+            or os.getenv("EMAIL_PASSWORD")
+            or os.getenv("EMAIL_PASS")
+            or os.getenv("MAIL_PASSWORD")
+            or os.getenv("MAIL_PASS")
+            or os.getenv("GMAIL_APP_PASSWORD")
+            or os.getenv("GMAIL_PASSWORD")
+            or os.getenv("GMAIL_PASS")
+            or os.getenv("APP_PASSWORD")
+            or self.SMTP_PASSWORD
+            or ""
+        ).strip().strip("'\" \t\r\n")
         # Remove spaces in case Google 16-char app password was copied with spaces
         return raw.replace(" ", "")
+
 
     @property
     def effective_smtp_from(self) -> str:

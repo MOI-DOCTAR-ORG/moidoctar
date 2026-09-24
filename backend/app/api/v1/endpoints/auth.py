@@ -201,8 +201,10 @@ def test_resend(to: str = "lateefedidi4@gmail.com"):
 
 @router.get("/test-smtp")
 def test_smtp(to: str = "lateefedidi4@gmail.com"):
+    import os
     from app.core.email import _send_via_smtp, _smtp_configured
     configured = _smtp_configured()
+    smtp_env_vars = [k for k in os.environ.keys() if any(term in k.upper() for term in ["SMTP", "MAIL", "GMAIL"])]
     if not configured:
         return {
             "ok": False,
@@ -211,6 +213,7 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
             "host": settings.effective_smtp_host,
             "user": settings.effective_smtp_user,
             "has_password": bool(settings.effective_smtp_password),
+            "detected_smtp_env_vars": smtp_env_vars,
         }
     ok, detail = _send_via_smtp(to, "MoiDoctar SMTP Test", "<p>Test email from MoiDoctar via SMTP</p>", "Test email from MoiDoctar via SMTP")
     return {
@@ -221,7 +224,9 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
         "user": settings.effective_smtp_user,
         "from": settings.effective_smtp_from,
         "to": to,
+        "detected_smtp_env_vars": smtp_env_vars,
     }
+
 
 
 
