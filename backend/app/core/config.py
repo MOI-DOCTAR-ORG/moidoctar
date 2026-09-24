@@ -81,6 +81,30 @@ class Settings(BaseSettings):
         return addr
 
     @property
+    def effective_smtp_host(self) -> str:
+        return (os.getenv("SMTP_HOST") or self.SMTP_HOST or "").strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_smtp_user(self) -> str:
+        return (os.getenv("SMTP_USER") or self.SMTP_USER or "").strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_smtp_password(self) -> str:
+        # App passwords often have spaces like "abcd efgh ijkl mnop", keep or remove spaces as needed
+        raw = (os.getenv("SMTP_PASSWORD") or self.SMTP_PASSWORD or "").strip().strip("'\" \t\r\n")
+        # Remove spaces in case Google 16-char app password was copied with spaces
+        return raw.replace(" ", "")
+
+    @property
+    def effective_smtp_from(self) -> str:
+        raw = (os.getenv("SMTP_FROM") or self.SMTP_FROM or "").strip().strip("'\" \t\r\n")
+        if raw:
+            return raw
+        user = self.effective_smtp_user
+        return f"MoiDoctar <{user}>" if user else ""
+
+
+    @property
     def normalized_supabase_url(self) -> str:
         url = (self.SUPABASE_URL or "").strip().rstrip("/")
         import re

@@ -76,12 +76,15 @@ def _send_via_resend(to_email: str, subject: str, html_body: str, text_body: str
 
 
 def _smtp_configured() -> bool:
-    return bool(settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD)
+    return bool(settings.effective_smtp_host and settings.effective_smtp_user and settings.effective_smtp_password)
 
 
 def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
     """Send an email via standard SMTP."""
-    from_addr = settings.SMTP_FROM.strip() or settings.SMTP_USER
+    host = settings.effective_smtp_host
+    user = settings.effective_smtp_user
+    password = settings.effective_smtp_password
+    from_addr = settings.effective_smtp_from or user
     recipient = to_email.strip().lower()
 
     msg = MIMEMultipart("alternative")
@@ -94,23 +97,24 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
     try:
         if settings.SMTP_USE_SSL:
             context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, context=context, timeout=10) as server:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            with smtplib.SMTP_SSL(host, settings.SMTP_PORT, context=context, timeout=10) as server:
+                server.login(user, password)
                 server.sendmail(from_addr, [recipient], msg.as_string())
         else:
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+            with smtplib.SMTP(host, settings.SMTP_PORT, timeout=10) as server:
                 server.ehlo()
                 if settings.SMTP_USE_TLS:
                     context = ssl.create_default_context()
                     server.starttls(context=context)
                     server.ehlo()
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                server.login(user, password)
                 server.sendmail(from_addr, [recipient], msg.as_string())
         logger.info(f"Email successfully sent via SMTP to {recipient}")
         return True, "Delivered via SMTP"
     except Exception as e:
         logger.error(f"Failed to send email via SMTP to {recipient}: {e}")
         return False, f"SMTP Error: {e}"
+
 
 
 def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
