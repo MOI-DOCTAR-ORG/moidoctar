@@ -19,14 +19,9 @@ export interface AccentPreset {
 }
 
 export const ACCENT_PRESETS: AccentPreset[] = [
-  { id: 'moidoctar', name: 'MoiDoctar blue', hex: '#2763eb' },
-  { id: 'navy', name: 'Deep navy', hex: '#1f3a8a' },
-  { id: 'ocean', name: 'Ocean', hex: '#0369a1' },
-  { id: 'teal', name: 'Teal', hex: '#0f766e' },
-  { id: 'forest', name: 'Forest', hex: '#2f7d4f' },
-  { id: 'violet', name: 'Violet', hex: '#6d28d9' },
-  { id: 'rose', name: 'Rose', hex: '#be185d' },
-  { id: 'copper', name: 'Copper', hex: '#b45309' },
+  { id: 'moidoctar', name: 'Default', hex: '#2763eb' },
+  { id: 'green', name: 'Green', hex: '#16a34a' },
+  { id: 'red', name: 'Red', hex: '#dc2626' },
 ]
 
 // ---------- colour maths ----------

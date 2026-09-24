@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import Icon from '../components/Icon'
 import { useTheme, type ThemeMode } from '../context/ThemeContext'
-import { ACCENT_PRESETS, buildPalette, contrast, hexToRgb, normalizeHex } from '../lib/palette'
+import { ACCENT_PRESETS, buildPalette, contrast, hexToRgb } from '../lib/palette'
 
 /** "246 248 253" (a palette value) -> "rgb(246,248,253)" for inline styles. */
 const rgbOf = (pal: ReturnType<typeof buildPalette>, key: string) => `rgb(${pal.vars[`--rgb-${key}`].split(' ').join(',')})`
@@ -55,36 +55,7 @@ function ModeCard({ value, label, hint, selected, onSelect, accent }: {
 }
 
 export default function Theme() {
-  const { mode, setMode, accent, setAccent, appliedAccent, accentAdjusted, resetTheme, isDefault } = useTheme()
-  const [hexDraft, setHexDraft] = useState(accent)
-  const [hexError, setHexError] = useState(false)
-  const draftRef = useRef(hexDraft)
-  draftRef.current = hexDraft
-
-  // Keep the text box in step when the accent changes from a swatch or the picker,
-  // but never overwrite something the person is still typing.
-  useEffect(() => {
-    if (normalizeHex(draftRef.current) !== accent) setHexDraft(accent)
-    setHexError(false)
-  }, [accent])
-
-  const isPreset = ACCENT_PRESETS.some(p => p.hex === accent)
-
-  // While typing, only a complete 6-digit code is applied. Shorthand like #0af is
-  // accepted when they leave the box (otherwise "#fff" would fire mid-way through "#ffff00").
-  const onHexChange = (value: string) => {
-    setHexDraft(value)
-    setHexError(false)
-    if (/^#?[0-9a-f]{6}$/i.test(value.trim())) {
-      const ok = normalizeHex(value)
-      if (ok) setAccent(ok)
-    }
-  }
-  const onHexBlur = () => {
-    const ok = normalizeHex(hexDraft)
-    if (ok) { setAccent(ok); setHexDraft(ok); setHexError(false) }
-    else setHexError(hexDraft.trim().length > 0 && hexDraft.trim() !== accent)
-  }
+  const { mode, setMode, accent, setAccent, resetTheme, isDefault } = useTheme()
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
@@ -106,7 +77,7 @@ export default function Theme() {
         <h2 id="accent-h" className="text-base font-semibold text-on-surface">Colour</h2>
         <p className="mt-1 text-sm text-on-surface-variant">Used for buttons, links and highlights.</p>
 
-        <div role="radiogroup" aria-labelledby="accent-h" className="mt-4 grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-8">
+        <div role="radiogroup" aria-labelledby="accent-h" className="mt-4 flex gap-4">
           {ACCENT_PRESETS.map(p => {
             const selected = accent === p.hex
             return (
@@ -115,7 +86,7 @@ export default function Theme() {
                 className="flex flex-col items-center gap-1.5 rounded-xl py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-full transition-shadow ${selected ? 'ring-2 ring-offset-2 ring-primary ring-offset-background' : 'ring-1 ring-outline-variant'}`}
+                  className={`flex h-12 w-12 items-center justify-center rounded-full transition-shadow ${selected ? 'ring-2 ring-offset-2 ring-primary ring-offset-background' : 'ring-1 ring-outline-variant'}`}
                   style={{ background: p.hex, color: inkOn(p.hex) }}
                 >
                   {selected && <Icon icon="check" size="md" />}
@@ -124,37 +95,6 @@ export default function Theme() {
               </button>
             )
           })}
-        </div>
-
-        <div className={`mt-5 rounded-2xl border p-4 ${!isPreset ? 'border-primary bg-primary-container/30' : 'border-outline-variant bg-surface'}`}>
-          <p className="text-sm font-semibold text-on-surface">Pick your own</p>
-          <div className="mt-3 flex items-center gap-3">
-            <label className="relative h-11 w-11 shrink-0 cursor-pointer overflow-hidden rounded-full ring-1 ring-outline focus-within:ring-2 focus-within:ring-primary" style={{ background: accent }}>
-              <span className="sr-only">Choose a custom colour</span>
-              <input
-                type="color" value={accent} onChange={e => setAccent(e.target.value)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-            </label>
-            <label className="min-w-0 flex-1">
-              <span className="sr-only">Colour code</span>
-              <input
-                value={hexDraft} onChange={e => onHexChange(e.target.value)} onBlur={onHexBlur} spellCheck={false} autoCapitalize="none" autoComplete="off" inputMode="text" maxLength={7}
-                aria-invalid={hexError} aria-describedby="hex-help"
-                className={`min-h-11 w-full rounded-xl border bg-surface px-3 font-mono text-base uppercase text-on-surface outline-none focus:border-primary ${hexError ? 'border-error' : 'border-outline-variant'}`}
-                placeholder="#2763EB"
-              />
-            </label>
-          </div>
-          <p id="hex-help" className={`mt-2 text-xs ${hexError ? 'text-error' : 'text-on-surface-variant'}`}>
-            {hexError ? 'That is not a colour code. Try something like #2763eb.' : 'Tap the circle to choose a colour, or type a colour code.'}
-          </p>
-          {accentAdjusted && (
-            <p className="mt-3 flex items-start gap-2 rounded-xl bg-primary-container px-3 py-2 text-xs text-on-primary-container" role="status">
-              <Icon icon="info" size="sm" className="mt-px shrink-0" />
-              <span>We changed this colour slightly so text on buttons stays easy to read. <span className="mt-1 inline-flex items-center gap-1.5 align-middle"><span className="inline-block h-3 w-3 rounded-full ring-1 ring-outline" style={{ background: appliedAccent }} aria-hidden="true" /> <span className="font-mono uppercase">{appliedAccent}</span></span></span>
-            </p>
-          )}
         </div>
       </section>
 
@@ -171,7 +111,6 @@ export default function Theme() {
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button type="button" tabIndex={-1} className="min-h-11 rounded-full bg-primary px-6 font-label-md text-label-md text-on-primary">Start triage</button>
             <button type="button" tabIndex={-1} className="min-h-11 rounded-full bg-primary-container px-5 font-label-md text-label-md text-on-primary-container">History</button>
-            <button type="button" tabIndex={-1} className="min-h-11 rounded-full border border-outline px-5 font-label-md text-label-md text-primary">Learn more</button>
           </div>
           <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Urgency colours never change</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -189,7 +128,7 @@ export default function Theme() {
           className="inline-flex min-h-11 items-center gap-2 rounded-full border border-outline px-5 font-label-md text-label-md text-on-surface transition-colors hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Icon icon="restart_alt" size="md" />
-          Reset to MoiDoctar blue
+          Reset to default
         </button>
       </div>
     </main>
