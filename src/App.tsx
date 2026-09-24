@@ -20,6 +20,7 @@ import NewTriageBodyMap from './pages/NewTriageBodyMap'
 import SymptomTrackerBodyMap from './pages/SymptomTrackerBodyMap'
 import AdminCache from './pages/AdminCache'
 import AISettings from './pages/AISettings'
+import Theme from './pages/Theme'
 import NotFound from './pages/NotFound'
 import ForgotPassword from './pages/ForgotPassword'
 import LocalCareDiscovery from './pages/LocalCareDiscovery'
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/new-triage-body-map" element={<NewTriageBodyMap />} />
         <Route path="/symptom-tracker-body-map" element={<SymptomTrackerBodyMap />} />
         <Route path="/ai-settings" element={<AISettings />} />
+        <Route path="/theme" element={<Theme />} />
         <Route path="/admin/cache" element={<AdminCache />} />
       </Route>
 

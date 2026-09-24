@@ -24,6 +24,7 @@ const pageTitles = [
   { path: '/notifications', label: 'Notifications' },
   { path: '/profile', label: 'Profile' },
   { path: '/ai-settings', label: 'AI Settings' },
+  { path: '/theme', label: 'Theme' },
 ]
 
 function getPageTitle(pathname: string) {
@@ -102,7 +103,7 @@ export default function AppLayout() {
               </button>
               <Link
                 to="/history"
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+                className="hidden md:grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
                 aria-label="Previous Triages and History"
                 title="Previous Triages"
               >

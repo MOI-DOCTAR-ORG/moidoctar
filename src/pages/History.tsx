@@ -279,8 +279,8 @@ function MedicalForm() {
     <section className="max-w-container-max-width w-full mx-auto">
       {saved && (
         <div className="mb-6 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
-          <Icon icon="check_circle" size="lg" className="text-green-400 icon-fill" />
-          <p className="font-body-md text-green-400">Your medical history has been saved successfully.</p>
+          <Icon icon="check_circle" size="lg" className="text-success icon-fill" />
+          <p className="font-body-md text-success">Your medical history has been saved successfully.</p>
         </div>
       )}
 

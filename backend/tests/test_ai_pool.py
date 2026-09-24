@@ -162,3 +162,36 @@ def test_endpoints(monkeypatch):
         assert "dust" in ai_memory.load("u3")["health_context"]["allergies"]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_profile_sync_keeps_ai_learned_items():
+    """Regression: the next chat turn re-sends the profile; it must not erase what the AI learned."""
+    ai_memory.sync_health_context("u9", {"conditions": ["diabetes"]}, "profile")
+    ai_memory.apply_ai_updates("u9", {"conditions_add": ["asthma"]})
+    ai_memory.sync_health_context("u9", {"conditions": ["diabetes"]}, "profile")
+    assert ai_memory.load("u9")["health_context"]["conditions"] == ["diabetes", "asthma"]
+    # removing something from the profile removes it from memory, but only that item
+    ai_memory.sync_health_context("u9", {"conditions": []}, "profile")
+    assert ai_memory.load("u9")["health_context"]["conditions"] == ["asthma"]
+    # an explicit edit in AI settings is exact
+    ai_memory.sync_health_context("u9", {"conditions": ["hypertension"]}, "user")
+    assert ai_memory.load("u9")["health_context"]["conditions"] == ["hypertension"]
+
+
+def test_chat_turns_update_one_history_entry(monkeypatch):
+    import uuid
+    sid, uid = str(uuid.uuid4()), "hist_user"
+    for text in ("headache", "headache for two days", "headache, now with fever"):
+        triage_service.save_triage_session(uid, [text], {"urgency_level": "Moderate", "recommended_actions": ["Rest"]}, session_id=sid)
+    rows = [r for r in triage_service.get_triage_history(uid)]
+    assert len(rows) == 1 and rows[0]["symptoms"] == ["headache, now with fever"]
+
+
+def test_history_items_expose_id():
+    """Regression: `_id` used to be a private pydantic attr and was dropped, so the History page got undefined ids."""
+    import uuid
+    from app.schemas.triage import TriageListResponse
+    uid = "id_user"
+    triage_service.save_triage_session(uid, ["cough"], {"urgency_level": "Stable", "recommended_actions": ["Rest"]}, session_id=str(uuid.uuid4()))
+    payload = TriageListResponse(data=triage_service.get_triage_history(uid)).model_dump(by_alias=True)
+    assert payload["data"][0]["_id"]

@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TriageRequest(BaseModel):
@@ -47,7 +47,9 @@ class BackendTriageStatus(BaseModel):
 
 
 class BackendTriageItem(BaseModel):
-    _id: str
+    model_config = ConfigDict(populate_by_name=True)
+    # Pydantic v2 treats a leading-underscore name as private and never serialises it, so alias it.
+    id: str = Field(alias="_id")
     symptoms: List[str]
     duration: str = "Recent"
     severity: str = "Moderate"  # 'Mild' | 'Moderate' | 'Severe'
