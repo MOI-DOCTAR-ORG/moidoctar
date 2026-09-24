@@ -44,6 +44,27 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
     navigate('/care-details')
   }
 
+  const [showAnswerBox, setShowAnswerBox] = useState(false)
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [focusedQuestion, setFocusedQuestion] = useState<string | null>(null)
+
+  const handleAnswerSubmit = () => {
+    const answered = Object.entries(answers)
+      .map(([q, a]) => ({ q, a: a.trim() }))
+      .filter(({ a }) => Boolean(a))
+
+    if (answered.length === 0) return
+
+    const formatted = answered.length === 1
+      ? `${answered[0].q}\nAnswer: ${answered[0].a}`
+      : answered.map(({ q, a }) => `• ${q}\n  Answer: ${a}`).join('\n')
+
+    onAsk(formatted)
+    setShowAnswerBox(false)
+    setAnswers({})
+    setFocusedQuestion(null)
+  }
+
   return (
     <div className="mt-3 rounded-xl border border-outline-variant bg-surface p-4 text-sm">
       <div className="flex items-center justify-between gap-3">
@@ -91,20 +112,97 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
         </div>
       )}
 
-      {result.follow_up_questions.length > 0 && (
+      {result.follow_up_questions.length > 0 && !showAnswerBox && (
         <div className="mt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Tap to answer</p>
-          <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Tap to answer</p>
+            <button
+              type="button"
+              onClick={() => setShowAnswerBox(true)}
+              className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
+            >
+              <Icon icon="edit_note" size="xs" /> Write answers
+            </button>
+          </div>
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
             {result.follow_up_questions.map((q) => (
               <button
                 key={q}
                 type="button"
-                onClick={() => onAsk(q)}
-                className="min-h-10 rounded-lg border border-outline-variant px-3 py-2 text-left text-xs text-on-surface transition-colors hover:bg-surface-container"
+                onClick={() => {
+                  setShowAnswerBox(true)
+                  setFocusedQuestion(q)
+                }}
+                className="min-h-10 rounded-lg border border-outline-variant px-3 py-2 text-left text-xs text-on-surface transition-colors hover:border-primary hover:bg-surface-container flex items-center justify-between gap-2 group"
               >
-                {q}
+                <span>{q}</span>
+                <Icon icon="edit" size="xs" className="text-primary shrink-0 opacity-60 group-hover:opacity-100" />
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {result.follow_up_questions.length > 0 && showAnswerBox && (
+        <div className="mt-3 rounded-xl border border-primary/30 bg-surface-container-low p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary flex items-center gap-1.5">
+              <Icon icon="edit_note" size="sm" />
+              Answer follow-up questions
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAnswerBox(false)}
+              className="text-on-surface-variant hover:text-on-surface text-xs p-1"
+              title="Close"
+            >
+              <Icon icon="close" size="sm" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            {result.follow_up_questions.map((q) => (
+              <div key={q} className="space-y-1">
+                <label className="text-xs font-medium text-on-surface block leading-tight">
+                  {q}
+                </label>
+                <input
+                  type="text"
+                  value={answers[q] || ''}
+                  onChange={(e) => setAnswers(prev => ({ ...prev, [q]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAnswerSubmit()
+                    }
+                  }}
+                  placeholder="Type your answer here..."
+                  className="w-full rounded-lg border border-outline-variant bg-background px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  autoFocus={focusedQuestion === q || (!focusedQuestion && q === result.follow_up_questions[0])}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => handleAnswerSubmit()}
+              disabled={!Object.values(answers).some(a => a && a.trim())}
+              className="min-h-9 rounded-lg bg-primary px-4 text-xs font-semibold text-on-primary hover:opacity-90 disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <Icon icon="send" size="xs" />
+              Submit all at once
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAnswerBox(false)
+                setAnswers({})
+                setFocusedQuestion(null)
+              }}
+              className="min-h-9 rounded-lg border border-outline-variant px-3 text-xs text-on-surface-variant hover:bg-surface-container"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
