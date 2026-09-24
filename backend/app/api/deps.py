@@ -52,7 +52,9 @@ async def get_optional_current_user(authorization: Optional[str] = Header(None))
 
 async def get_current_admin(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
     user = await get_current_user(authorization)
-    if user.get("role") != "admin":
+    from app.core.config import settings
+    is_admin = user.get("role") == "admin" or (user.get("email") or "").strip().lower() in settings.admin_emails_list
+    if not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"err": "not_authorized", "msg": "Admin privileges are required for this action"},

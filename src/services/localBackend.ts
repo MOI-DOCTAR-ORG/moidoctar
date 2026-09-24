@@ -513,7 +513,14 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
     } else if (body?.symptoms) {
       symptomsText = body.symptoms
     }
-    const assessment = generateTriageAssessment(symptomsText)
+    const assessment: TriageChatResponse = {
+      ...generateTriageAssessment(symptomsText),
+      ai_source: 'offline',
+      ai_notice: 'The server is not reachable, so this is an offline safety check, not the AI.',
+    }
+    assessment.reply = assessment.urgency_level === 'Urgent'
+      ? 'What you describe could be serious. Please call your local emergency number or get to the nearest emergency department now.'
+      : assessment.rationale
     return {
       data: assessment,
       status: 200,
@@ -598,6 +605,11 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
       headers: {},
       config,
     }
+  }
+
+  // AI settings need the real server: never pretend they saved.
+  if (url?.startsWith('/ai/')) {
+    throw { response: { status: 503, data: { detail: { msg: 'The server is not reachable right now.' } } }, config }
   }
 
   // Fallback 200 for any other API route

@@ -1,18 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import Icon from '../components/Icon'
-import { useAuth } from '../context/AuthContext'
-import { useBodyMap } from '../context/BodyMapContext'
-import { getUserInitials } from '../utils/getUserInitials'
-import LianaAvatar from '../components/LianaAvatar'
-import EmergencyEscalation from '../components/EmergencyEscalation'
-import TriageFeedback from '../components/TriageFeedback'
-import { useCreateTriageChat } from '../hooks/useMoiDoctor'
-import type { TriageChatResponse } from '../types/triage'
-
-type Severity = 'Mild' | 'Moderate' | 'Severe'
+import TriageChat from '../components/TriageChat'
 
 export default function NewTriage() {
+<<<<<<< HEAD
   const navigate = useNavigate()
   const { addSession } = useAuth()
   const { selectedAreas, hasAreas } = useBodyMap()
@@ -452,4 +441,7 @@ export default function NewTriage() {
       </section>
     </main>
   )
+=======
+  return <TriageChat />
+>>>>>>> 1043c60 (fixed UI, made AI API multiple)
 }

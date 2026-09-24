@@ -1,16 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import Icon from '../components/Icon'
-import { getUserInitials } from '../utils/getUserInitials'
-import LianaAvatar from '../components/LianaAvatar'
-import { useCreateTriageChat } from '../hooks/useMoiDoctor'
-import type { TriageChatResponse } from '../types/triage'
+import { Navigate } from 'react-router-dom'
 
-const initialMessages = [
-  { role: 'ai', text: "Hello. I'm ready to help assess your symptoms. Could you please describe what you're feeling and when it started?" },
-]
-
+// The two triage chat screens were duplicates; both now use the shared chat at /new-triage.
 export default function NewTriageInterface() {
+<<<<<<< HEAD
   const navigate = useNavigate()
   const createTriage = useCreateTriageChat()
   const [inputValue, setInputValue] = useState('')
@@ -314,4 +306,7 @@ export default function NewTriageInterface() {
       </main>
     </div>
   )
+=======
+  return <Navigate to="/new-triage" replace />
+>>>>>>> 1043c60 (fixed UI, made AI API multiple)
 }

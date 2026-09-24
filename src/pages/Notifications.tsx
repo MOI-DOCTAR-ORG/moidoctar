@@ -111,7 +111,7 @@ export default function Notifications() {
       <div className="max-w-container-max-width mx-auto px-margin-mobile md:px-gutter py-stack-lg">
         <div className="overflow-x-auto mb-8"><div className="flex gap-2">
           {tabs.map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={'px-5 py-2 rounded-full font-label-md text-label-md transition-all min-h-[44px] ' + (activeTab === tab ? 'bg-[var(--neon-primary)] text-white shadow-sm shadow-[var(--neon-primary)]/20' : 'text-secondary hover:text-[var(--neon-primary)] hover:bg-[var(--glass-bg)]')}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={'px-5 py-2 rounded-full font-label-md text-label-md transition-all min-h-[44px] ' + (activeTab === tab ? 'bg-primary text-on-primary shadow-sm/20' : 'text-secondary hover:text-primary hover:bg-surface')}>
               {tab}
             </button>
           ))}
@@ -120,7 +120,7 @@ export default function Notifications() {
         <div className="flex flex-col gap-10">
           {Object.keys(grouped).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-20 h-20 mb-5 bg-[var(--neon-primary)]/10 rounded-full flex items-center justify-center text-[var(--neon-primary)]">
+              <div className="w-20 h-20 mb-5 bg-primary/10 rounded-full flex items-center justify-center text-primary">
                 <Icon icon="notifications_off" size="2xl" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No notifications yet</h3>
@@ -128,7 +128,7 @@ export default function Notifications() {
             </div>
           ) : (
             Object.entries(grouped).map(([category, items]) => {
-              const barClass = items[0]?.barClass || 'bg-[var(--neon-primary)]'
+              const barClass = items[0]?.barClass || 'bg-primary'
               return (
                 <section key={category}>
                   <div className="flex items-center justify-between mb-6">
@@ -137,12 +137,12 @@ export default function Notifications() {
                       <h3 className="font-headline-md text-headline-md text-on-surface">{category}</h3>
                     </div>
                     {category === 'Urgency Alerts' && (
-                      <button onClick={markAllRead} className="text-[var(--neon-primary)] font-label-md text-label-md hover:underline">Mark all as read</button>
+                      <button onClick={markAllRead} className="text-primary font-label-md text-label-md hover:underline">Mark all as read</button>
                     )}
                   </div>
                   <div className="space-y-4">
                     {items.map((n) => (
-                      <div key={n.id} className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-3 md:p-5 flex items-start gap-3 md:gap-4 transition-all hover:border-[var(--neon-primary)]/30 hover:shadow-[0_0_20px_rgba(148,197,253,0.08)] relative group">
+                      <div key={n.id} className="bg-surface border border-outline-variant rounded-xl p-3 md:p-5 flex items-start gap-3 md:gap-4 transition-all hover:border-primary/30 relative group">
                         <div className={`w-12 h-12 rounded-full ${n.iconBg} flex items-center justify-center shrink-0`}>
                           <Icon icon={n.icon} size="lg" className={n.iconColor} />
                         </div>
@@ -150,7 +150,7 @@ export default function Notifications() {
                           <div className="flex justify-between items-start mb-1">
                             <h4 className="font-label-md text-label-md text-on-surface flex items-center gap-2">
                               {n.title}
-                              {!n.read && <span className="w-2 h-2 rounded-full bg-[var(--neon-primary)]" />}
+                              {!n.read && <span className="w-2 h-2 rounded-full bg-primary" />}
                             </h4>
                             <span className="font-caption text-caption text-secondary shrink-0">{n.time}</span>
                           </div>
@@ -158,11 +158,11 @@ export default function Notifications() {
                           {n.actions && (
                             <div className="flex gap-3">
                               {n.actions.map((a) => a.primary ? (
-                                <button key={a.label} onClick={() => a.to && navigate(a.to)} className="bg-[var(--neon-primary)] text-white px-6 py-2.5 rounded-full font-label-md text-label-md hover:opacity-90 transition-colors min-h-[44px] shadow-[0_0_16px_rgba(148,197,253,0.2)]">
+                                <button key={a.label} onClick={() => a.to && navigate(a.to)} className="bg-primary text-on-primary px-6 py-2.5 rounded-full font-label-md text-label-md hover:opacity-90 transition-colors min-h-[44px]">
                                   {a.label}
                                 </button>
                               ) : (
-                                <button key={a.label} onClick={() => a.to && navigate(a.to)} className="bg-[var(--glass-bg)] text-[var(--neon-primary)] border border-[var(--neon-primary)] px-6 py-2.5 rounded-full font-label-md text-label-md hover:bg-[var(--neon-primary)]/10 transition-colors min-h-[44px]">
+                                <button key={a.label} onClick={() => a.to && navigate(a.to)} className="bg-surface text-primary border border-primary px-6 py-2.5 rounded-full font-label-md text-label-md hover:bg-primary/10 transition-colors min-h-[44px]">
                                   {a.label}
                                 </button>
                               ))}

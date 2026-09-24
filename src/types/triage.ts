@@ -16,6 +16,8 @@ export type TriageResponse = {
 export type TriageChatRequest = {
   symptoms: string
   messages?: string
+  /** JSON string: profile details, marked body areas, self-rated severity */
+  context?: string
   image?: File | Blob
 }
 
@@ -30,9 +32,19 @@ export type TriageChatResponse = {
   follow_up_questions: string[]
   red_flags_to_watch: string[]
   disclaimer: string
+<<<<<<< HEAD
   reply?: string
   has_symptoms?: boolean
   is_conversational?: boolean
+=======
+  /** What the assistant says in the chat bubble */
+  reply?: string
+  /** "gemini" = real AI answer, "rules" = server safety rules only, "offline" = local demo fallback */
+  ai_source?: 'gemini' | 'rules' | 'offline'
+  ai_notice?: string
+  /** Things the assistant just remembered about the user */
+  memory_notes?: string[]
+>>>>>>> 1043c60 (fixed UI, made AI API multiple)
 }
 
 export type CacheStats = {
@@ -45,3 +57,47 @@ export type CacheStats = {
 export type CacheClearResponse = {
   status: string
 }
+
+export type AiPreferences = {
+  response_style: 'concise' | 'balanced' | 'detailed'
+  tone: 'gentle' | 'direct'
+  units: 'metric' | 'imperial'
+  language: string
+  emergency_number: string
+  remember_conversations: boolean
+}
+
+export type AiHealthContext = {
+  age: number | null
+  gender: string
+  location: string
+  conditions: string[]
+  allergies: string[]
+  medications: string[]
+}
+
+export type AiMemory = {
+  preferences: AiPreferences
+  health_context: AiHealthContext
+  facts: { id: string; text: string; source: string; created_at: string }[]
+  history: { at: string; field: string; from: unknown; to: unknown; source: 'user' | 'ai' | 'profile' }[]
+  updated_at: string | null
+}
+
+export type AiKeyInfo = {
+  id: string
+  label: string
+  masked: string
+  model: string
+  enabled: boolean
+  source: 'env' | 'admin'
+  added_at: string | null
+  uses: number
+  failures: number
+  last_used: string | null
+  last_error: string
+  status: 'unknown' | 'ok' | 'rate_limited' | 'invalid' | 'error' | 'cooling_down'
+  cooldown_seconds: number
+}
+
+export type AiStatus = { ai_enabled: boolean; keys_total: number; keys_active: number }

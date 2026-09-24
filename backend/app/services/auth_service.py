@@ -52,6 +52,11 @@ _local_users: Dict[str, Dict[str, Any]] = {
 }
 
 
+def _admin_emails() -> List[str]:
+    from app.core.config import settings
+    return settings.admin_emails_list
+
+
 def _format_user_out(u: Any) -> Dict[str, Any]:
     if not isinstance(u, dict):
         return {}
@@ -60,7 +65,7 @@ def _format_user_out(u: Any) -> Dict[str, Any]:
         "userName": u.get("user_name", "User"),
         "email": u.get("email", ""),
         "isVerified": bool(u.get("is_verified", True)),
-        "role": u.get("role", "user"),
+        "role": "admin" if (u.get("role") == "admin" or str(u.get("email", "")).strip().lower() in _admin_emails()) else u.get("role", "user"),
         "phone": u.get("phone"),
         "demographics": u.get("demographics") or {},
         "preference": u.get("preference") or {"emailNotification": True, "smsAlert": False, "twoFactorAuth": False},
@@ -185,7 +190,7 @@ def authenticate_user(email: str, password: str) -> Dict[str, Any]:
     return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
 
 
-def _verify_google_id_token(id_token: str) -> Dict[str, Any]:
+def _verify_google_id_token(id_token: str, token_type: str = "id_token") -> Dict[str, Any]:
     """Verify a Google ID token (the `credential` from @react-oauth/google's
     GoogleLogin) against Google's tokeninfo endpoint and return its claims.
 
@@ -203,7 +208,9 @@ def _verify_google_id_token(id_token: str) -> Dict[str, Any]:
         raise ValueError("invalid_google_token")
 
     try:
-        url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+        import urllib.parse
+        param = "access_token" if token_type == "access_token" else "id_token"
+        url = f"https://oauth2.googleapis.com/tokeninfo?{param}={urllib.parse.quote(id_token, safe='')}"
         with urllib.request.urlopen(url, timeout=10) as response:
             claims = json.load(response)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError):
@@ -212,7 +219,8 @@ def _verify_google_id_token(id_token: str) -> Dict[str, Any]:
         logger.error(f"Unexpected error verifying Google token: {e}")
         raise ValueError("invalid_google_token")
 
-    if settings.GOOGLE_CLIENT_ID and claims.get("aud") != settings.GOOGLE_CLIENT_ID:
+    # For access tokens Google reports the client in "aud" (and "azp"); accept either.
+    if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_ID not in (claims.get("aud"), claims.get("azp")):
         logger.warning("Google token audience mismatch - rejecting.")
         raise ValueError("invalid_google_token")
 
@@ -225,7 +233,7 @@ def _verify_google_id_token(id_token: str) -> Dict[str, Any]:
     return claims
 
 
-def authenticate_google(access_token: str) -> Dict[str, Any]:
+def authenticate_google(access_token: str, token_type: str = "id_token") -> Dict[str, Any]:
     """Sign in (or sign up) with a verified Google account.
 
     `access_token` here is actually the Google ID token supplied by the
@@ -233,7 +241,7 @@ def authenticate_google(access_token: str) -> Dict[str, Any]:
     then find-or-create the corresponding real user by their verified email
     - never a shared placeholder account.
     """
-    claims = _verify_google_id_token(access_token)
+    claims = _verify_google_id_token(access_token, token_type)
     email_clean = claims["email"].strip().lower()
     full_name = claims.get("name") or email_clean.split("@")[0]
 

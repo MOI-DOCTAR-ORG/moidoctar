@@ -92,15 +92,15 @@ const sampleFacilities: Facility[] = [
 ]
 
 const facilityTypeConfig = {
-  hospital: { icon: 'local_hospital', color: 'text-blue-500', bg: 'bg-blue-500/15', border: 'border-blue-500/20', label: 'Hospital' },
+  hospital: { icon: 'local_hospital', color: 'text-primary', bg: 'bg-primary/15', border: 'border-primary/20', label: 'Hospital' },
   clinic: { icon: 'medical_services', color: 'text-green-500', bg: 'bg-green-500/15', border: 'border-green-500/20', label: 'Clinic' },
-  pharmacy: { icon: 'medication', color: 'text-purple-500', bg: 'bg-purple-500/15', border: 'border-purple-500/20', label: 'Pharmacy' },
+  pharmacy: { icon: 'medication', color: 'text-tertiary', bg: 'bg-tertiary/15', border: 'border-tertiary/20', label: 'Pharmacy' },
   emergency: { icon: 'emergency', color: 'text-red-500', bg: 'bg-red-500/15', border: 'border-red-500/20', label: 'Emergency' },
 }
 
 const provenanceLabels = {
   current: { text: 'Current', color: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/20' },
-  verified: { text: 'Verified', color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  verified: { text: 'Verified', color: 'bg-primary/15 text-primary border-primary/20' },
   prototype: { text: 'Prototype Data', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20' },
 }
 
@@ -132,9 +132,9 @@ export default function LocalCareDiscovery() {
       <header className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <nav className="flex items-center gap-2 text-secondary mb-2">
-            <button onClick={() => navigate('/dashboard')} className="text-caption font-caption hover:text-[var(--neon-primary)] transition-colors">Dashboard</button>
+            <button onClick={() => navigate('/dashboard')} className="text-caption font-caption hover:text-primary transition-colors">Dashboard</button>
             <Icon icon="chevron_right" size="sm" />
-            <span className="text-caption font-caption text-[var(--neon-primary)] font-bold">Nearby Care</span>
+            <span className="text-caption font-caption text-primary font-bold">Nearby Care</span>
           </nav>
           <h2 className="font-headline-lg text-headline-lg text-on-surface">Find Nearby Care</h2>
           <p className="text-body-md text-secondary mt-1">Locate healthcare facilities and resources near you</p>
@@ -174,8 +174,8 @@ export default function LocalCareDiscovery() {
               onClick={() => setFilter(type)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-label-md font-label-md transition-all min-h-[44px] ${
                 filter === type
-                  ? 'bg-[var(--neon-primary)] text-white shadow-[0_0_12px_var(--neon-primary)]'
-                  : 'bg-[var(--glass-bg)] border border-[var(--glass-border)] text-secondary hover:border-[var(--neon-primary)]/30'
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface border border-outline-variant text-secondary hover:border-primary/30'
               }`}
             >
               <Icon icon={config.icon} size="sm" />
@@ -193,7 +193,7 @@ export default function LocalCareDiscovery() {
           return (
             <div
               key={facility.id}
-              className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] p-5 hover:border-[var(--neon-primary)]/20 transition-all hover:shadow-[0_0_20px_rgba(148,197,253,0.08)]"
+              className="bg-surface rounded-2xl border border-outline-variant p-5 hover:border-primary/20 transition-all"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -212,7 +212,7 @@ export default function LocalCareDiscovery() {
 
               <div className="flex items-center gap-4 mb-3 text-caption text-secondary">
                 <span className="flex items-center gap-1">
-                  <Icon icon="near_me" size="sm" className="text-[var(--neon-primary)]" />
+                  <Icon icon="near_me" size="sm" className="text-primary" />
                   {facility.distance}
                 </span>
                 <span className="flex items-center gap-1">
@@ -228,7 +228,7 @@ export default function LocalCareDiscovery() {
               {facility.specialties && facility.specialties.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-4">
                   {facility.specialties.map((spec) => (
-                    <span key={spec} className="px-2 py-0.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-full text-[11px] text-secondary">
+                    <span key={spec} className="px-2 py-0.5 bg-surface border border-outline-variant rounded-full text-[11px] text-secondary">
                       {spec}
                     </span>
                   ))}
@@ -238,7 +238,7 @@ export default function LocalCareDiscovery() {
               <div className="flex gap-2">
                 <a
                   href={`tel:${facility.phone}`}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[var(--neon-primary)]/10 border border-[var(--neon-primary)]/20 rounded-xl text-[var(--neon-primary)] font-label-md text-label-md font-bold hover:bg-[var(--neon-primary)]/15 transition-all min-h-[44px]"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary font-label-md text-label-md font-bold hover:bg-primary/15 transition-all min-h-[44px]"
                 >
                   <Icon icon="call" size="sm" />
                   Call
@@ -247,7 +247,7 @@ export default function LocalCareDiscovery() {
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facility.address)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-[var(--glass-border)] rounded-xl text-secondary font-label-md text-label-md font-bold hover:border-[var(--neon-primary)]/30 hover:text-on-surface transition-all min-h-[44px]"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-outline-variant rounded-xl text-secondary font-label-md text-label-md font-bold hover:border-primary/30 hover:text-on-surface transition-all min-h-[44px]"
                 >
                   <Icon icon="directions" size="sm" />
                   Directions

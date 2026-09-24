@@ -4,8 +4,7 @@ import Icon from './Icon'
 export default function HeroSection() {
   return (
     <section className="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-gutter">
-      <div className="md:col-span-2 relative overflow-hidden rounded-[16px] p-6 md:p-10 bg-gradient-to-br from-[var(--neon-primary)]/80 via-[#2763EB] to-[#1F3A8A] text-on-primary flex flex-col justify-center min-h-[220px] md:min-h-[300px] border border-[var(--neon-primary)]/20 shadow-[0_0_40px_rgba(148,197,253,0.15)]">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+      <div className="md:col-span-2 relative overflow-hidden rounded-[16px] p-6 md:p-10 bg-primary-container text-on-primary-container flex flex-col justify-center min-h-[220px] md:min-h-[300px] border border-primary/20">
         <div className="absolute right-[-5%] top-[-10%] opacity-10 transform rotate-12">
           <Icon icon="health_and_safety" size="3xl" />
         </div>
@@ -18,7 +17,7 @@ export default function HeroSection() {
         </p>
         <Link
           to="/new-triage"
-          className="inline-block w-fit px-8 py-4 bg-white text-[var(--neon-primary)] rounded-full font-label-md text-label-md hover:bg-white/90 transition-all hover:scale-105 active:scale-95 shadow-[0_0_24px_rgba(148,197,253,0.3)] relative z-10 min-h-[44px] flex items-center"
+          className="inline-block w-fit px-8 py-4 bg-primary text-on-primary rounded-full font-label-md text-label-md hover:opacity-90 transition-all relative z-10 min-h-[44px] flex items-center"
         >
           Start New Triage
         </Link>
@@ -43,7 +42,7 @@ const dayData = [
 
 function TrendChart() {
   return (
-    <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-[16px] p-4 md:p-6 flex flex-col justify-between border border-[var(--glass-border)] shadow-[0_0_20px_rgba(148,197,253,0.08)]">
+    <div className="bg-surface rounded-[16px] p-4 md:p-6 flex flex-col justify-between border border-outline-variant">
       <div>
         <h4 className="font-label-md text-label-md text-secondary mb-1">
           Symptom Trend
@@ -59,8 +58,8 @@ function TrendChart() {
             key={i}
             className={`flex-1 rounded-t-lg transition-all ${
               day.isPrimary
-                ? 'bg-[var(--neon-primary)] shadow-[0_0_12px_rgba(148,197,253,0.4)]'
-                : 'bg-[var(--glass-border)] hover:bg-[var(--neon-primary)]/30'
+                ? 'bg-primary'
+                : 'bg-outline-variant hover:bg-primary/30'
             }`}
             style={{ height: day.height }}
             title={dayLabels[i]}

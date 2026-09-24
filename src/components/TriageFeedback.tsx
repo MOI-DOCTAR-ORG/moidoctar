@@ -42,9 +42,9 @@ export default function TriageFeedback({ assessmentId }: TriageFeedbackProps) {
   }
 
   return (
-    <div className="p-4 bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl">
+    <div className="p-4 bg-surface border border-outline-variant rounded-2xl">
       <h4 className="font-label-md text-label-md text-on-surface mb-3 flex items-center gap-2">
-        <Icon icon="rate_review" size="md" className="text-[var(--neon-primary)]" />
+        <Icon icon="rate_review" size="md" className="text-primary" />
         Was this assessment helpful?
       </h4>
 
@@ -53,8 +53,8 @@ export default function TriageFeedback({ assessmentId }: TriageFeedbackProps) {
           onClick={() => setRating('helpful')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border transition-all min-h-[44px] ${
             rating === 'helpful'
-              ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400 shadow-[0_0_12px_rgba(34,197,94,0.2)]'
-              : 'border-[var(--glass-border)] hover:border-green-500/30 text-secondary'
+              ? 'bg-green-500/15 border-green-500/40 text-green-600 dark:text-green-400'
+              : 'border-outline-variant hover:border-green-500/30 text-secondary'
           }`}
         >
           <Icon icon="thumb_up" size="md" />
@@ -64,8 +64,8 @@ export default function TriageFeedback({ assessmentId }: TriageFeedbackProps) {
           onClick={() => setRating('not_helpful')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border transition-all min-h-[44px] ${
             rating === 'not_helpful'
-              ? 'bg-red-500/15 border-red-500/40 text-red-600 dark:text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
-              : 'border-[var(--glass-border)] hover:border-red-500/30 text-secondary'
+              ? 'bg-red-500/15 border-red-500/40 text-red-600 dark:text-red-400'
+              : 'border-outline-variant hover:border-red-500/30 text-secondary'
           }`}
         >
           <Icon icon="thumb_down" size="md" />
@@ -79,12 +79,12 @@ export default function TriageFeedback({ assessmentId }: TriageFeedbackProps) {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Optional: Tell us how we can improve (e.g., inaccurate symptoms, unclear recommendations)..."
-            className="w-full p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:border-[var(--neon-primary)] focus:ring-1 focus:ring-[var(--neon-primary)]/30 transition-colors resize-none"
+            className="w-full p-3 bg-surface border border-outline-variant rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors resize-none"
             rows={3}
           />
           <button
             onClick={handleSubmit}
-            className="w-full py-3 bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white rounded-xl font-label-md text-label-md font-bold hover:shadow-[0_0_20px_rgba(148,197,253,0.3)] transition-all min-h-[44px]"
+            className="w-full py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md font-bold transition-all min-h-[44px]"
           >
             Submit Feedback
           </button>

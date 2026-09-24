@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     triage,
     cache,
     admin,
+    ai,
 )
 
 api_router = APIRouter()
@@ -18,3 +19,4 @@ api_router.include_router(symptom.router, prefix="/symptom", tags=["Symptoms"])
 api_router.include_router(triage.router, prefix="/triage", tags=["Triage"])
 api_router.include_router(cache.router, prefix="/cache", tags=["Cache Management"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+api_router.include_router(ai.router, prefix="/ai", tags=["AI Settings"])

@@ -91,11 +91,11 @@ export default function MedicationReminderWidget() {
   }
 
   return (
-    <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] p-4 md:p-6">
+    <div className="bg-surface rounded-2xl border border-outline-variant p-4 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
-            <Icon icon="notifications_active" size="lg" className="text-purple-500" />
+          <div className="w-10 h-10 rounded-xl bg-tertiary/15 flex items-center justify-center">
+            <Icon icon="notifications_active" size="lg" className="text-tertiary" />
           </div>
           <div>
             <h3 className="font-label-md text-label-md text-on-surface font-bold">Medication Reminders</h3>
@@ -104,7 +104,7 @@ export default function MedicationReminderWidget() {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="p-2 rounded-xl text-[var(--neon-primary)] hover:bg-[var(--neon-primary)]/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="p-2 rounded-xl text-primary hover:bg-primary/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           <Icon icon={showForm ? 'close' : 'add'} size="md" />
         </button>
@@ -118,7 +118,7 @@ export default function MedicationReminderWidget() {
           </div>
           <button
             onClick={requestNotificationPermission}
-            className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-caption font-bold hover:bg-amber-600 transition-colors min-h-[36px]"
+            className="px-3 py-1.5 bg-tertiary text-on-primary rounded-lg text-caption font-bold hover:bg-amber-600 transition-colors min-h-[36px]"
           >
             Enable
           </button>
@@ -132,26 +132,26 @@ export default function MedicationReminderWidget() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Medication name"
-            className="w-full px-3 py-2.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:border-[var(--neon-primary)] focus:ring-1 focus:ring-[var(--neon-primary)]/30"
+            className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
           <input
             type="text"
             value={newDosage}
             onChange={(e) => setNewDosage(e.target.value)}
             placeholder="Dosage (e.g., 500mg)"
-            className="w-full px-3 py-2.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:border-[var(--neon-primary)] focus:ring-1 focus:ring-[var(--neon-primary)]/30"
+            className="w-full px-3 py-2.5 bg-surface border border-outline-variant rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:border-primary focus:ring-1 focus:ring-primary/30"
           />
           <div className="grid grid-cols-2 gap-3">
             <input
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="px-3 py-2.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl text-body-sm text-on-surface focus:border-[var(--neon-primary)] focus:ring-1 focus:ring-[var(--neon-primary)]/30"
+              className="px-3 py-2.5 bg-surface border border-outline-variant rounded-xl text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/30"
             />
             <select
               value={newFrequency}
               onChange={(e) => setNewFrequency(e.target.value)}
-              className="px-3 py-2.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl text-body-sm text-on-surface focus:border-[var(--neon-primary)] focus:ring-1 focus:ring-[var(--neon-primary)]/30"
+              className="px-3 py-2.5 bg-surface border border-outline-variant rounded-xl text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/30"
             >
               <option value="daily">Daily</option>
               <option value="twice_daily">Twice Daily</option>
@@ -162,7 +162,7 @@ export default function MedicationReminderWidget() {
           <button
             onClick={addReminder}
             disabled={!newName.trim() || !newTime}
-            className="w-full py-2.5 bg-[var(--neon-primary)] text-white rounded-xl font-label-md text-label-md font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all min-h-[44px]"
+            className="w-full py-2.5 bg-primary text-on-primary rounded-xl font-label-md text-label-md font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all min-h-[44px]"
           >
             Add Reminder
           </button>
@@ -181,15 +181,15 @@ export default function MedicationReminderWidget() {
               key={reminder.id}
               className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                 reminder.enabled
-                  ? 'bg-[var(--glass-bg)] border-[var(--glass-border)]'
-                  : 'bg-[var(--glass-bg)]/50 border-[var(--glass-border)]/50 opacity-60'
+                  ? 'bg-surface border-outline-variant'
+                  : 'bg-surface/50 border-outline-variant/50 opacity-60'
               }`}
             >
               <button
                 onClick={() => toggleReminder(reminder.id)}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
                   reminder.enabled
-                    ? 'bg-[var(--neon-primary)]/15 text-[var(--neon-primary)]'
+                    ? 'bg-primary/15 text-primary'
                     : 'bg-outline-variant/30 text-secondary'
                 }`}
               >
@@ -210,7 +210,7 @@ export default function MedicationReminderWidget() {
         </div>
       )}
 
-      <div className="mt-4 pt-4 border-t border-[var(--glass-border)] text-caption text-secondary italic flex items-center gap-2">
+      <div className="mt-4 pt-4 border-t border-outline-variant text-caption text-secondary italic flex items-center gap-2">
         <Icon icon="info" size="sm" />
         Reminders are for schedule tracking only and do not constitute medical advice.
       </div>

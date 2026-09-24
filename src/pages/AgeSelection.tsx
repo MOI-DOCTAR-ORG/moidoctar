@@ -14,7 +14,7 @@ export default function AgeSelection() {
   const [selected, setSelected] = useState<string>('')
 
   return (
-    <div className="bg-background text-on-background font-body-md min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="bg-background text-on-background font-body-md min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)] py-8 flex flex-col items-center justify-center">
       <main className="w-full max-w-lg px-margin-mobile z-10 flex flex-col items-center">
         <div className="mb-stack-lg flex flex-col items-center gap-stack-sm">
           <Icon icon="medical_services" size="2xl" className="text-primary" />
@@ -33,7 +33,7 @@ export default function AgeSelection() {
               return (
                 <button
                   key={opt.value}
-                  className={`w-full flex items-center justify-between p-4 rounded-full transition-colors duration-200 ${
+                  className={`w-full flex items-center justify-between p-4 rounded-xl transition-colors duration-200 ${
                     isSelected
                       ? 'border-2 border-primary bg-surface-container-lowest'
                       : 'border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low group'
@@ -54,18 +54,13 @@ export default function AgeSelection() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-stack-md mt-4">
-            <button className="flex-1 py-3 px-6 rounded-full border border-primary text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors duration-200 text-center" onClick={() => navigate('/sign-in')}>
+            <button className="flex-1 py-3 px-6 rounded-xl border border-primary text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors duration-200 text-center" onClick={() => navigate('/sign-in')}>
               Back
             </button>
-            <button className="flex-1 py-3 px-6 rounded-full bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/90 transition-colors duration-200 text-center shadow-sm" onClick={() => navigate('/body-map')}>
+            <button className="flex-1 py-3 px-6 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/90 transition-colors duration-200 text-center shadow-sm" onClick={() => navigate('/body-map')}>
               Continue
             </button>
           </div>
-        </div>
-
-        <div className="mt-stack-lg flex items-center gap-2 text-secondary">
-          <Icon icon="lock" size="sm" />
-          <span className="font-caption text-caption uppercase tracking-widest">HIPAA Compliant</span>
         </div>
       </main>
     </div>

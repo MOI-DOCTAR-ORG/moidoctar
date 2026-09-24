@@ -60,7 +60,11 @@ type AuthState = {
 type AuthContextValue = AuthState & {
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>
   signUp: (fullName: string, email: string, password: string) => Promise<SignUpResult>
+<<<<<<< HEAD
   signInWithGoogle: (accessToken: string) => Promise<LoginResult>
+=======
+  signInWithGoogle: (token: string, tokenType?: 'id_token' | 'access_token') => Promise<LoginResult>
+>>>>>>> 1043c60 (fixed UI, made AI API multiple)
   verifyEmail: (code: string, email?: string) => Promise<boolean>
   resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string } | void>
   signOut: () => Promise<void>
@@ -182,9 +186,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signInWithGoogle = useCallback(async (accessToken: string): Promise<LoginResult> => {
+  const signInWithGoogle = useCallback(async (accessToken: string, tokenType: 'id_token' | 'access_token' = 'id_token'): Promise<LoginResult> => {
     try {
-      const res = await api.post<AuthTokens>('/auth/google', { accessToken }, null)
+      const res = await api.post<AuthTokens>('/auth/google', { accessToken, tokenType }, null)
       setTokens(res.authorization, res.refreshToken)
       const user = await fetchUser()
       if (!user) return { success: false, error: 'Could not load user data.' }

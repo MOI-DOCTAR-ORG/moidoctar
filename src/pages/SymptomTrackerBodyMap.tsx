@@ -78,7 +78,7 @@ export default function SymptomTrackerBodyMap() {
                     onClick={() => setSelectedSeverity(opt.label)}
                     className={`flex-1 py-3 px-2 md:px-4 rounded-full border font-label-md text-xs md:text-sm transition-all ${
                       selectedSeverity === opt.label
-                        ? 'bg-primary text-white border-primary'
+                        ? 'bg-primary text-on-primary border-primary'
                         : 'border-outline-variant hover:border-primary'
                     }`}
                   >
@@ -89,7 +89,7 @@ export default function SymptomTrackerBodyMap() {
             </div>
           </div>
           <div className="mt-8 flex justify-end">
-            <button onClick={handleSaveEntry} className="w-full sm:w-auto bg-primary text-white font-label-md px-6 md:px-8 py-3 md:py-4 rounded-full hover:bg-opacity-90 transition-transform active:scale-95 flex items-center justify-center gap-2">
+            <button onClick={handleSaveEntry} className="w-full sm:w-auto bg-primary text-on-primary font-label-md px-6 md:px-8 py-3 md:py-4 rounded-full hover:bg-opacity-90 transition-transform active:scale-95 flex items-center justify-center gap-2">
               <span>Save Entry</span>
               <Icon icon="arrow_forward" size="md" />
             </button>

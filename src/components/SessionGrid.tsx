@@ -7,8 +7,8 @@ export default function SessionGrid() {
 
   if (sessions.length === 0) {
     return (
-      <section className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-dashed border-[var(--glass-border)] p-10 text-center shadow-[0_0_20px_rgba(148,197,253,0.06)]">
-        <div className="w-16 h-16 mx-auto mb-4 bg-[var(--neon-primary)]/10 rounded-full flex items-center justify-center text-[var(--neon-primary)]">
+      <section className="bg-surface rounded-2xl border border-dashed border-outline-variant p-10 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center text-primary">
           <Icon icon="history" size="2xl" />
         </div>
         <h4 className="font-headline-md text-headline-md text-on-surface mb-2">No sessions yet</h4>

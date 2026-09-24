@@ -242,7 +242,7 @@ export default function Profile() {
   }
 
   function badgeClass() {
-    return 'bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] px-3 py-1 rounded-full text-label-md font-label-md text-on-surface flex items-center gap-2'
+    return 'bg-surface border border-outline-variant px-3 py-1 rounded-full text-label-md font-label-md text-on-surface flex items-center gap-2'
   }
 
   return (
@@ -256,11 +256,11 @@ export default function Profile() {
         )}
 
         {/* Profile Header Card */}
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-4 md:p-8 shadow-[0_0_20px_rgba(148,197,253,0.08)]">
+        <div className="bg-surface border border-outline-variant rounded-xl p-4 md:p-8">
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
             {/* Photo */}
             <div className="relative group">
-              <div className="w-28 h-28 md:w-36 md:h-36 rounded-full bg-[var(--neon-primary)]/15 text-[var(--neon-primary)] flex items-center justify-center text-4xl font-extrabold border-4 border-[var(--glass-border)] overflow-hidden">
+              <div className="w-28 h-28 md:w-36 md:h-36 rounded-full bg-primary/15 text-primary flex items-center justify-center text-4xl font-extrabold border-4 border-outline-variant overflow-hidden">
                 {form.photo ? (
                   <img src={form.photo} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -289,13 +289,13 @@ export default function Profile() {
             {/* Name / Email / Completion */}
             <div className="flex-1 text-center md:text-left w-full">
               <input
-                className="text-center md:text-left font-headline-md text-headline-md font-bold text-on-surface bg-transparent border-b-2 border-transparent focus:border-[var(--neon-primary)] outline-none w-full mb-1 transition-colors"
+                className="text-center md:text-left font-headline-md text-headline-md font-bold text-on-surface bg-transparent border-b-2 border-transparent focus:border-primary outline-none w-full mb-1 transition-colors"
                 value={form.fullName}
                 onChange={e => updateField('fullName', e.target.value)}
                 placeholder="Your full name"
               />
               <input
-                className="text-center md:text-left font-body-md text-secondary bg-transparent border-b-2 border-transparent focus:border-[var(--neon-primary)] outline-none w-full mb-4 transition-colors"
+                className="text-center md:text-left font-body-md text-secondary bg-transparent border-b-2 border-transparent focus:border-primary outline-none w-full mb-4 transition-colors"
                 type="email"
                 value={form.email}
                 onChange={e => updateField('email', e.target.value)}
@@ -304,10 +304,10 @@ export default function Profile() {
 
               {/* Completion bar */}
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-[var(--glass-border)] rounded-full overflow-hidden">
+                <div className="flex-1 h-2 bg-outline-variant rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      completion === 100 ? 'bg-green-500' : 'bg-[var(--neon-primary)]'
+                      completion === 100 ? 'bg-green-500' : 'bg-primary'
                     }`}
                     style={{ width: `${completion}%` }}
                   />
@@ -440,7 +440,7 @@ export default function Profile() {
                   onChange={e => setNewAllergy(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addAllergy() }}
                 />
-                <button onClick={addAllergy} className="bg-primary text-white px-4 py-2 rounded-lg font-label-md hover:bg-primary/90 transition-colors">
+                <button onClick={addAllergy} className="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md hover:bg-primary/90 transition-colors">
                   <Icon icon="add" size="md" />
                 </button>
               </div>
@@ -468,7 +468,7 @@ export default function Profile() {
                   onChange={e => setNewCondition(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addCondition() }}
                 />
-                <button onClick={addCondition} className="bg-primary text-white px-4 py-2 rounded-lg font-label-md hover:bg-primary/90 transition-colors">
+                <button onClick={addCondition} className="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md hover:bg-primary/90 transition-colors">
                   <Icon icon="add" size="md" />
                 </button>
               </div>
@@ -480,7 +480,7 @@ export default function Profile() {
               {form.currentMedications.length > 0 && (
                 <div className="space-y-2 mb-3">
                   {form.currentMedications.map((m, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-lg px-4 py-3">
+                    <div key={i} className="flex items-center gap-3 bg-surface border border-outline-variant rounded-lg px-4 py-3">
                       <div className="flex-1">
                         <p className="font-label-md text-on-surface">{m.name}</p>
                         <p className="text-caption text-secondary">{m.dosage} &middot; {m.frequency}</p>
@@ -513,7 +513,7 @@ export default function Profile() {
                     onChange={e => setNewMedication(p => ({ ...p, frequency: e.target.value }))}
                     onKeyDown={e => { if (e.key === 'Enter') addMedication() }}
                   />
-                  <button onClick={addMedication} className="bg-primary text-white px-4 py-2 rounded-lg font-label-md hover:bg-primary/90 transition-colors self-stretch shrink-0">
+                  <button onClick={addMedication} className="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md hover:bg-primary/90 transition-colors self-stretch shrink-0">
                     <Icon icon="add" size="md" />
                   </button>
                 </div>
@@ -620,8 +620,8 @@ export default function Profile() {
                 <p className="font-label-md text-label-md text-secondary mb-2">Appointment History</p>
                 <div className="space-y-2">
                   {form.appointmentHistory.map((a, i) => (
-                    <div key={i} className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-lg px-4 py-3 flex items-center gap-3">
-                      <Icon icon="event" size="lg" className="text-[var(--neon-primary)]" />
+                    <div key={i} className="bg-surface border border-outline-variant rounded-lg px-4 py-3 flex items-center gap-3">
+                      <Icon icon="event" size="lg" className="text-primary" />
                       <div className="flex-1">
                         <p className="font-label-md text-on-surface">{a.reason}</p>
                         <p className="text-caption text-secondary">{a.date} &middot; {a.doctor}</p>
@@ -637,8 +637,8 @@ export default function Profile() {
                 <p className="font-label-md text-label-md text-secondary mb-2">Medical Records</p>
                 <div className="space-y-2">
                   {form.medicalRecords.map((r, i) => (
-                    <div key={i} className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-lg px-4 py-3 flex items-center gap-3">
-                      <Icon icon="description" size="lg" className="text-[var(--neon-primary)]" />
+                    <div key={i} className="bg-surface border border-outline-variant rounded-lg px-4 py-3 flex items-center gap-3">
+                      <Icon icon="description" size="lg" className="text-primary" />
                       <div className="flex-1">
                         <p className="font-label-md text-on-surface">{r.name}</p>
                         <p className="text-caption text-secondary">{r.type} &middot; {new Date(r.uploadedAt).toLocaleDateString()}</p>
@@ -656,7 +656,7 @@ export default function Profile() {
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
-            className="flex-1 py-3 px-6 rounded-full bg-[var(--neon-primary)] text-white font-label-md text-label-md hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_16px_rgba(148,197,253,0.2)] min-h-[44px]"
+            className="flex-1 py-3 px-6 rounded-full bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
             <Icon icon={saving ? 'hourglass_top' : dirty ? 'save' : 'check_circle'} size="md" />
             {saving ? 'Saving...' : dirty ? 'Save Changes' : 'Saved'}
@@ -693,7 +693,7 @@ export default function Profile() {
                     Type <strong className="text-error">DELETE</strong> to confirm
                   </label>
                   <input
-                    className="w-full bg-[var(--glass-bg)] border border-error/50 rounded-lg px-4 py-3 font-body-md text-on-surface focus:border-error focus:ring-2 focus:ring-error/20 transition-all outline-none placeholder:text-secondary"
+                    className="w-full bg-surface border border-error/50 rounded-lg px-4 py-3 font-body-md text-on-surface focus:border-error focus:ring-2 focus:ring-error/20 transition-all outline-none placeholder:text-secondary"
                     placeholder="Type DELETE here..."
                     value={deleteConfirmText}
                     onChange={e => setDeleteConfirmText(e.target.value)}
@@ -702,7 +702,7 @@ export default function Profile() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}
-                    className="flex-1 py-3 px-6 rounded-full border border-[var(--glass-border)] text-secondary font-label-md text-label-md hover:bg-[var(--glass-bg)] transition-colors min-h-[44px]"
+                    className="flex-1 py-3 px-6 rounded-full border border-outline-variant text-secondary font-label-md text-label-md hover:bg-surface transition-colors min-h-[44px]"
                   >
                     Cancel
                   </button>
@@ -721,22 +721,22 @@ export default function Profile() {
         </div>
 
         {/* Footer */}
-        <footer className="mt-8 mb-12 flex flex-col md:flex-row items-center justify-between py-6 border-t border-[var(--glass-border)] gap-4">
+        <footer className="mt-8 mb-12 flex flex-col md:flex-row items-center justify-between py-6 border-t border-outline-variant gap-4">
           <div className="flex items-center gap-6">
           </div>
           <div className="flex gap-stack-lg">
-            <a className="text-caption text-secondary hover:text-[var(--neon-primary)] transition-colors" href="#">Privacy Policy</a>
-            <a className="text-caption text-secondary hover:text-[var(--neon-primary)] transition-colors" href="#">Terms of Service</a>
+            <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Privacy Policy</a>
+            <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Terms of Service</a>
           </div>
         </footer>
       </div>
 
       {/* Password Confirm Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setShowPasswordModal(false); setPasswordConfirmValue(''); setPasswordConfirmError('') }}>
-          <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl p-6 md:p-8 max-w-md w-full mx-4 shadow-2xl modal-animate" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowPasswordModal(false); setPasswordConfirmValue(''); setPasswordConfirmError('') }}>
+          <div className="bg-surface border border-outline-variant rounded-2xl p-6 md:p-8 max-w-md w-full mx-4 shadow-2xl modal-animate" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[var(--neon-primary)]/10 flex items-center justify-center text-[var(--neon-primary)]">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                 <Icon icon="lock" size="lg" />
               </div>
               <div>
@@ -759,14 +759,14 @@ export default function Profile() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => { setShowPasswordModal(false); setPasswordConfirmValue(''); setPasswordConfirmError('') }}
-                className="flex-1 py-3 px-6 rounded-full border border-[var(--glass-border)] text-secondary font-label-md text-label-md hover:bg-[var(--glass-bg)] transition-colors min-h-[44px]"
+                className="flex-1 py-3 px-6 rounded-full border border-outline-variant text-secondary font-label-md text-label-md hover:bg-surface transition-colors min-h-[44px]"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePasswordConfirm}
                 disabled={!passwordConfirmValue}
-                className="flex-1 py-3 px-6 rounded-full bg-[var(--neon-primary)] text-white font-label-md text-label-md hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                className="flex-1 py-3 px-6 rounded-full bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
               >
                 Confirm
               </button>
@@ -795,12 +795,12 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-[0_0_20px_rgba(148,197,253,0.08)] overflow-hidden">
+    <div className="bg-surface border border-outline-variant rounded-xl overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-[rgba(148,197,253,0.04)] transition-colors text-left min-h-[44px]"
+        className="w-full flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 hover:bg-primary/10 transition-colors text-left min-h-[44px]"
       >
-        <Icon icon={icon} size="lg" className="text-[var(--neon-primary)]" />
+        <Icon icon={icon} size="lg" className="text-primary" />
         <h3 className="font-headline-md text-headline-md text-on-surface flex-1">{title}</h3>
         {completed && (
           <span className="text-green-400">

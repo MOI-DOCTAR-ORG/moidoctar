@@ -12,6 +12,8 @@ import Icon from '../components/Icon'
 const pageTitles = [
   { path: '/new-triage-interface', label: 'New Triage' },
   { path: '/new-triage-body-map', label: 'New Triage' },
+  { path: '/body-map', label: 'Body Map' },
+  { path: '/age-selection', label: 'Age Range' },
   { path: '/symptom-tracker-body-map', label: 'Symptom Tracker' },
   { path: '/new-triage', label: 'New Triage' },
   { path: '/history', label: 'History' },
@@ -21,6 +23,7 @@ const pageTitles = [
   { path: '/medication-tracker', label: 'Medications' },
   { path: '/notifications', label: 'Notifications' },
   { path: '/profile', label: 'Profile' },
+  { path: '/ai-settings', label: 'AI Settings' },
 ]
 
 function getPageTitle(pathname: string) {
@@ -43,6 +46,8 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(hasAcceptedDisclaimer())
   const isDark = theme === 'dark'
+  // The chat owns the full screen height on phones (its own input bar replaces the bottom nav).
+  const isChat = pathname.startsWith('/new-triage')
   const pageTitle = getPageTitle(pathname)
 
   const handleSignOut = async () => {
@@ -63,16 +68,9 @@ export default function AppLayout() {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="fixed top-0 left-0 right-0 md:left-[var(--spacing-sidebar-width,232px)] z-30">
-        {/* Neon accent line at top */}
-        <div
-          className="h-px w-full"
-          style={{
-            background: 'linear-gradient(90deg, transparent 0%, var(--neon-primary) 30%, var(--neon-accent) 70%, transparent 100%)',
-          }}
-        />
 
         {/* Glass header */}
-        <div className="bg-[var(--glass-bg)] backdrop-blur-2xl border-b border-[var(--glass-border)] h-14 md:h-16">
+        <div className="bg-surface border-b border-outline-variant h-14 md:h-16">
           <div className="mx-auto flex h-full w-full max-w-[1400px] items-center justify-between px-3 sm:px-4 md:px-6">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <button
@@ -97,21 +95,21 @@ export default function AppLayout() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-[rgba(148,197,253,0.04)] hover:text-[var(--neon-primary)]"
+                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               >
                 <Icon icon={isDark ? 'light_mode' : 'dark_mode'} size="lg" />
               </button>
               <Link
                 to="/notifications"
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-[rgba(148,197,253,0.04)] hover:text-[var(--neon-primary)]"
+                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
                 aria-label="Notifications"
               >
                 <Icon icon="notifications" size="lg" />
               </Link>
               <Link
                 to="/profile"
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl bg-primary-container text-sm font-bold text-primary transition hover:ring-2 hover:ring-[var(--neon-primary)]/30"
+                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl bg-primary-container text-sm font-bold text-primary transition hover:ring-2 hover:ring-primary/30"
                 aria-label="Profile"
                 title={user?.userName || 'Profile'}
               >
@@ -133,11 +131,11 @@ export default function AppLayout() {
       <OfflineBanner />
 
       {/* Content */}
-      <div className="md:ml-[var(--spacing-sidebar-width,232px)] pt-14 md:pt-16 pb-16 md:pb-0 min-h-[100dvh]">
+      <div className={`md:ml-[var(--spacing-sidebar-width,232px)] pt-14 md:pt-16 ${isChat ? 'pb-0' : 'pb-[calc(4rem+env(safe-area-inset-bottom))]'} md:pb-0 min-h-[100dvh]`}>
         <Outlet key={userChangeKey} />
       </div>
 
-      <MobileBottomNav />
+      {!isChat && <MobileBottomNav />}
     </div>
   )
 }

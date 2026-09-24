@@ -24,9 +24,9 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
       <div
-        className="bg-surface w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-3xl border border-[var(--glass-border)] shadow-2xl"
+        className="bg-surface w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-3xl border border-outline-variant shadow-2xl"
         style={{ animation: 'disclaimerEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
       >
         <style>{`
@@ -35,7 +35,7 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
 
         <div className="p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--neon-primary)]/15 flex items-center justify-center text-[var(--neon-primary)]">
+            <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center text-primary">
               <Icon icon="health_and_safety" size="xl" />
             </div>
             <div>
@@ -61,11 +61,11 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
               </div>
             </div>
 
-            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl">
               <div className="flex items-start gap-3">
-                <Icon icon="emergency" size="lg" className="text-blue-500 mt-0.5 shrink-0" />
+                <Icon icon="emergency" size="lg" className="text-primary mt-0.5 shrink-0" />
                 <div>
-                  <h3 className="font-label-md text-label-md text-blue-600 dark:text-blue-400 font-bold mb-1">
+                  <h3 className="font-label-md text-label-md text-primary font-bold mb-1">
                     Emergency Situations
                   </h3>
                   <p className="text-body-sm text-on-surface-variant leading-relaxed">
@@ -109,7 +109,7 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
           <button
             onClick={handleAccept}
             disabled={!acknowledged}
-            className="w-full min-h-14 rounded-2xl font-label-md text-label-md font-bold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-accent)] text-white shadow-[0_0_24px_rgba(148,197,253,0.25)] hover:shadow-[0_0_32px_rgba(148,197,253,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+            className="w-full min-h-14 rounded-2xl font-label-md text-label-md font-bold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed bg-primary text-on-primary hover:-translate-y-0.5 active:translate-y-0"
           >
             <Icon icon="check_circle" size="md" />
             I Understand & Continue

@@ -107,3 +107,10 @@ INSERT INTO public.users (
     '{"gender": "Female", "age": "29", "bloodType": "O+", "country": "United States"}'::jsonb,
     '{"emailNotification": true, "smsAlert": false, "twoFactorAuth": false}'::jsonb
 ) ON CONFLICT (email) DO NOTHING;
+
+-- Generic key/value settings (AI API key pool, per-user AI memory).
+create table if not exists app_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz default now()
+);

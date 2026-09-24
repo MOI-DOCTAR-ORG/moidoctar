@@ -11,6 +11,7 @@ class ManualAuthRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     accessToken: str
+    tokenType: str = "id_token"  # "id_token" (GoogleLogin) or "access_token" (custom button)
 
 
 class VerifyEmailRequest(BaseModel):

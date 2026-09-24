@@ -78,7 +78,7 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags }: Emergenc
             ))}
           </div>
 
-          <div className="p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl">
+          <div className="p-3 bg-surface border border-outline-variant rounded-xl">
             <p className="text-body-sm text-on-surface-variant leading-relaxed">
               <strong>Important:</strong> If you are experiencing chest pain, difficulty breathing, severe bleeding,
               loss of consciousness, or any life-threatening symptoms, <strong>call emergency services immediately</strong> before

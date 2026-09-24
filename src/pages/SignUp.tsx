@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
-import { GOOGLE_AUTH_ENABLED } from '../lib/constants'
+import GoogleButton from '../components/auth/GoogleButton'
 import AuthShell from '../components/auth/AuthShell'
 import {
   authDivider,
@@ -22,7 +21,7 @@ import {
 
 export default function SignUp() {
   const navigate = useNavigate()
-  const { signUp, signInWithGoogle } = useAuth()
+  const { signUp } = useAuth()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -48,7 +47,7 @@ export default function SignUp() {
     if (password.length === 0) return { text: '', color: '' }
     if (strengthScore <= 1) return { text: 'Weak', color: 'text-error' }
     if (strengthScore <= 2) return { text: 'Fair', color: 'text-amber-500' }
-    if (strengthScore <= 3) return { text: 'Good', color: 'text-blue-500' }
+    if (strengthScore <= 3) return { text: 'Good', color: 'text-primary' }
     return { text: 'Strong', color: 'text-green-500' }
   }, [strengthScore, password.length])
 
@@ -56,7 +55,7 @@ export default function SignUp() {
     if (password.length === 0) return 'bg-secondary-fixed-dim'
     if (strengthScore <= 1) return 'bg-error'
     if (strengthScore <= 2) return 'bg-amber-500'
-    if (strengthScore <= 3) return 'bg-blue-500'
+    if (strengthScore <= 3) return 'bg-primary'
     return 'bg-green-500'
   }, [strengthScore, password.length])
 
@@ -133,35 +132,17 @@ export default function SignUp() {
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
-          {GOOGLE_AUTH_ENABLED ? (
-            <GoogleLogin
-              onSuccess={async (credentialResponse) => {
-                setError('')
-                const result = await signInWithGoogle(credentialResponse.credential ?? '')
-                if (!result.success) {
-                  setError(result.error)
-                  setShakeKey(k => k + 1)
-                }
-              }}
-              onError={() => {
-                setError('Google sign-in failed. Please try again.')
-                setShakeKey(k => k + 1)
-              }}
-              theme="outline"
-              size="large"
-              text="continue_with"
-              shape="rectangular"
-              width="100%"
-            />
-          ) : null}
-        </div>
+        <GoogleButton
+          label="Sign up with Google"
+          onError={(msg) => {
+            setError(msg)
+            setShakeKey(k => k + 1)
+          }}
+        />
 
-        {GOOGLE_AUTH_ENABLED && (
-          <div className={authDivider} role="separator" aria-orientation="horizontal">
-            or continue with email
+        <div className={authDivider} role="separator" aria-orientation="horizontal">
+            or use your email
           </div>
-        )}
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <div className={authField}>

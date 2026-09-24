@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiClient from '../lib/axios'
 import modelClient from '../lib/modelAxios'
-import type { TriageRequest, TriageResponse, TriageChatRequest, TriageChatResponse, CacheStats, CacheClearResponse } from '../types/triage'
+import type { TriageRequest, TriageResponse, TriageChatRequest, TriageChatResponse, CacheStats, CacheClearResponse, AiMemory, AiPreferences, AiHealthContext, AiKeyInfo, AiStatus } from '../types/triage'
 
 type MutationPayload = unknown
 
@@ -99,12 +99,20 @@ export function useCreateTriageChat() {
         const fd = new FormData()
         fd.append('symptoms', payload.symptoms)
         fd.append('messages', payload.messages ?? '[]')
+<<<<<<< HEAD
+=======
+        if (payload.context) fd.append('context', payload.context)
+>>>>>>> 1043c60 (fixed UI, made AI API multiple)
         fd.append('image', payload.image)
         return modelClient.post<TriageChatResponse>('/triage/chat', fd)
       }
       return modelClient.post<TriageChatResponse>('/triage/chat', {
         symptoms: payload.symptoms,
         messages: payload.messages ?? '[]',
+<<<<<<< HEAD
+=======
+        context: payload.context,
+>>>>>>> 1043c60 (fixed UI, made AI API multiple)
       })
     },
   })
@@ -176,3 +184,84 @@ export function useClearCache() {
     mutationFn: () => modelClient.post<CacheClearResponse>('/cache/clear'),
   })
 }
+
+// ---------- AI status, memory & API keys ----------
+
+export function useAiStatus() {
+  return useQuery({
+    queryKey: ['ai-status'],
+    queryFn: async () => (await modelClient.get<AiStatus>('/ai/status')).data,
+    retry: false,
+    staleTime: 30_000,
+  })
+}
+
+export function useAiMemory() {
+  return useQuery({
+    queryKey: ['ai-memory'],
+    queryFn: async () => (await modelClient.get<AiMemory>('/ai/memory')).data,
+    retry: false,
+  })
+}
+
+export function useUpdateAiPreferences() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (changes: Partial<AiPreferences>) => (await modelClient.put<AiMemory>('/ai/preferences', changes)).data,
+    onSuccess: (data) => qc.setQueryData(['ai-memory'], data),
+  })
+}
+
+export function useUpdateAiHealthContext() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (changes: Partial<AiHealthContext>) => (await modelClient.put<AiMemory>('/ai/health-context', changes)).data,
+    onSuccess: (data) => qc.setQueryData(['ai-memory'], data),
+  })
+}
+
+export function useDeleteAiFact() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => (await modelClient.delete<AiMemory>(`/ai/memory/facts/${encodeURIComponent(id)}`)).data,
+    onSuccess: (data) => qc.setQueryData(['ai-memory'], data),
+  })
+}
+
+export function useResetAiMemory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => (await modelClient.delete<AiMemory>('/ai/memory')).data,
+    onSuccess: (data) => qc.setQueryData(['ai-memory'], data),
+  })
+}
+
+type KeysResponse = { keys: AiKeyInfo[]; test?: { ok: boolean; model?: string; error?: string }; added_id?: string }
+
+export function useAiKeys() {
+  return useQuery({
+    queryKey: ['ai-keys'],
+    queryFn: async () => (await modelClient.get<KeysResponse>('/ai/keys')).data.keys,
+    retry: false,
+  })
+}
+
+function useKeysMutation<T>(fn: (v: T) => Promise<KeysResponse>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (data) => {
+      qc.setQueryData(['ai-keys'], data.keys)
+      qc.invalidateQueries({ queryKey: ['ai-status'] })
+    },
+  })
+}
+
+export const useAddAiKey = () =>
+  useKeysMutation(async (v: { key: string; label: string; model?: string }) => (await modelClient.post<KeysResponse>('/ai/keys', v)).data)
+export const useToggleAiKey = () =>
+  useKeysMutation(async (v: { id: string; enabled: boolean }) => (await modelClient.patch<KeysResponse>(`/ai/keys/${v.id}`, { enabled: v.enabled })).data)
+export const useDeleteAiKey = () =>
+  useKeysMutation(async (id: string) => (await modelClient.delete<KeysResponse>(`/ai/keys/${id}`)).data)
+export const useTestAiKey = () =>
+  useKeysMutation(async (id: string) => (await modelClient.post<KeysResponse>(`/ai/keys/${id}/test`)).data)

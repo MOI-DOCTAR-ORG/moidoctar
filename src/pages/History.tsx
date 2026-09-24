@@ -22,7 +22,7 @@ const sessionFilters = ['All Sessions', 'Low', 'Moderate', 'High']
 const severityConfig: Record<string, { severityClass: string; severityIcon: string }> = {
   Urgent: { severityClass: 'bg-error/15 text-error border border-error/20', severityIcon: 'warning' },
   Moderate: { severityClass: 'bg-amber-500/15 text-amber-400 border border-amber-500/20', severityIcon: 'info' },
-  Stable: { severityClass: 'bg-[var(--neon-primary)]/15 text-[var(--neon-primary)] border border-[var(--neon-primary)]/20', severityIcon: 'check_circle' },
+  Stable: { severityClass: 'bg-primary/15 text-primary border border-primary/20', severityIcon: 'check_circle' },
 }
 
 const tabs: { key: Tab; label: string; icon: string }[] = [
@@ -91,15 +91,15 @@ function SessionsView() {
     <section className="max-w-container-max-width w-full mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 mb-6 md:mb-10">
         <div className="overflow-x-auto w-full md:w-auto">
-          <div className="flex p-1 bg-[var(--glass-bg)] backdrop-blur-xl rounded-full border border-[var(--glass-border)] w-max">
+          <div className="flex p-1 bg-surface rounded-full border border-outline-variant w-max">
             {sessionFilters.map(f => (
               <button
                 key={f}
                 onClick={() => setActiveFilter(f)}
                 className={
                   activeFilter === f
-                    ? 'px-6 py-2 rounded-full font-label-md text-label-md bg-[var(--neon-primary)] text-white transition-all shadow-sm shadow-[var(--neon-primary)]/20'
-                    : 'px-6 py-2 rounded-full font-label-md text-label-md text-secondary hover:text-[var(--neon-primary)] transition-all'
+                    ? 'px-6 py-2 rounded-full font-label-md text-label-md bg-primary text-on-primary transition-all shadow-sm/20'
+                    : 'px-6 py-2 rounded-full font-label-md text-label-md text-secondary hover:text-primary transition-all'
                 }
               >
                 {f}
@@ -108,11 +108,11 @@ function SessionsView() {
           </div>
         </div>
         <div className="flex gap-4 flex-wrap">
-          <div className="px-5 py-3 bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)] flex flex-col">
+          <div className="px-5 py-3 bg-surface rounded-xl border border-outline-variant flex flex-col">
             <span className="font-caption text-caption text-secondary uppercase tracking-wider">Total Triage</span>
-            <span className="font-headline-md text-headline-md text-[var(--neon-primary)]">{sessions.length}</span>
+            <span className="font-headline-md text-headline-md text-primary">{sessions.length}</span>
           </div>
-          <div className="px-5 py-3 bg-error/10 backdrop-blur-xl rounded-xl border border-error/20 flex flex-col">
+          <div className="px-5 py-3 bg-error/10 rounded-xl border border-error/20 flex flex-col">
             <span className="font-caption text-caption text-error uppercase tracking-wider">Urgent Alerts</span>
             <span className="font-headline-md text-headline-md text-error">{urgentCount}</span>
           </div>
@@ -120,10 +120,10 @@ function SessionsView() {
       </div>
 
       {loadingHistory ? (
-        <div className="flex justify-center py-20"><span className="w-8 h-8 border-2 border-[var(--neon-primary)]/30 border-t-[var(--neon-primary)] rounded-full animate-spin" /></div>
+        <div className="flex justify-center py-20"><span className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /></div>
       ) : filteredSessions.length === 0 ? (
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] p-14 text-center">
-          <div className="w-20 h-20 mx-auto mb-5 bg-[var(--neon-primary)]/10 rounded-full flex items-center justify-center text-[var(--neon-primary)]">
+        <div className="bg-surface rounded-2xl border border-outline-variant p-14 text-center">
+          <div className="w-20 h-20 mx-auto mb-5 bg-primary/10 rounded-full flex items-center justify-center text-primary">
             <Icon icon="history" size="2xl" />
           </div>
           <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No triage history</h3>
@@ -132,7 +132,7 @@ function SessionsView() {
               ? 'Your completed triage sessions will appear here. Start a new session to begin.'
               : `No sessions match "${activeFilter}" severity.`}
           </p>
-          <button onClick={() => navigate('/new-triage')} className="inline-flex items-center gap-2 bg-[var(--neon-primary)] text-white px-6 py-3 rounded-full font-label-md text-label-md hover:opacity-90 transition-colors shadow-lg shadow-[var(--neon-primary)]/20 min-h-[44px]">
+          <button onClick={() => navigate('/new-triage')} className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-label-md text-label-md hover:opacity-90 transition-colors shadow-lg/20 min-h-[44px]">
             <Icon icon="add" size="md" />
             Start New Triage
           </button>
@@ -140,19 +140,19 @@ function SessionsView() {
       ) : (
         <div className="space-y-4">
           {filteredSessions.map(s => {
-            const config = severityConfig[s.severity] || { severityClass: 'bg-[var(--glass-bg)] text-secondary', severityIcon: 'info' }
+            const config = severityConfig[s.severity] || { severityClass: 'bg-surface text-secondary', severityIcon: 'info' }
             return (
               <div
                 key={s.id}
-                className="bg-[var(--glass-bg)] backdrop-blur-xl p-4 md:p-6 rounded-xl border border-[var(--glass-border)] flex flex-col lg:flex-row items-start lg:items-center gap-4 md:gap-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--neon-primary)]/5"
+                className="bg-surface p-4 md:p-6 rounded-xl border border-outline-variant flex flex-col lg:flex-row items-start lg:items-center gap-4 md:gap-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg/5"
               >
                 <div className="flex flex-col min-w-[120px]">
-                  <span className="font-label-md text-label-md text-[var(--neon-primary)]">{s.date}</span>
+                  <span className="font-label-md text-label-md text-primary">{s.date}</span>
                   <span className="font-caption text-caption text-secondary">{s.time}</span>
                 </div>
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <span className="px-3 py-1 bg-[var(--neon-primary)]/10 rounded-full text-[var(--neon-primary)] font-label-md text-label-md border border-[var(--neon-primary)]/20">
+                    <span className="px-3 py-1 bg-primary/10 rounded-full text-primary font-label-md text-label-md border border-primary/20">
                       {s.condition}
                     </span>
                     <span className={`px-3 py-1 rounded-full font-label-md text-label-md flex items-center gap-1 ${config.severityClass}`}>
@@ -163,7 +163,7 @@ function SessionsView() {
                   <p className="text-on-surface-variant font-body-md line-clamp-1">{s.description}</p>
                 </div>
                 <div className="flex items-center gap-4 w-full lg:w-auto">
-                  <button onClick={() => navigate('/care-details')} className="flex-1 lg:flex-none px-6 py-3 border border-[var(--neon-primary)] text-[var(--neon-primary)] font-label-md text-label-md rounded-full hover:bg-[var(--neon-primary)]/10 transition-colors min-h-[44px]">
+                  <button onClick={() => navigate('/care-details')} className="flex-1 lg:flex-none px-6 py-3 border border-primary text-primary font-label-md text-label-md rounded-full hover:bg-primary/10 transition-colors min-h-[44px]">
                     View Details
                   </button>
                 </div>
@@ -176,7 +176,7 @@ function SessionsView() {
       {sessions.length > 0 && (
         <div className="mt-12 flex justify-center">
           <nav className="flex items-center gap-2">
-            <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} className="w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] hover:bg-[var(--neon-primary)]/10 transition-colors text-secondary min-h-[44px]">
+            <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-outline-variant hover:bg-primary/10 transition-colors text-secondary min-h-[44px]">
               <Icon icon="chevron_left" size="md" />
             </button>
             {[1, 2, 3].map(p => (
@@ -185,14 +185,14 @@ function SessionsView() {
                 onClick={() => setCurrentPage(p)}
                 className={
                   currentPage === p
-                    ? 'w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--neon-primary)] text-white font-label-md text-label-md shadow-lg shadow-[var(--neon-primary)]/20 min-h-[44px]'
-                    : 'w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] hover:bg-[var(--neon-primary)]/10 transition-colors font-label-md text-label-md min-h-[44px]'
+                    ? 'w-11 h-11 flex items-center justify-center rounded-lg bg-primary text-on-primary font-label-md text-label-md shadow-lg/20 min-h-[44px]'
+                    : 'w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-outline-variant hover:bg-primary/10 transition-colors font-label-md text-label-md min-h-[44px]'
                 }
               >
                 {p}
               </button>
             ))}
-            <button onClick={() => setCurrentPage(Math.min(3, currentPage + 1))} className="w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] hover:bg-[var(--neon-primary)]/10 transition-colors text-secondary min-h-[44px]">
+            <button onClick={() => setCurrentPage(Math.min(3, currentPage + 1))} className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-outline-variant hover:bg-primary/10 transition-colors text-secondary min-h-[44px]">
               <Icon icon="chevron_right" size="md" />
             </button>
           </nav>
@@ -269,17 +269,17 @@ function MedicalForm() {
   return (
     <section className="max-w-container-max-width w-full mx-auto">
       {saved && (
-        <div className="mb-6 bg-green-500/10 backdrop-blur-xl border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
+        <div className="mb-6 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
           <Icon icon="check_circle" size="lg" className="text-green-400 icon-fill" />
           <p className="font-body-md text-green-400">Your medical history has been saved successfully.</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-[var(--glass-bg)] backdrop-blur-xl rounded-2xl border border-[var(--glass-border)] shadow-[0px_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
+      <form onSubmit={handleSubmit} className="bg-surface rounded-2xl border border-outline-variant shadow-[0px_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
         <div className="p-6 md:p-8 space-y-12">
           <section>
-            <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
-              <div className="w-8 h-8 rounded-full bg-[var(--neon-primary)]/10 flex items-center justify-center text-[var(--neon-primary)] border border-[var(--neon-primary)]/20">
+            <div className="flex items-center gap-3 mb-6 border-b border-outline-variant pb-4">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                 <Icon icon="badge" size="sm" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface">Personal Information</h3>
@@ -322,8 +322,8 @@ function MedicalForm() {
           </section>
 
           <section>
-            <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
-              <div className="w-8 h-8 rounded-full bg-[var(--neon-primary)]/10 flex items-center justify-center text-[var(--neon-primary)] border border-[var(--neon-primary)]/20">
+            <div className="flex items-center gap-3 mb-6 border-b border-outline-variant pb-4">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                 <Icon icon="vital_signs" size="sm" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface">Existing Conditions</h3>
@@ -337,15 +337,15 @@ function MedicalForm() {
                   onClick={() => toggleCondition(condition)}
                   className={`px-4 py-2 rounded-full font-label-md text-label-md transition-all cursor-pointer min-h-[44px] ${
                     selectedConditions.includes(condition)
-                      ? 'border border-[var(--neon-primary)] bg-[var(--neon-primary)]/15 text-[var(--neon-primary)]'
-                      : 'border border-[var(--glass-border)] bg-[var(--glass-bg)] text-on-surface-variant hover:border-[var(--neon-primary)]/30'
+                      ? 'border border-primary bg-primary/15 text-primary'
+                      : 'border border-outline-variant bg-surface text-on-surface-variant hover:border-primary/30'
                   }`}
                 >
                   {condition}
                 </button>
               ))}
               {customConditions.map(c => (
-                <span key={c} className="px-4 py-2 rounded-full border border-[var(--neon-primary)]/30 bg-[var(--neon-primary)]/10 text-[var(--neon-primary)] font-label-md text-label-md flex items-center gap-2">
+                <span key={c} className="px-4 py-2 rounded-full border border-primary/30 bg-primary/10 text-primary font-label-md text-label-md flex items-center gap-2">
                   {c}
                   <button type="button" onClick={() => removeCustomCondition(c)} className="hover:text-error transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
                     <Icon icon="close" size="xs" />
@@ -353,13 +353,13 @@ function MedicalForm() {
                 </span>
               ))}
               {!showCustomCondition ? (
-                <button onClick={() => setShowCustomCondition(true)} className="px-4 py-2 rounded-full border border-dashed border-[var(--neon-primary)]/50 text-[var(--neon-primary)] font-label-md text-label-md flex items-center gap-1 hover:bg-[var(--neon-primary)]/10 transition-colors min-h-[44px]" type="button">
+                <button onClick={() => setShowCustomCondition(true)} className="px-4 py-2 rounded-full border border-dashed border-primary/50 text-primary font-label-md text-label-md flex items-center gap-1 hover:bg-primary/10 transition-colors min-h-[44px]" type="button">
                   <Icon icon="add" size="sm" /> Add Other
                 </button>
               ) : (
                 <div className="flex gap-2 items-center flex-wrap">
                   <PremiumInput compact containerClassName="min-w-0 flex-1" placeholder="Condition name" value={customConditionInput} onChange={e => setCustomConditionInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomCondition() } }} />
-                  <button onClick={addCustomCondition} className="bg-[var(--neon-primary)] text-white px-3 py-2 rounded-lg font-label-md text-sm min-h-[44px]" type="button">Add</button>
+                  <button onClick={addCustomCondition} className="bg-primary text-on-primary px-3 py-2 rounded-lg font-label-md text-sm min-h-[44px]" type="button">Add</button>
                   <button onClick={() => { setShowCustomCondition(false); setCustomConditionInput('') }} className="text-secondary px-2 py-2 text-sm min-h-[44px]" type="button">Cancel</button>
                 </div>
               )}
@@ -367,7 +367,7 @@ function MedicalForm() {
           </section>
 
           <section>
-            <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
+            <div className="flex items-center gap-3 mb-6 border-b border-outline-variant pb-4">
               <div className="w-8 h-8 rounded-full bg-error/10 flex items-center justify-center text-error border border-error/20">
                 <Icon icon="warning" size="sm" />
               </div>
@@ -386,23 +386,23 @@ function MedicalForm() {
             </div>
             <div className="flex gap-2 max-w-full">
               <PremiumInput compact containerClassName="flex-1 min-w-0" placeholder="Type allergy to add..." type="text" value={allergyInput} onChange={e => setAllergyInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAllergy() } }} />
-              <button className="bg-[var(--glass-bg)] backdrop-blur-xl text-on-surface border border-[var(--glass-border)] px-4 py-2 rounded-lg font-label-md hover:bg-[var(--neon-primary)]/10 transition-colors min-h-[44px]" type="button" onClick={addAllergy}>Add</button>
+              <button className="bg-surface text-on-surface border border-outline-variant px-4 py-2 rounded-lg font-label-md hover:bg-primary/10 transition-colors min-h-[44px]" type="button" onClick={addAllergy}>Add</button>
             </div>
           </section>
 
           <section>
-            <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
-              <div className="w-8 h-8 rounded-full bg-[var(--neon-primary)]/10 flex items-center justify-center text-[var(--neon-primary)] border border-[var(--neon-primary)]/20">
+            <div className="flex items-center gap-3 mb-6 border-b border-outline-variant pb-4">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                 <Icon icon="prescriptions" size="sm" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface">Current Medications</h3>
             </div>
             <div className="space-y-3 mb-4">
               {medications.length === 0 ? (
-                <p className="py-8 text-center text-secondary font-body-md bg-[var(--glass-bg)] backdrop-blur-xl rounded-xl border border-[var(--glass-border)]">No medications added yet.</p>
+                <p className="py-8 text-center text-secondary font-body-md bg-surface rounded-xl border border-outline-variant">No medications added yet.</p>
               ) : (
                 medications.map((med, i) => (
-                  <div key={i} className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-[var(--neon-primary)]/20 transition-colors">
+                  <div key={i} className="bg-surface border border-outline-variant rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-primary/20 transition-colors">
                     <div className="flex-1 min-w-0">
                       <PremiumInput compact variant="inline" placeholder="Medication name" value={med.name} onChange={e => updateMedication(i, 'name', e.target.value)} />
                     </div>
@@ -419,14 +419,14 @@ function MedicalForm() {
                 ))
               )}
             </div>
-            <button onClick={addMedication} className="px-4 py-2 rounded-full border border-dashed border-[var(--neon-primary)]/50 text-[var(--neon-primary)] font-label-md text-label-md flex items-center gap-1 hover:bg-[var(--neon-primary)]/10 transition-colors min-h-[44px]" type="button">
+            <button onClick={addMedication} className="px-4 py-2 rounded-full border border-dashed border-primary/50 text-primary font-label-md text-label-md flex items-center gap-1 hover:bg-primary/10 transition-colors min-h-[44px]" type="button">
               <Icon icon="add" size="sm" /> Add Medication
             </button>
           </section>
 
           <section>
-            <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
-              <div className="w-8 h-8 rounded-full bg-[var(--neon-primary)]/10 flex items-center justify-center text-[var(--neon-primary)] border border-[var(--neon-primary)]/20">
+            <div className="flex items-center gap-3 mb-6 border-b border-outline-variant pb-4">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                 <Icon icon="content_cut" size="sm" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface">Past Surgeries</h3>
@@ -435,13 +435,13 @@ function MedicalForm() {
           </section>
         </div>
 
-        <div className="bg-[var(--glass-bg)] backdrop-blur-xl p-6 md:p-8 border-t border-[var(--glass-border)] flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="bg-surface p-6 md:p-8 border-t border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2 text-on-surface-variant">
-            <Icon icon="lock" size="md" className="text-[var(--neon-primary)]" />
-            <p className="font-caption text-caption">Your data is HIPAA compliant and securely encrypted.</p>
+            <Icon icon="lock" size="md" className="text-primary" />
+            <p className="font-caption text-caption">Your health details are kept private and only used to personalise your triage.</p>
           </div>
           <div className="flex gap-4 w-full sm:w-auto">
-            <button className="flex-1 sm:flex-none px-8 py-3 rounded-full bg-[var(--neon-primary)] text-white font-label-md text-label-md hover:opacity-90 shadow-lg shadow-[var(--neon-primary)]/20 transition-all text-center min-h-[44px]" type="submit">
+            <button className="flex-1 sm:flex-none px-8 py-3 rounded-full bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 shadow-lg/20 transition-all text-center min-h-[44px]" type="submit">
               Save Medical History
             </button>
           </div>
@@ -459,15 +459,15 @@ export default function History() {
   return (
     <main className="min-h-screen flex flex-col bg-surface p-4 md:p-6 overflow-x-hidden">
       <div className="overflow-x-auto mb-8 flex-shrink-0">
-        <div className="flex p-1 bg-[var(--glass-bg)] backdrop-blur-xl rounded-full border border-[var(--glass-border)] w-max">
+        <div className="flex p-1 bg-surface rounded-full border border-outline-variant w-max">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={
                 activeTab === tab.key
-                  ? 'px-4 md:px-6 py-2 rounded-full font-label-md text-label-md bg-[var(--neon-primary)] text-white transition-all shadow-sm shadow-[var(--neon-primary)]/20 flex items-center gap-2 whitespace-nowrap min-h-[44px]'
-                  : 'px-4 md:px-6 py-2 rounded-full font-label-md text-label-md text-secondary hover:text-[var(--neon-primary)] transition-all flex items-center gap-2 whitespace-nowrap min-h-[44px]'
+                  ? 'px-4 md:px-6 py-2 rounded-full font-label-md text-label-md bg-primary text-on-primary transition-all shadow-sm/20 flex items-center gap-2 whitespace-nowrap min-h-[44px]'
+                  : 'px-4 md:px-6 py-2 rounded-full font-label-md text-label-md text-secondary hover:text-primary transition-all flex items-center gap-2 whitespace-nowrap min-h-[44px]'
               }
             >
               <Icon icon={tab.icon} size="sm" />

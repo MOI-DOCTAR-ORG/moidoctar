@@ -94,7 +94,7 @@ def debug_auth(email: str = None):
 @router.post("/google", response_model=TokenResponse)
 def google_authentication(req: GoogleAuthRequest):
     try:
-        res = authenticate_google(req.accessToken)
+        res = authenticate_google(req.accessToken, req.tokenType)
         return TokenResponse(
             msg="Google authentication successful",
             authorization=res["authorization"],

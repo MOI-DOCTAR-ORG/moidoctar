@@ -55,7 +55,7 @@ export default function Landing() {
           </Link>
           <Link
             to="/sign-up"
-            className="rounded-xl bg-[linear-gradient(135deg,#94C5FD_0%,#2663EB_100%)] px-4 py-2.5 font-label-md text-label-md font-extrabold text-white shadow-neon transition hover:-translate-y-0.5 hover:shadow-neon-lg"
+            className="rounded-xl bg-primary px-4 py-2.5 font-label-md text-label-md font-bold text-on-primary shadow-sm transition shadow-sm"
           >
             Get started
           </Link>
@@ -72,7 +72,7 @@ export default function Landing() {
 
           <h1 className="max-w-3xl font-headline-xl text-4xl font-extrabold leading-tight text-on-background md:text-[56px] md:leading-[1.05]">
             Know what to do next,{' '}
-            <span className="bg-[linear-gradient(135deg,#94C5FD_0%,#2663EB_100%)] bg-clip-text text-transparent">
+            <span className="text-primary">
               in minutes.
             </span>
           </h1>
@@ -85,14 +85,14 @@ export default function Landing() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               to="/sign-up"
-              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#94C5FD_0%,#2663EB_100%)] px-8 py-3.5 font-body-md text-sm font-extrabold text-white shadow-neon-lg transition hover:-translate-y-0.5"
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3.5 font-body-md text-sm font-bold text-on-primary shadow-sm transition hover:-translate-y-0.5"
             >
               Start your first triage
               <Icon icon="arrow_forward" size="sm" aria-hidden="true" />
             </Link>
             <Link
               to="/sign-in"
-              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-surface px-8 py-3.5 font-body-md text-sm font-extrabold text-on-surface transition hover:-translate-y-0.5 hover:border-primary"
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-surface px-8 py-3.5 font-body-md text-sm font-extrabold text-on-surface transition hover:border-primary"
             >
               I already have an account
             </Link>
@@ -139,7 +139,7 @@ export default function Landing() {
 
         {/* CTA */}
         <section className="py-16 md:py-24">
-          <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6 rounded-3xl border border-outline-variant bg-[linear-gradient(135deg,rgba(148,197,253,0.12)_0%,rgba(38,99,235,0.12)_100%)] px-6 py-14 text-center md:px-16">
+          <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6 rounded-3xl border border-outline-variant bg-primary-container px-6 py-14 text-center md:px-16">
             <h2 className="font-headline-lg text-headline-lg text-on-background">
               Not sure if it's urgent? Let's find out.
             </h2>
@@ -148,7 +148,7 @@ export default function Landing() {
             </p>
             <Link
               to="/sign-up"
-              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#94C5FD_0%,#2663EB_100%)] px-8 py-3.5 font-body-md text-sm font-extrabold text-white shadow-neon-lg transition hover:-translate-y-0.5"
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3.5 font-body-md text-sm font-bold text-on-primary shadow-sm transition hover:-translate-y-0.5"
             >
               Create your free account
             </Link>
