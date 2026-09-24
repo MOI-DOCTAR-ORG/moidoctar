@@ -23,18 +23,14 @@ class Settings(BaseSettings):
 
     # Google Gemini AI Triage (API Key from Google AI Studio).
     GOOGLE_API_KEY: str = ""
-<<<<<<< HEAD
-    GEMINI_MODEL: str = "gemini-flash-lite-latest"
-=======
     # Any number of extra keys, comma / space / newline separated. The pool
     # rotates through them and skips keys that are rate limited or invalid.
     GOOGLE_API_KEYS: str = ""
-    GEMINI_MODEL: str = "gemini-flash-latest"
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
     # Emails that are treated as admins (can manage AI API keys), in addition
     # to users whose role is "admin". Comma separated.
     ADMIN_EMAILS: str = ""
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
 
     # Server Port
     PORT: int = 3000
@@ -62,6 +58,66 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://moidoctar.vercel.app,https://moidoctar8.pxxlspace.cv"
+
+    @property
+    def effective_resend_api_key(self) -> str:
+        key = (
+            os.getenv("RESEND_API_KEY")
+            or os.getenv("RESEND_KEY")
+            or os.getenv("RESEND_TOKEN")
+            or self.RESEND_API_KEY
+            or ""
+        ).strip().strip("'\" \t\r\n")
+        return key
+
+    @property
+    def effective_resend_from(self) -> str:
+        addr = (
+            os.getenv("RESEND_FROM")
+            or os.getenv("RESEND_SENDER")
+            or self.RESEND_FROM
+            or "MoiDoctar <onboarding@resend.dev>"
+        ).strip().strip("'\" \t\r\n")
+        return addr
+
+    @property
+    def effective_smtp_host(self) -> str:
+        return (os.getenv("SMTP_HOST") or self.SMTP_HOST or "").strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_smtp_user(self) -> str:
+        return (os.getenv("SMTP_USER") or self.SMTP_USER or "").strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_smtp_password(self) -> str:
+        # App passwords often have spaces like "abcd efgh ijkl mnop", keep or remove spaces as needed
+        raw = (
+            os.getenv("SMTP_PASSWORD")
+            or os.getenv("SMTP_PASS")
+            or os.getenv("SMTP_KEY")
+            or os.getenv("EMAIL_PASSWORD")
+            or os.getenv("EMAIL_PASS")
+            or os.getenv("MAIL_PASSWORD")
+            or os.getenv("MAIL_PASS")
+            or os.getenv("GMAIL_APP_PASSWORD")
+            or os.getenv("GMAIL_PASSWORD")
+            or os.getenv("GMAIL_PASS")
+            or os.getenv("APP_PASSWORD")
+            or self.SMTP_PASSWORD
+            or ""
+        ).strip().strip("'\" \t\r\n")
+        # Remove spaces in case Google 16-char app password was copied with spaces
+        return raw.replace(" ", "")
+
+
+    @property
+    def effective_smtp_from(self) -> str:
+        raw = (os.getenv("SMTP_FROM") or self.SMTP_FROM or "").strip().strip("'\" \t\r\n")
+        if raw:
+            return raw
+        user = self.effective_smtp_user
+        return f"MoiDoctar <{user}>" if user else ""
+
 
     @property
     def normalized_supabase_url(self) -> str:

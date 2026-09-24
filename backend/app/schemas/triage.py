@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TriageRequest(BaseModel):
@@ -34,16 +34,12 @@ class TriageChatResponse(BaseModel):
     follow_up_questions: List[str]
     red_flags_to_watch: List[str]
     disclaimer: str
-<<<<<<< HEAD
-    reply: Optional[str] = None
+    reply: Optional[str] = ""
     has_symptoms: Optional[bool] = False
     is_conversational: Optional[bool] = False
-=======
-    reply: str = ""
     ai_source: str = "rules"  # "gemini" | "rules"
     ai_notice: str = ""
     memory_notes: List[str] = []
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
 
 
 class BackendTriageStatus(BaseModel):
@@ -51,7 +47,9 @@ class BackendTriageStatus(BaseModel):
 
 
 class BackendTriageItem(BaseModel):
-    _id: str
+    model_config = ConfigDict(populate_by_name=True)
+    # Pydantic v2 treats a leading-underscore name as private and never serialises it, so alias it.
+    id: str = Field(alias="_id")
     symptoms: List[str]
     duration: str = "Recent"
     severity: str = "Moderate"  # 'Mild' | 'Moderate' | 'Severe'
@@ -59,6 +57,10 @@ class BackendTriageItem(BaseModel):
     triageStatus: BackendTriageStatus
     actionPlan: str
     createdAt: str
+    possible_conditions: Optional[List[str]] = []
+    recommended_actions: Optional[List[str]] = []
+    urgency_level: Optional[str] = None
+    rationale: Optional[str] = ""
 
 
 class TriageListResponse(BaseModel):

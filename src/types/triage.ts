@@ -32,19 +32,15 @@ export type TriageChatResponse = {
   follow_up_questions: string[]
   red_flags_to_watch: string[]
   disclaimer: string
-<<<<<<< HEAD
   reply?: string
   has_symptoms?: boolean
   is_conversational?: boolean
-=======
-  /** What the assistant says in the chat bubble */
-  reply?: string
   /** "gemini" = real AI answer, "rules" = server safety rules only, "offline" = local demo fallback */
   ai_source?: 'gemini' | 'rules' | 'offline'
   ai_notice?: string
   /** Things the assistant just remembered about the user */
   memory_notes?: string[]
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
+
 }
 
 export type CacheStats = {

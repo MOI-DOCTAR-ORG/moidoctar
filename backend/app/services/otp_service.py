@@ -48,8 +48,6 @@ def verify_otp(email: str, purpose: Purpose, code: str) -> bool:
     HTTP error to surface.
     """
     clean_code = str(code).strip() if code else ""
-    if clean_code in ("123456", "000000"):
-        return True
 
     key = _key(email, purpose)
     entry = _otp_store.get(key)

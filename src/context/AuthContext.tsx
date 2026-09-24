@@ -41,15 +41,20 @@ export type TriageSession = {
   summary?: string
   severityClass?: string
   severityIcon?: string
+  conditions?: string[]
+  recommendedActions?: string[]
+  redFlags?: string[]
+  rationale?: string
 }
 
-type AuthTokens = { authorization: string; refreshToken: string }
+type AuthTokens = { authorization: string; refreshToken: string; email_delivered?: boolean; email_error?: string }
 type VerifyResponse = { msg: string; authorization?: string; refreshToken?: string }
 
 type LoginResult =
   | { success: true }
-  | { success: false; error: string; needsVerification?: true; pendingEmail?: string }
-type SignUpResult = { success: true } | { success: false; error: string }
+  | { success: false; error: string; needsVerification?: true; pendingEmail?: string; emailDelivered?: boolean }
+type SignUpResult = { success: true; emailDelivered?: boolean } | { success: false; error: string }
+
 
 type AuthState = {
   user: BackendUser | null
@@ -60,17 +65,14 @@ type AuthState = {
 type AuthContextValue = AuthState & {
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>
   signUp: (fullName: string, email: string, password: string) => Promise<SignUpResult>
-<<<<<<< HEAD
-  signInWithGoogle: (accessToken: string) => Promise<LoginResult>
-=======
   signInWithGoogle: (token: string, tokenType?: 'id_token' | 'access_token') => Promise<LoginResult>
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
   verifyEmail: (code: string, email?: string) => Promise<boolean>
-  resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string } | void>
+  resendVerificationCode: (email?: string) => Promise<{ msg?: string; dev_code?: string; email_delivered?: boolean } | void>
   signOut: () => Promise<void>
   sessions: TriageSession[]
   addSession: (session: TriageSession) => void
   removeSession: (id: string) => void
+  refreshSessions: () => Promise<void>
   userChangeKey: number
 }
 
@@ -121,6 +123,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<TriageSession[]>(loadSessions)
   const [userChangeKey, setUserChangeKey] = useState(0)
 
+  const refreshSessions = useCallback(async () => {
+    try {
+      const res = await api.get<{ msg: string; data: Array<{
+        _id: string
+        symptoms: string[]
+        duration?: string
+        severity?: 'Mild' | 'Moderate' | 'Severe' | string
+        notes?: string
+        triageStatus?: { level: string }
+        actionPlan?: string
+        createdAt?: string
+        possible_conditions?: string[]
+        recommended_actions?: string[]
+        urgency_level?: string
+        rationale?: string
+      }> }>('/triage/list')
+
+      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+        const fetched: TriageSession[] = res.data.map(item => {
+          const urg = item.urgency_level || (item.triageStatus?.level === 'Emergency' ? 'Urgent' : item.triageStatus?.level === 'Urgent' ? 'Moderate' : 'Stable')
+          const sev: 'Urgent' | 'Moderate' | 'Stable' = urg === 'Urgent' ? 'Urgent' : urg === 'Moderate' ? 'Moderate' : 'Stable'
+          const dateObj = item.createdAt ? new Date(item.createdAt) : new Date()
+          return {
+            id: item._id,
+            date: dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+            condition: Array.isArray(item.symptoms) && item.symptoms.length > 0 ? item.symptoms.join(', ') : 'Reported symptoms',
+            description: item.rationale || item.actionPlan || item.notes || 'Triage completed',
+            severity: sev,
+            statusLabel: item.triageStatus?.level || urg,
+            statusIcon: sev === 'Urgent' ? 'warning' : 'clinical_notes',
+            tags: item.possible_conditions?.length ? item.possible_conditions : [item.severity || 'Evaluated'],
+            conditions: item.possible_conditions,
+            recommendedActions: item.recommended_actions,
+            rationale: item.rationale || item.notes,
+          }
+        })
+
+        setSessions(prev => {
+          const map = new Map<string, TriageSession>()
+          fetched.forEach(s => map.set(s.id, s))
+          prev.forEach(s => {
+            if (!map.has(s.id)) map.set(s.id, s)
+          })
+          const merged = Array.from(map.values())
+          saveSessions(merged)
+          return merged
+        })
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   // Restore session on mount
   useEffect(() => {
     const token = getAccessToken()
@@ -132,12 +188,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user?.isVerified) {
         seedLocalStorage(user)
         setState({ user, isAuthenticated: true, isLoading: false })
+        void refreshSessions()
       } else {
         clearTokens()
         setState({ user: null, isAuthenticated: false, isLoading: false })
       }
     })
-  }, [])
+  }, [refreshSessions])
 
   useEffect(() => { saveSessions(sessions) }, [sessions])
 
@@ -154,17 +211,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       seedLocalStorage(user)
       setState({ user, isAuthenticated: true, isLoading: false })
       setUserChangeKey(k => k + 1)
+      void refreshSessions()
       return { success: true }
     } catch (err) {
-      const e = err as { err?: string; authorization?: string; msg?: string }
+      const e = err as { err?: string; authorization?: string; msg?: string; email_delivered?: boolean }
       if (e?.err === 'account_not_verified' && e.authorization) {
         // Store the temp token so the verify page can call /auth/verify
         setTokens(e.authorization, '')
         return {
           success: false,
-          error: "Your email is not verified. We've sent a fresh code — check your inbox.",
+          error: e.email_delivered
+            ? "Your email is not verified. We've sent a fresh code — check your inbox."
+            : "Your email is not verified. A code has been generated — contact support if you don't receive the email.",
           needsVerification: true,
           pendingEmail: email.toLowerCase().trim(),
+          emailDelivered: e.email_delivered ?? false,
         }
       }
       return { success: false, error: mapApiError(err) }
@@ -180,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName,
       }, null)
       setTokens(res.authorization, res.refreshToken)
-      return { success: true }
+      return { success: true, emailDelivered: res.email_delivered ?? false }
     } catch (err) {
       return { success: false, error: mapApiError(err) }
     }
@@ -195,11 +256,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       seedLocalStorage(user)
       setState({ user, isAuthenticated: true, isLoading: false })
       setUserChangeKey(k => k + 1)
+      void refreshSessions()
       return { success: true }
     } catch (err) {
       return { success: false, error: mapApiError(err) }
     }
-  }, [])
+  }, [refreshSessions])
 
   const verifyEmail = useCallback(async (code: string, email?: string): Promise<boolean> => {
     try {
@@ -215,13 +277,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       seedLocalStorage(user)
       setState({ user, isAuthenticated: true, isLoading: false })
       setUserChangeKey(k => k + 1)
+      void refreshSessions()
       return true
     } catch { return false }
-  }, [])
+  }, [refreshSessions])
 
   const resendVerificationCode = useCallback(async (email?: string) => {
     try {
-      const res = await api.post<{ msg?: string; dev_code?: string }>(
+      const res = await api.post<{ msg?: string; dev_code?: string; email_delivered?: boolean; email_status?: string }>(
         '/auth/resendVerification',
         email && email !== 'your email' ? { email: email.toLowerCase().trim() } : undefined
       )
@@ -249,7 +312,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, signInWithGoogle, verifyEmail, resendVerificationCode, signOut, sessions, addSession, removeSession, userChangeKey }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, signInWithGoogle, verifyEmail, resendVerificationCode, signOut, sessions, addSession, removeSession, refreshSessions, userChangeKey }}>
       {children}
     </AuthContext.Provider>
   )

@@ -70,7 +70,7 @@ export default function CareDetails() {
         {(['Mild', 'Moderate', 'Severe'] as const).map(sev => {
           const count = reports.filter(r => r.severity === sev).length
           const colors = {
-            Mild: 'bg-green-500/15 border-green-500/30 text-green-400',
+            Mild: 'bg-green-500/15 border-green-500/30 text-success',
             Moderate: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
             Severe: 'bg-error/15 border-error/30 text-error',
           }

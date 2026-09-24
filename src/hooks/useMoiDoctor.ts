@@ -98,21 +98,14 @@ export function useCreateTriageChat() {
       if (payload.image) {
         const fd = new FormData()
         fd.append('symptoms', payload.symptoms)
-        fd.append('messages', payload.messages ?? '[]')
-<<<<<<< HEAD
-=======
         if (payload.context) fd.append('context', payload.context)
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
         fd.append('image', payload.image)
         return modelClient.post<TriageChatResponse>('/triage/chat', fd)
       }
       return modelClient.post<TriageChatResponse>('/triage/chat', {
         symptoms: payload.symptoms,
         messages: payload.messages ?? '[]',
-<<<<<<< HEAD
-=======
         context: payload.context,
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
       })
     },
   })

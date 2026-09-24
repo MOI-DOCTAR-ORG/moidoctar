@@ -11,6 +11,8 @@ import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import App from './App'
 import { queryClient } from './lib/queryClient'
+import '@fontsource-variable/quicksand/wght.css'
+import '@fontsource-variable/nunito-sans/wght.css'
 import './index.css'
 
 if ('serviceWorker' in navigator) {

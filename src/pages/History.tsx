@@ -62,8 +62,10 @@ function SessionsView() {
       .finally(() => setLoadingHistory(false))
   }, [])
 
-  const allSessions = backendSessions.length > 0
-    ? backendSessions.map(s => ({
+  const allSessions = (() => {
+    const map = new Map<string, any>()
+    backendSessions.forEach(s => {
+      map.set(s._id, {
         id: s._id,
         condition: s.symptoms.join(', '),
         description: s.actionPlan,
@@ -73,8 +75,15 @@ function SessionsView() {
         statusLabel: s.triageStatus.level,
         statusIcon: s.triageStatus.level === 'Emergency' ? 'warning' : s.triageStatus.level === 'Urgent' ? 'info' : 'check_circle',
         tags: [s.severity, `Duration: ${s.duration}`],
-      }))
-    : sessions
+      })
+    })
+    sessions.forEach(s => {
+      if (!map.has(s.id)) {
+        map.set(s.id, s)
+      }
+    })
+    return Array.from(map.values())
+  })()
 
   const filteredSessions = activeFilter === 'All Sessions'
     ? allSessions
@@ -110,7 +119,7 @@ function SessionsView() {
         <div className="flex gap-4 flex-wrap">
           <div className="px-5 py-3 bg-surface rounded-xl border border-outline-variant flex flex-col">
             <span className="font-caption text-caption text-secondary uppercase tracking-wider">Total Triage</span>
-            <span className="font-headline-md text-headline-md text-primary">{sessions.length}</span>
+            <span className="font-headline-md text-headline-md text-primary">{allSessions.length}</span>
           </div>
           <div className="px-5 py-3 bg-error/10 rounded-xl border border-error/20 flex flex-col">
             <span className="font-caption text-caption text-error uppercase tracking-wider">Urgent Alerts</span>
@@ -173,7 +182,7 @@ function SessionsView() {
         </div>
       )}
 
-      {sessions.length > 0 && (
+      {allSessions.length > 0 && (
         <div className="mt-12 flex justify-center">
           <nav className="flex items-center gap-2">
             <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} className="w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-outline-variant hover:bg-primary/10 transition-colors text-secondary min-h-[44px]">
@@ -270,8 +279,8 @@ function MedicalForm() {
     <section className="max-w-container-max-width w-full mx-auto">
       {saved && (
         <div className="mb-6 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
-          <Icon icon="check_circle" size="lg" className="text-green-400 icon-fill" />
-          <p className="font-body-md text-green-400">Your medical history has been saved successfully.</p>
+          <Icon icon="check_circle" size="lg" className="text-success icon-fill" />
+          <p className="font-body-md text-success">Your medical history has been saved successfully.</p>
         </div>
       )}
 

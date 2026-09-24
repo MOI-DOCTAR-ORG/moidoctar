@@ -24,6 +24,7 @@ const pageTitles = [
   { path: '/notifications', label: 'Notifications' },
   { path: '/profile', label: 'Profile' },
   { path: '/ai-settings', label: 'AI Settings' },
+  { path: '/theme', label: 'Theme' },
 ]
 
 function getPageTitle(pathname: string) {
@@ -100,6 +101,14 @@ export default function AppLayout() {
               >
                 <Icon icon={isDark ? 'light_mode' : 'dark_mode'} size="lg" />
               </button>
+              <Link
+                to="/history"
+                className="hidden md:grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+                aria-label="Previous Triages and History"
+                title="Previous Triages"
+              >
+                <Icon icon="history" size="lg" />
+              </Link>
               <Link
                 to="/notifications"
                 className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-primary/10 hover:text-primary"

@@ -12,8 +12,8 @@ export default function HeroSection() {
           Check your symptoms now.
         </h3>
         <p className="font-body-md md:font-body-lg text-body-md md:text-body-lg mb-6 md:mb-8 max-w-md opacity-90 relative z-10">
-          Our AI-driven triage system provides clinical-grade guidance in under
-          3 minutes.
+          Answer a few questions about how you feel and get a suggested level of
+          urgency and what to do next.
         </p>
         <Link
           to="/new-triage"

@@ -20,6 +20,7 @@ import NewTriageBodyMap from './pages/NewTriageBodyMap'
 import SymptomTrackerBodyMap from './pages/SymptomTrackerBodyMap'
 import AdminCache from './pages/AdminCache'
 import AISettings from './pages/AISettings'
+import Theme from './pages/Theme'
 import NotFound from './pages/NotFound'
 import ForgotPassword from './pages/ForgotPassword'
 import LocalCareDiscovery from './pages/LocalCareDiscovery'
@@ -44,13 +45,10 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-triage" element={<NewTriage />} />
-<<<<<<< HEAD
         <Route path="/new_triage" element={<NewTriage />} />
-=======
         <Route path="/age-selection" element={<AgeSelection />} />
         <Route path="/body-map" element={<BodyMap />} />
         <Route path="/pinpoint-pain" element={<PinpointPain />} />
->>>>>>> 1043c60 (fixed UI, made AI API multiple)
         <Route path="/history" element={<History />} />
         <Route path="/care-details" element={<CareDetails />} />
         <Route path="/local-care" element={<LocalCareDiscovery />} />
@@ -62,6 +60,7 @@ export default function App() {
         <Route path="/new-triage-body-map" element={<NewTriageBodyMap />} />
         <Route path="/symptom-tracker-body-map" element={<SymptomTrackerBodyMap />} />
         <Route path="/ai-settings" element={<AISettings />} />
+        <Route path="/theme" element={<Theme />} />
         <Route path="/admin/cache" element={<AdminCache />} />
       </Route>
 

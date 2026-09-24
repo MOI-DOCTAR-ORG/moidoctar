@@ -25,7 +25,7 @@ export default function Dashboard() {
   const [savedToday, setSavedToday] = useState(false)
 
   const moods = [
-    { label: 'Great', icon: 'sentiment_very_satisfied', color: 'text-green-400' },
+    { label: 'Great', icon: 'sentiment_very_satisfied', color: 'text-success' },
     { label: 'Okay', icon: 'sentiment_neutral', color: 'text-amber-400' },
     { label: 'Unwell', icon: 'sentiment_dissatisfied', color: 'text-red-400' },
   ]
@@ -104,10 +104,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="bg-green-500/10 border border-green-500/30 rounded-[20px] p-5 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center text-green-400">
+          <div className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center text-success">
             <Icon icon="check_circle" size="lg" className="icon-fill" />
           </div>
-          <p className="font-body-md text-green-300">Today's check-in saved! Feeling <strong>{mood?.toLowerCase()}</strong>.</p>
+          <p className="font-body-md text-success">Today's check-in saved! Feeling <strong>{mood?.toLowerCase()}</strong>.</p>
         </div>
       )}
 
@@ -117,19 +117,23 @@ export default function Dashboard() {
             <Icon icon="health_and_safety" size="3xl" />
           </div>
           <div className="relative z-10 max-w-md">
-            <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 mb-6 border border-white/15">
+            <div className="inline-flex items-center gap-2 bg-surface/70 rounded-full px-4 py-1.5 mb-6 border border-primary/20">
               <Icon icon="verified_user" size="sm" />
               <span className="text-sm font-medium tracking-wide">AI-Powered Assessment</span>
             </div>
-            <h3 className="font-headline-lg-mobile md:text-headline-lg mb-2 md:mb-3">Feeling unwell?</h3>
+            <h3 className="font-headline-lg-mobile text-headline-lg-mobile md:text-headline-lg mb-2 md:mb-3">Feeling unwell?</h3>
             <p className="font-body-md text-body-md text-on-primary-fixed-variant mb-4 md:mb-6 opacity-90 leading-relaxed">
-              Start a new triage session to evaluate your symptoms instantly and receive medical-grade guidance on your next steps.
+              Tell Liana what you're feeling. She'll ask a few questions and suggest how urgent it is and what to do next.
             </p>
           </div>
-          <div className="relative z-10">
-            <button onClick={() => navigate('/new-triage')} className="bg-primary text-on-primary hover:opacity-90 rounded-full px-8 py-3.5 font-label-md text-label-md transition-all flex items-center gap-2 w-fit">
+          <div className="relative z-10 flex flex-wrap gap-3">
+            <button onClick={() => navigate('/new-triage')} className="bg-primary text-on-primary hover:opacity-90 rounded-full px-6 py-3.5 font-label-md text-label-md transition-all flex items-center gap-2 w-fit">
               <Icon icon="add_circle" size="md" className="icon-fill" />
               Start New Triage
+            </button>
+            <button onClick={() => navigate('/history')} className="border border-primary/40 hover:bg-primary/10 text-primary rounded-full px-5 py-3.5 font-label-md text-label-md transition-all flex items-center gap-2 w-fit">
+              <Icon icon="history" size="md" />
+              Previous Triages
             </button>
           </div>
         </div>

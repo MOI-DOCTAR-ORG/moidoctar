@@ -49,6 +49,8 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
   const [error, setError] = useState<string | null>(null)
   const [severity, setSeverity] = useState<Severity | null>(null)
   const [image, setImage] = useState<File | null>(null)
+  // One id per conversation so the server updates a single history entry instead of adding one per message.
+  const sessionId = useRef(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : '')
   const lastSent = useRef<{ history: ChatMsg[]; image: File | null } | null>(null)
 
   const latest = [...messages].reverse().find((m) => m.result)?.result ?? null
@@ -62,13 +64,20 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
         const res = await chat.mutateAsync({
           symptoms: userText,
           messages: JSON.stringify(history.map((m) => ({ role: m.role === 'ai' ? 'model' : 'user', content: m.text }))),
-          context: buildAiContext({ bodyAreas, severity }),
+          context: buildAiContext({ bodyAreas, severity, sessionId: sessionId.current }),
           image: img ?? undefined,
         })
         const data = res.data
+        const hasSymptoms = Boolean(data.has_symptoms && data.possible_conditions && data.possible_conditions.length > 0)
         setMessages((prev) => [
           ...prev,
-          { id: nextId(), role: 'ai', time: nowLabel(), text: data.reply || data.rationale, result: data },
+          {
+            id: nextId(),
+            role: 'ai',
+            time: nowLabel(),
+            text: data.reply || data.rationale || "Hello! How can I help you today? Please feel free to share any symptoms or health questions.",
+            result: hasSymptoms ? data : undefined,
+          },
         ])
       } catch (err) {
         setError(errorText(err))
@@ -97,5 +106,22 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
     if (lastSent.current && !chat.isPending) void run(lastSent.current.history, lastSent.current.image)
   }, [run, chat.isPending])
 
-  return { messages, latest, pending: chat.isPending, error, retry, send, severity, setSeverity, image, setImage }
+  const reset = useCallback(() => {
+    setMessages([
+      {
+        id: nextId(),
+        role: 'ai',
+        time: nowLabel(),
+        text: bodyAreas.length
+          ? `Hi, I'm Liana. I can see you marked ${bodyAreas.map((a) => a.label.toLowerCase()).join(', ')}. What does it feel like, and when did it start?`
+          : GREETING,
+      },
+    ])
+    setError(null)
+    setSeverity(null)
+    setImage(null)
+    lastSent.current = null
+  }, [bodyAreas])
+
+  return { messages, latest, pending: chat.isPending, error, retry, send, reset, severity, setSeverity, image, setImage }
 }
