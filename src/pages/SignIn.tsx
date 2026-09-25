@@ -51,7 +51,13 @@ export default function SignIn() {
     setIsSubmitting(false)
     if (!result.success) {
       if (result.needsVerification) {
-        navigate('/verify-email', { state: { email: result.pendingEmail ?? email.trim() } })
+        navigate('/verify-email', {
+          state: {
+            email: result.pendingEmail ?? email.trim(),
+            emailDelivered: result.emailDelivered,
+            devCode: result.devCode,
+          },
+        })
         return
       }
       setError(result.error)

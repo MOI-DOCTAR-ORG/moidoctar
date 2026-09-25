@@ -81,69 +81,115 @@ def _smtp_configured() -> bool:
 
 def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
     """Send an email via standard SMTP."""
+    import email.utils
+
     host = settings.effective_smtp_host
     user = settings.effective_smtp_user
     password = settings.effective_smtp_password
-    from_addr = settings.effective_smtp_from or user
+    port = settings.effective_smtp_port
+    use_ssl = settings.effective_smtp_use_ssl
+    use_tls = settings.effective_smtp_use_tls
+
+    from_header = settings.effective_smtp_from
     recipient = to_email.strip().lower()
+
+    # CRITICAL: RFC 5321 envelope sender must be a bare email address,
+    # not a formatted display name like "MoiDoctar <user@gmail.com>".
+    # Otherwise strict SMTP servers (Gmail, Zoho, Postfix) reject with "501 Syntax error".
+    _, envelope_from = email.utils.parseaddr(from_header)
+    if not envelope_from:
+        envelope_from = user if ("@" in user) else from_header
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = from_addr
+    msg["From"] = from_header
     msg["To"] = recipient
-    msg.attach(MIMEText(text_body, "plain"))
-    msg.attach(MIMEText(html_body, "html"))
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
-        if settings.SMTP_USE_SSL:
+        if use_ssl:
             context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, settings.SMTP_PORT, context=context, timeout=10) as server:
+            with smtplib.SMTP_SSL(host, port, context=context, timeout=15) as server:
                 server.login(user, password)
-                server.sendmail(from_addr, [recipient], msg.as_string())
+                server.sendmail(envelope_from, [recipient], msg.as_string())
         else:
-            with smtplib.SMTP(host, settings.SMTP_PORT, timeout=10) as server:
+            with smtplib.SMTP(host, port, timeout=15) as server:
                 server.ehlo()
-                if settings.SMTP_USE_TLS:
+                if use_tls:
                     context = ssl.create_default_context()
                     server.starttls(context=context)
                     server.ehlo()
                 server.login(user, password)
-                server.sendmail(from_addr, [recipient], msg.as_string())
-        logger.info(f"Email successfully sent via SMTP to {recipient}")
+                server.sendmail(envelope_from, [recipient], msg.as_string())
+        logger.info(f"Email successfully sent via SMTP ({host}:{port}) to {recipient}")
         return True, "Delivered via SMTP"
     except Exception as e:
-        logger.error(f"Failed to send email via SMTP to {recipient}: {e}")
-        return False, f"SMTP Error: {e}"
+        logger.error(f"Failed to send email via SMTP ({host}:{port}) to {recipient}: {e}")
+        return False, f"SMTP Error ({host}:{port}): {e}"
 
 
 
 def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
-    """Send an email via Resend (preferred) or SMTP fallback."""
+    """Send an email via Resend or SMTP based on configuration and provider preference."""
     recipient = to_email.strip().lower()
     last_error = ""
 
-    # 1. Try Resend if configured
-    if settings.effective_resend_api_key:
-        ok, detail = _send_via_resend(recipient, subject, html_body, text_body)
-        if ok:
-            return True, detail
-        last_error = detail
-        logger.warning(f"Resend delivery failed for {recipient} ({detail}); checking for SMTP fallback...")
+    has_resend = bool(settings.effective_resend_api_key)
+    has_smtp = _smtp_configured()
+    pref = settings.email_provider_preference
 
-    # 2. Try SMTP fallback if configured
-    if _smtp_configured():
+    # Check if Resend is in sandbox mode (onboarding@resend.dev)
+    # The sandbox can only deliver to the Resend account owner.
+    resend_is_sandbox = "onboarding@resend.dev" in settings.effective_resend_from.lower()
+
+    # Determine delivery strategy:
+    # If the user explicitly requested SMTP, or if SMTP is configured and Resend is
+    # stuck on the onboarding@resend.dev sandbox, try SMTP first!
+    try_smtp_first = False
+    if has_smtp:
+        if pref == "smtp":
+            try_smtp_first = True
+        elif resend_is_sandbox:
+            # Resend sandbox cannot deliver to third-party recipients,
+            # so prefer SMTP when available to avoid guaranteed Resend 403 failure
+            try_smtp_first = True
+
+    if try_smtp_first:
+        logger.info(f"Attempting email delivery via SMTP to {recipient} (try_smtp_first=True)")
         ok, detail = _send_via_smtp(recipient, subject, html_body, text_body)
         if ok:
             return True, detail
-        last_error = f"{last_error} | SMTP: {detail}" if last_error else detail
+        last_error = f"SMTP: {detail}"
+        logger.warning(f"SMTP delivery failed for {recipient} ({detail}); falling back to Resend if available...")
+        if has_resend:
+            ok_resend, detail_resend = _send_via_resend(recipient, subject, html_body, text_body)
+            if ok_resend:
+                return True, detail_resend
+            last_error = f"{last_error} | Resend: {detail_resend}"
+    else:
+        # Default order: try Resend first, then fallback to SMTP
+        if has_resend:
+            logger.info(f"Attempting email delivery via Resend to {recipient}")
+            ok, detail = _send_via_resend(recipient, subject, html_body, text_body)
+            if ok:
+                return True, detail
+            last_error = f"Resend: {detail}"
+            logger.warning(f"Resend delivery failed for {recipient} ({detail}); checking for SMTP fallback...")
 
-    # 3. If an email service failed, return its detailed message
+        if has_smtp:
+            logger.info(f"Attempting email delivery via SMTP fallback to {recipient}")
+            ok_smtp, detail_smtp = _send_via_smtp(recipient, subject, html_body, text_body)
+            if ok_smtp:
+                return True, detail_smtp
+            last_error = f"{last_error} | SMTP: {detail_smtp}" if last_error else f"SMTP: {detail_smtp}"
+
     if last_error:
         logger.error(f"Email delivery could not be completed for {recipient}: {last_error}")
         return False, last_error
 
     logger.warning(
-        f"No email service configured (set RESEND_API_KEY in environment). Simulated email delivery for: {recipient}"
+        f"No email service configured (set SMTP_* or RESEND_API_KEY in environment). Simulated email delivery for: {recipient}"
     )
     return False, "No email service configured"
 

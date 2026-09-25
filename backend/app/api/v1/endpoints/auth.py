@@ -204,7 +204,7 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
     import os
     from app.core.email import _send_via_smtp, _smtp_configured
     configured = _smtp_configured()
-    smtp_env_vars = [k for k in os.environ.keys() if any(term in k.upper() for term in ["SMTP", "MAIL", "GMAIL"])]
+    smtp_env_vars = [k for k in os.environ.keys() if any(term in k.upper() for term in ["SMTP", "MAIL", "GMAIL", "EMAIL"])]
     if not configured:
         return {
             "ok": False,
@@ -212,6 +212,9 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
             "detail": "SMTP credentials not configured (set SMTP_HOST, SMTP_USER, SMTP_PASSWORD in environment)",
             "host": settings.effective_smtp_host,
             "user": settings.effective_smtp_user,
+            "port": settings.effective_smtp_port,
+            "use_ssl": settings.effective_smtp_use_ssl,
+            "use_tls": settings.effective_smtp_use_tls,
             "has_password": bool(settings.effective_smtp_password),
             "detected_smtp_env_vars": smtp_env_vars,
         }
@@ -222,9 +225,40 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
         "detail": detail,
         "host": settings.effective_smtp_host,
         "user": settings.effective_smtp_user,
+        "port": settings.effective_smtp_port,
+        "use_ssl": settings.effective_smtp_use_ssl,
+        "use_tls": settings.effective_smtp_use_tls,
         "from": settings.effective_smtp_from,
         "to": to,
         "detected_smtp_env_vars": smtp_env_vars,
+    }
+
+
+@router.get("/test-email")
+def test_email(to: str = "lateefedidi4@gmail.com"):
+    """Comprehensive test endpoint to diagnose which provider is selected and test real delivery."""
+    from app.core.email import send_otp_email, _smtp_configured
+    ok, detail = send_otp_email(to, "123456", "verify_email")
+    return {
+        "ok": ok,
+        "detail": detail,
+        "recipient": to,
+        "provider_preference": settings.email_provider_preference,
+        "resend": {
+            "configured": bool(settings.effective_resend_api_key),
+            "from": settings.effective_resend_from,
+            "is_sandbox": "onboarding@resend.dev" in settings.effective_resend_from.lower(),
+        },
+        "smtp": {
+            "configured": _smtp_configured(),
+            "host": settings.effective_smtp_host,
+            "user": settings.effective_smtp_user,
+            "port": settings.effective_smtp_port,
+            "use_ssl": settings.effective_smtp_use_ssl,
+            "use_tls": settings.effective_smtp_use_tls,
+            "from": settings.effective_smtp_from,
+            "has_password": bool(settings.effective_smtp_password),
+        },
     }
 
 

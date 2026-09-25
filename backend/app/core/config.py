@@ -82,15 +82,36 @@ class Settings(BaseSettings):
 
     @property
     def effective_smtp_host(self) -> str:
-        return (os.getenv("SMTP_HOST") or self.SMTP_HOST or "").strip().strip("'\" \t\r\n")
+        return (
+            os.getenv("SMTP_HOST")
+            or os.getenv("SMTP_SERVER")
+            or os.getenv("MAIL_HOST")
+            or os.getenv("MAIL_SERVER")
+            or os.getenv("EMAIL_HOST")
+            or os.getenv("EMAIL_SERVER")
+            or self.SMTP_HOST
+            or ""
+        ).strip().strip("'\" \t\r\n")
 
     @property
     def effective_smtp_user(self) -> str:
-        return (os.getenv("SMTP_USER") or self.SMTP_USER or "").strip().strip("'\" \t\r\n")
+        return (
+            os.getenv("SMTP_USER")
+            or os.getenv("SMTP_USERNAME")
+            or os.getenv("SMTP_EMAIL")
+            or os.getenv("MAIL_USER")
+            or os.getenv("MAIL_USERNAME")
+            or os.getenv("EMAIL_USER")
+            or os.getenv("EMAIL_USERNAME")
+            or os.getenv("GMAIL_USER")
+            or os.getenv("GMAIL_USERNAME")
+            or self.SMTP_USER
+            or ""
+        ).strip().strip("'\" \t\r\n")
 
     @property
     def effective_smtp_password(self) -> str:
-        # App passwords often have spaces like "abcd efgh ijkl mnop", keep or remove spaces as needed
+        # App passwords often have spaces like "abcd efgh ijkl mnop", remove spaces
         raw = (
             os.getenv("SMTP_PASSWORD")
             or os.getenv("SMTP_PASS")
@@ -106,17 +127,82 @@ class Settings(BaseSettings):
             or self.SMTP_PASSWORD
             or ""
         ).strip().strip("'\" \t\r\n")
-        # Remove spaces in case Google 16-char app password was copied with spaces
         return raw.replace(" ", "")
 
+    @property
+    def effective_smtp_port(self) -> int:
+        raw = (
+            os.getenv("SMTP_PORT")
+            or os.getenv("MAIL_PORT")
+            or os.getenv("EMAIL_PORT")
+            or str(self.SMTP_PORT)
+            or "587"
+        ).strip().strip("'\" \t\r\n")
+        try:
+            return int(raw)
+        except (ValueError, TypeError):
+            return 587
+
+    @property
+    def effective_smtp_use_ssl(self) -> bool:
+        raw = (
+            os.getenv("SMTP_USE_SSL")
+            or os.getenv("SMTP_SSL")
+            or os.getenv("MAIL_USE_SSL")
+            or os.getenv("MAIL_SSL")
+            or os.getenv("EMAIL_USE_SSL")
+        )
+        if raw is not None:
+            return str(raw).strip().lower() in ("true", "1", "yes", "on")
+        # Automatically use SSL if port is 465
+        return self.effective_smtp_port == 465
+
+    @property
+    def effective_smtp_use_tls(self) -> bool:
+        raw = (
+            os.getenv("SMTP_USE_TLS")
+            or os.getenv("SMTP_TLS")
+            or os.getenv("MAIL_USE_TLS")
+            or os.getenv("MAIL_TLS")
+            or os.getenv("EMAIL_USE_TLS")
+        )
+        if raw is not None:
+            return str(raw).strip().lower() in ("true", "1", "yes", "on")
+        # If not SSL and port is 587 or 25, default to STARTTLS True
+        return not self.effective_smtp_use_ssl
 
     @property
     def effective_smtp_from(self) -> str:
-        raw = (os.getenv("SMTP_FROM") or self.SMTP_FROM or "").strip().strip("'\" \t\r\n")
+        raw = (
+            os.getenv("SMTP_FROM")
+            or os.getenv("MAIL_FROM")
+            or os.getenv("EMAIL_FROM")
+            or os.getenv("DEFAULT_FROM_EMAIL")
+            or os.getenv("MAIL_SENDER")
+            or self.SMTP_FROM
+            or ""
+        ).strip().strip("'\" \t\r\n")
         if raw:
             return raw
         user = self.effective_smtp_user
-        return f"MoiDoctar <{user}>" if user else ""
+        if user and "@" in user:
+            return f"MoiDoctar <{user}>"
+        return "MoiDoctar <noreply@moidoctar.com>"
+
+    @property
+    def email_provider_preference(self) -> str:
+        """Returns 'smtp', 'resend', or 'auto'."""
+        provider = (
+            os.getenv("EMAIL_PROVIDER")
+            or os.getenv("MAIL_PROVIDER")
+            or os.getenv("EMAIL_BACKEND")
+            or ""
+        ).strip().lower()
+        if provider in ("smtp", "mail"):
+            return "smtp"
+        if provider == "resend":
+            return "resend"
+        return "auto"
 
 
     @property

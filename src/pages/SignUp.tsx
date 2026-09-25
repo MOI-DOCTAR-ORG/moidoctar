@@ -97,7 +97,13 @@ export default function SignUp() {
     const result = await signUp(fullName.trim(), email.trim(), password)
     setIsSubmitting(false)
     if (result.success) {
-      navigate('/verify-email', { state: { email: email.trim() } })
+      navigate('/verify-email', {
+        state: {
+          email: email.trim(),
+          emailDelivered: result.emailDelivered,
+          devCode: result.devCode,
+        },
+      })
     } else {
       setError(result.error)
       setShakeKey(k => k + 1)
