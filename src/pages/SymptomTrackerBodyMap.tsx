@@ -49,7 +49,7 @@ export default function SymptomTrackerBodyMap() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
         <section className="lg:col-span-12 bg-surface-container-lowest rounded-[16px] border border-outline-variant shadow-[0px_4px_20px_rgba(0,0,0,0.03)] p-stack-lg">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-white">
+            <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
               <Icon icon="edit_note" size="md" />
             </div>
             <h2 className="font-headline-md text-headline-md">New Log Entry</h2>

@@ -28,6 +28,7 @@ DEFAULT_PREFERENCES: Dict[str, Any] = {
     "remember_conversations": True,
 }
 LIST_FIELDS = ("conditions", "allergies", "medications")
+_NOTE_LABEL = {"conditions": "condition", "allergies": "allergy", "medications": "medication"}
 MAX_FACTS = 40
 MAX_HISTORY = 120
 
@@ -46,6 +47,7 @@ def _blank() -> Dict[str, Any]:
         "health_context": {"age": None, "gender": "", "location": "", "conditions": [], "allergies": [], "medications": []},
         "facts": [],
         "history": [],
+        "profile_items": {f: [] for f in LIST_FIELDS},  # what the profile last supplied, per list
         "updated_at": None,
     }
 
@@ -58,6 +60,9 @@ def load(user_id: str) -> Dict[str, Any]:
         mem["health_context"].update(data.get("health_context") or {})
         mem["facts"] = data.get("facts") or []
         mem["history"] = data.get("history") or []
+        snap = data.get("profile_items")
+        if isinstance(snap, dict):
+            mem["profile_items"].update({k: v for k, v in snap.items() if k in LIST_FIELDS and isinstance(v, list)})
         mem["updated_at"] = data.get("updated_at")
     return mem
 
@@ -127,10 +132,23 @@ def sync_health_context(user_id: str, incoming: Dict[str, Any], source: str = "p
         for field in LIST_FIELDS:
             if field not in incoming:
                 continue
-            new = _clean_list(incoming[field])
-            if new != ctx.get(field):
-                _log(mem, f"health.{field}", ctx.get(field), new, source)
-                ctx[field] = new
+            supplied = _clean_list(incoming[field])
+            if source == "user":
+                # An explicit edit in AI settings is exact: the list becomes what they sent.
+                if supplied != ctx.get(field):
+                    _log(mem, f"health.{field}", ctx.get(field), supplied, source)
+                    ctx[field] = supplied
+                continue
+            previous = mem["profile_items"].get(field, [])
+            # Replace only what the profile itself supplied last time. Items the
+            # AI learned in chat (or the user added here) are kept.
+            prev_lower = {x.lower() for x in previous}
+            kept = [x for x in ctx.get(field, []) if x.lower() not in prev_lower]
+            merged = supplied + [x for x in kept if x.lower() not in {y.lower() for y in supplied}]
+            mem["profile_items"][field] = supplied
+            if merged != ctx.get(field):
+                _log(mem, f"health.{field}", ctx.get(field), merged, source)
+                ctx[field] = merged
         _save(user_id, mem)
         return mem
 
@@ -151,7 +169,7 @@ def apply_ai_updates(user_id: str, updates: Any) -> List[str]:
                 if item.lower() not in {x.lower() for x in ctx[field]}:
                     ctx[field].append(item)
                     _log(mem, f"health.{field}", None, item, "ai")
-                    notes.append(f"Noted {field[:-1] if field != 'medications' else 'medication'}: {item}")
+                    notes.append(f"Noted {_NOTE_LABEL[field]}: {item}")
 
         for field, value in (updates.get("preferences") or {}).items():
             if field in DEFAULT_PREFERENCES and field != "remember_conversations":

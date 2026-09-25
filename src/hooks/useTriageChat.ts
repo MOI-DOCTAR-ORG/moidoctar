@@ -49,6 +49,8 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
   const [error, setError] = useState<string | null>(null)
   const [severity, setSeverity] = useState<Severity | null>(null)
   const [image, setImage] = useState<File | null>(null)
+  // One id per conversation so the server updates a single history entry instead of adding one per message.
+  const sessionId = useRef(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : '')
   const lastSent = useRef<{ history: ChatMsg[]; image: File | null } | null>(null)
 
   const latest = [...messages].reverse().find((m) => m.result)?.result ?? null
@@ -62,7 +64,7 @@ export function useTriageChat(bodyAreas: BodyAreaLike[] = []) {
         const res = await chat.mutateAsync({
           symptoms: userText,
           messages: JSON.stringify(history.map((m) => ({ role: m.role === 'ai' ? 'model' : 'user', content: m.text }))),
-          context: buildAiContext({ bodyAreas, severity }),
+          context: buildAiContext({ bodyAreas, severity, sessionId: sessionId.current }),
           image: img ?? undefined,
         })
         const data = res.data

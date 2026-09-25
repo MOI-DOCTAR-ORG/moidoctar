@@ -389,7 +389,8 @@ def analyze_symptoms(symptoms: str, user_id: str = "user") -> Dict[str, Any]:
     return analyze_conversation(user_id, symptoms, [{"role": "user", "content": symptoms}])
 
 
-def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str, Any]) -> None:
+def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str, Any], session_id: Optional[str] = None) -> None:
+    """Save an assessment. With a session_id (one per chat) later turns update the same row."""
     # Do not save pure greetings or non-symptom chats into clinical history records
     if not assessment.get("has_symptoms", True):
         return
@@ -412,6 +413,11 @@ def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str,
         user_is_uuid = False
 
     session_uuid = str(uuid.uuid4())
+    if session_id:
+        try:
+            session_uuid = str(uuid.UUID(str(session_id)))
+        except ValueError:
+            pass
 
     if supabase and user_is_uuid:
         record = {
@@ -425,12 +431,12 @@ def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str,
             "created_at": now_iso,
         }
         try:
-            supabase.table("triage_sessions").insert(record).execute()
+            supabase.table("triage_sessions").upsert(record).execute()
         except Exception as e:
             logger.debug(f"Could not insert triage session into Supabase: {e}")
 
-    _local_triage_sessions.insert(0, {
-        "_id": raw_id,
+    entry = {
+        "_id": session_uuid if session_id else raw_id,
         "id": session_uuid,
         "user_id": str(user_id),
         "symptoms": symptoms_list,
@@ -444,7 +450,14 @@ def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str,
         "possible_conditions": assessment.get("possible_conditions", []),
         "recommended_actions": assessment.get("recommended_actions", []),
         "rationale": assessment.get("rationale", ""),
-    })
+    }
+    if session_id:
+        existing = next((i for i, x in enumerate(_local_triage_sessions) if x.get("id") == session_uuid and str(x.get("user_id")) == str(user_id)), None)
+        if existing is not None:
+            entry["createdAt"] = _local_triage_sessions[existing].get("createdAt", now_iso)
+            _local_triage_sessions[existing] = entry
+            return
+    _local_triage_sessions.insert(0, entry)
 
 
 def get_triage_history(user_id: str) -> List[Dict[str, Any]]:

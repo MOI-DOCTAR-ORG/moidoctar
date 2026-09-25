@@ -803,7 +803,7 @@ function SectionCard({
         <Icon icon={icon} size="lg" className="text-primary" />
         <h3 className="font-headline-md text-headline-md text-on-surface flex-1">{title}</h3>
         {completed && (
-          <span className="text-green-400">
+          <span className="text-success">
             <Icon icon="check_circle" size="lg" />
           </span>
         )}

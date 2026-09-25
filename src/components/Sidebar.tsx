@@ -10,6 +10,7 @@ const primaryNav = [
   { label: 'Symptom Tracker', icon: 'monitor_heart', to: '/symptom-tracker' },
   { label: 'Medications', icon: 'pill', to: '/medication-tracker' },
   { label: 'AI Settings', icon: 'psychology', to: '/ai-settings' },
+  { label: 'Theme', icon: 'palette', to: '/theme' },
 ]
 
 const bottomNav = [
