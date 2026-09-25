@@ -24,9 +24,10 @@ _cursor = 0
 # Runtime-only state (not persisted): cooldowns and counters for env keys too.
 _runtime: Dict[str, Dict[str, Any]] = {}
 
-RATE_LIMIT_COOLDOWN = 60
-QUOTA_COOLDOWN = 60 * 60
+RATE_LIMIT_COOLDOWN = 30
+QUOTA_COOLDOWN = 60 * 15
 INVALID_COOLDOWN = 60 * 60 * 24
+
 
 
 def _now() -> float:
@@ -140,9 +141,10 @@ def report_failure(key_id: str, http_status: Optional[int], detail: str = "") ->
         st["failures"] += 1
         st["last_error"] = (detail or f"HTTP {http_status}")[:200]
         if http_status == 429:
-            quota = "quota" in detail.lower() or "per day" in detail.lower()
-            st["cooldown_until"] = _now() + (QUOTA_COOLDOWN if quota else RATE_LIMIT_COOLDOWN)
+            daily = "per day" in detail.lower() or "daily" in detail.lower()
+            st["cooldown_until"] = _now() + (QUOTA_COOLDOWN if daily else RATE_LIMIT_COOLDOWN)
             st["status"] = "rate_limited"
+
         elif http_status in (400, 401, 403):
             # 400 is only a key problem when the message says so
             if http_status != 400 or "api key" in detail.lower():
