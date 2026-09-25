@@ -126,6 +126,38 @@ ever read that state.
   next step for a production-scale version).
 
 ## 5. Google Auth — manual setup needed
-Status: TODO — code is fully wired, just needs credentials. Instructions will go here.
+Status: TODO — code is fully wired (see BUG_FIXES.md #7/#8), just needs real
+credentials. **This cannot be fixed from inside the repo** — the "Error 401:
+invalid_client / The OAuth client was not found" screenshot Peter sent means
+whatever `VITE_GOOGLE_CLIENT_ID` is set on Pxxl right now either isn't a real
+Google Web-application OAuth client, or is one that was deleted/disabled. Only
+Peter can fix this, in Google Cloud Console + Pxxl's env var settings (see the
+step-by-step in the root `.env.example`). Once he has a real client id: set
+`VITE_GOOGLE_CLIENT_ID` on the frontend service and the matching `GOOGLE_CLIENT_ID`
+on the backend service in Pxxl's Secrets tab, then redeploy both (Vite bakes
+`VITE_*` vars in at build time, so just editing the value does nothing until
+the frontend is rebuilt).
+
+## 6. Pxxl deploy failure — root cause found and fixed
+Status: DONE
+
+`Static release packaging failed: invalid pxxl.toml: strict mode: fields in
+the document are missing in the target struct` — happened *after* a
+successful build, at the static-release packaging step.
+
+- **Root cause:** both `pxxl.toml` (root) and `backend/pxxl.toml` used
+  snake_case keys (`install_command`, `build_command`, `start_command`).
+  Checked Pxxl's own docs (docs.pxxl.app/deploy/multiple-services) — the
+  platform's real schema is **camelCase**: `installCommand`, `buildCommand`,
+  `startCommand`, `outputDirectory`, `packageManager`, `port`. Every key in
+  both files was therefore an unrecognized field, which is exactly what
+  strict-mode TOML deserialization rejects.
+- **Fix:** renamed all keys to camelCase in both `pxxl.toml` and
+  `backend/pxxl.toml`, and added an explicit `outputDirectory = "dist"` to
+  the root one (matches the `dist/` output already seen in the build log).
+- Not verified against a live Pxxl deploy (no network access in this
+  session) — the fix is based on Pxxl's documented config schema, not a
+  live redeploy. **Please trigger a redeploy on Pxxl and confirm the
+  packaging step completes** before considering this fully closed.
 
 ---
