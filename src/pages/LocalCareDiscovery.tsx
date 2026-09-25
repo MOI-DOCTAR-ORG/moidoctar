@@ -174,6 +174,11 @@ const provenanceLabels = {
   prototype: { text: 'Sample Data', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20' },
 }
 
+// Geolocation permission states we distinguish in the UI. `navigator.permissions` isn't
+// available everywhere (notably Safari for the geolocation permission itself), so we treat
+// 'unknown' as "haven't asked yet, browser support unclear" rather than assuming denial.
+type LocationPermissionState = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported' | 'requesting'
+
 export default function LocalCareDiscovery() {
   const navigate = useNavigate()
   const { addSession } = useAuth()
@@ -182,6 +187,7 @@ export default function LocalCareDiscovery() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationError, setLocationError] = useState('')
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(false)
+  const [locationPermission, setLocationPermission] = useState<LocationPermissionState>('unknown')
 
   const loadNearby = useCallback((lat: number, lng: number) => {
     setIsLoadingFacilities(true)
@@ -202,22 +208,61 @@ export default function LocalCareDiscovery() {
       .finally(() => setIsLoadingFacilities(false))
   }, [])
 
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          setUserLocation({ lat: latitude, lng: longitude })
-          loadNearby(latitude, longitude)
-        },
-        () => {
-          setLocationError('Location access denied. Showing sample facilities.')
-        }
-      )
-    } else {
+  // Triggers the browser's native location prompt. Must be called from a user gesture (a
+  // button click) for reliable behavior — some browsers silently suppress or auto-dismiss a
+  // geolocation prompt fired automatically on page load, which is why this was previously
+  // failing quietly instead of ever showing the "Allow location?" dialog.
+  const requestLocation = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      setLocationPermission('unsupported')
       setLocationError('Location is not available on this device. Showing sample facilities.')
+      return
     }
+    setLocationPermission('requesting')
+    setLocationError('')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setLocationPermission('granted')
+        setUserLocation({ lat: latitude, lng: longitude })
+        loadNearby(latitude, longitude)
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationPermission('denied')
+          setLocationError('Location access is blocked for this site. Enable it in your browser\u2019s site settings, then tap Retry.')
+        } else {
+          setLocationPermission('prompt')
+          setLocationError('Could not get your location. Showing sample facilities.')
+        }
+      }
+    )
   }, [loadNearby])
+
+  // On mount: only auto-request location if the browser can tell us permission was already
+  // granted in a previous visit (so we don't re-prompt someone who already said yes). If the
+  // browser can't tell us (no Permissions API support, e.g. Safari), or the state is 'prompt'/
+  // 'denied', we hold off and show an explicit "Enable Location" card with a button instead of
+  // silently calling getCurrentPosition with no user gesture behind it.
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setLocationPermission('unsupported')
+      setLocationError('Location is not available on this device. Showing sample facilities.')
+      return
+    }
+    if (!('permissions' in navigator) || !navigator.permissions?.query) {
+      setLocationPermission('prompt')
+      return
+    }
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((status) => {
+        setLocationPermission(status.state as LocationPermissionState)
+        if (status.state === 'granted') requestLocation()
+        status.onchange = () => setLocationPermission(status.state as LocationPermissionState)
+      })
+      .catch(() => setLocationPermission('prompt'))
+  }, [requestLocation])
 
   const filtered = filter === 'all' ? facilities : facilities.filter(f => f.type === filter)
 
@@ -241,7 +286,44 @@ export default function LocalCareDiscovery() {
         )}
       </header>
 
-      {locationError && (
+      {(locationPermission === 'prompt' || locationPermission === 'unknown' || locationPermission === 'requesting') && !userLocation && (
+        <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Icon icon="location_on" size="lg" className="text-primary shrink-0" />
+            <div>
+              <p className="text-body-sm text-on-surface font-bold">Allow location access</p>
+              <p className="text-caption text-secondary">See real hospitals, clinics and pharmacies sorted by distance from you.</p>
+            </div>
+          </div>
+          <button
+            onClick={requestLocation}
+            disabled={locationPermission === 'requesting'}
+            className="px-4 min-h-[44px] bg-primary text-on-primary rounded-xl text-label-md font-label-md font-bold hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-60 disabled:hover:translate-y-0"
+          >
+            {locationPermission === 'requesting' ? 'Requesting\u2026' : 'Enable Location'}
+          </button>
+        </div>
+      )}
+
+      {locationPermission === 'denied' && (
+        <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Icon icon="warning" size="lg" className="text-amber-500 shrink-0" />
+            <div>
+              <p className="text-body-sm text-on-surface font-bold">Location access blocked</p>
+              <p className="text-caption text-secondary">Enable it for this site in your browser settings, then retry.</p>
+            </div>
+          </div>
+          <button
+            onClick={requestLocation}
+            className="px-4 min-h-[44px] bg-surface border border-outline-variant text-on-surface rounded-xl text-label-md font-label-md font-bold hover:border-primary/30 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {locationError && locationPermission !== 'denied' && (
         <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-caption text-amber-600 dark:text-amber-400">
           <Icon icon="info" size="sm" />
           {locationError}
