@@ -12,14 +12,8 @@ from app.services import ai_keys
 logger = logging.getLogger("moidoctar.gemini")
 
 _URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-_DEFAULT_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-flash-latest",
-    "gemini-flash-lite-latest",
-    "gemini-1.5-flash",
-]
-_dead_models: Dict[str, float] = {}  # model -> time it failed with 404/503 (retry after 15 min)
+_DEFAULT_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"]
+_dead_models: Dict[str, float] = {}  # model -> time it 404'd (retry after an hour)
 TOTAL_BUDGET_SECONDS = 28
 
 
@@ -27,29 +21,14 @@ class GeminiUnavailable(RuntimeError):
     """No key configured, or every key/model combination failed."""
 
 
-def _normalize_model(m: str) -> str:
-    cleaned = (m or "").strip().lower()
-    if not cleaned:
-        return ""
-    # Map non-existent or typo models (e.g. gemini-3.6-flash) to the current flash model
-    if "3.6" in cleaned or "3." in cleaned:
-        return "gemini-2.5-flash"
-    return cleaned
-
-
 def candidate_models(key_model: str = "") -> List[str]:
-    raw_list = [
-        _normalize_model(key_model),
-        _normalize_model(settings.GEMINI_MODEL),
-        *_DEFAULT_MODELS,
-    ]
     models: List[str] = []
-    for m in raw_list:
+    for m in (key_model, settings.GEMINI_MODEL, *_DEFAULT_MODELS):
+        m = (m or "").strip()
         if m and m not in models:
             models.append(m)
     now = time.time()
-    # Retry dead models after 15 minutes (900s)
-    live = [m for m in models if now - _dead_models.get(m, 0) > 900]
+    live = [m for m in models if now - _dead_models.get(m, 0) > 3600]
     return live or models
 
 
@@ -93,8 +72,7 @@ def generate(
     started = time.time()
     last_error = "unknown error"
     for key in keys:
-        models_to_try = candidate_models(key.get("model", ""))
-        for model in models_to_try:
+        for model in candidate_models(key.get("model", "")):
             remaining = TOTAL_BUDGET_SECONDS - (time.time() - started)
             if remaining <= 2:
                 raise GeminiUnavailable(f"Timed out. Last error: {last_error}")
@@ -103,18 +81,13 @@ def generate(
             except urllib.error.HTTPError as exc:
                 detail = exc.read().decode("utf-8", "replace")[:300]
                 last_error = f"HTTP {exc.code} on {model}"
-                # 404, 500, 502, 503 are model-specific or temporary Google server errors; try next model
-                if exc.code in (404, 500, 502, 503):
+                if exc.code == 404:
                     _dead_models[model] = time.time()
-                    logger.warning("Gemini model %s returned HTTP %s; falling back to next candidate model...", model, exc.code)
-                    continue
-                # If 429 on one model, try next candidate model first before failing the entire key
-                if exc.code == 429 and model != models_to_try[-1]:
-                    logger.warning("Gemini model %s returned HTTP 429; trying alternative model for key %s...", model, key["id"])
-                    continue
+                    logger.warning("Gemini model %s not available; skipping.", model)
+                    continue  # model problem, not key problem
                 ai_keys.report_failure(key["id"], exc.code, detail)
-                logger.warning("Gemini key %s failed with %s (%s)", key["id"], exc.code, detail[:80])
-                break  # try next key
+                logger.warning("Gemini key %s failed with %s", key["id"], exc.code)
+                break  # next key
             except Exception as exc:  # timeout / network
                 last_error = f"{type(exc).__name__}: {exc}"
                 ai_keys.report_failure(key["id"], None, last_error)
@@ -130,7 +103,6 @@ def generate(
             ai_keys.report_success(key["id"])
             return text, {"model": model, "key_id": key["id"]}
     raise GeminiUnavailable(last_error)
-
 
 
 def parse_json_object(text: str) -> Dict[str, Any]:

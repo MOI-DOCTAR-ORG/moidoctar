@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Icon from './Icon'
 import LianaAvatar from './LianaAvatar'
+import { TriageResultSkeleton } from './Skeleton'
 import EmergencyEscalation from './EmergencyEscalation'
 import TriageFeedback from './TriageFeedback'
 import { useAuth, type TriageSession } from '../context/AuthContext'
 import { useBodyMap } from '../context/BodyMapContext'
-import { useTriageChat, type ChatMsg, type Severity } from '../hooks/useTriageChat'
+import { useTriageChat, type ChatMsg, type Severity } from '../context/TriageChatContext'
 import { getUserInitials } from '../utils/getUserInitials'
 import type { TriageChatResponse } from '../types/triage'
 
@@ -392,7 +393,7 @@ type SpeechCtor = new () => {
 
 export default function TriageChat() {
   const { selectedAreas, hasAreas } = useBodyMap()
-  const chat = useTriageChat(selectedAreas)
+  const chat = useTriageChat()
   const { sessions, addSession, refreshSessions } = useAuth()
   const [input, setInput] = useState('')
   const [showDetails, setShowDetails] = useState(false)
@@ -402,7 +403,7 @@ export default function TriageChat() {
   const endRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const recRef = useRef<InstanceType<SpeechCtor> | null>(null)
-  const [sessionId, setSessionId] = useState(() => Date.now().toString(36).toUpperCase())
+  const sessionId = chat.sessionId.slice(0, 8).toUpperCase()
 
   // Refresh sessions from backend on mount
   useEffect(() => {
@@ -438,7 +439,6 @@ export default function TriageChat() {
 
   const handleStartNewTriage = () => {
     chat.reset()
-    setSessionId(Date.now().toString(36).toUpperCase())
     setShowPastTriagesMobile(false)
   }
 
@@ -659,22 +659,19 @@ export default function TriageChat() {
             {chat.messages.map((m) => (
               <Bubble key={m.id} msg={m} severity={chat.severity} onAsk={(q) => chat.send(q)} isLatest={m.id === latestId} />
             ))}
-            {chat.pending && (
-              <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                <LianaAvatar size="sm" />
-                <span className="inline-flex gap-1" aria-label="Liana is typing">
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-outline [animation-delay:-0.3s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-outline [animation-delay:-0.15s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-outline" />
-                </span>
-              </div>
-            )}
+            {chat.pending && <TriageResultSkeleton />}
             {chat.error && (
-              <div role="alert" className="flex items-start gap-3 rounded-xl border border-error/30 bg-error-container/50 p-3 text-sm text-on-error-container">
-                <Icon icon="error" size="md" className="mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p>{chat.error}</p>
-                  <button type="button" onClick={chat.retry} className="mt-2 min-h-9 rounded-lg bg-error px-3 text-xs font-semibold text-on-error">Try again</button>
+              <div className="space-y-3">
+                <div role="alert" className="flex items-start gap-3 rounded-xl border border-error/30 bg-error-container/50 p-3 text-sm text-on-error-container">
+                  <Icon icon="error" size="md" className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p>{chat.error}</p>
+                    <button type="button" onClick={chat.retry} className="mt-2 min-h-9 rounded-lg bg-error px-3 text-xs font-semibold text-on-error">Try again</button>
+                  </div>
+                </div>
+                {/* Keeps the expected layout visible instead of leaving a blank gap while the connection is down. */}
+                <div className="opacity-40">
+                  <TriageResultSkeleton />
                 </div>
               </div>
             )}

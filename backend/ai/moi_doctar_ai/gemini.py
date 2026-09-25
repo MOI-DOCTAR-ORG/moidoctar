@@ -15,9 +15,8 @@ _URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generate
 class GeminiModel:
     def __init__(self, api_key=None, model=None, timeout=30):
         self.api_key = api_key if api_key is not None else os.environ.get("GOOGLE_API_KEY", "")
-        self.model = model or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model = model or os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
         self.timeout = timeout
-
 
     def generate(self, contents, tools):
         if not self.api_key:
