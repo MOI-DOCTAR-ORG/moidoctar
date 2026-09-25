@@ -15,7 +15,7 @@ function ageFromDob(dob: string): number | undefined {
  * triage message so the assistant does not have to ask again. The server also
  * stores it (with a change log) so it can be reviewed in AI settings.
  */
-export function buildAiContext(opts: { bodyAreas?: BodyAreaLike[]; severity?: string | null } = {}) {
+export function buildAiContext(opts: { bodyAreas?: BodyAreaLike[]; severity?: string | null; sessionId?: string } = {}) {
   const profile = loadProfile(scopeKey('doctarr_patient_profile'))
   const ctx: Record<string, unknown> = {}
   if (profile) {
@@ -30,5 +30,6 @@ export function buildAiContext(opts: { bodyAreas?: BodyAreaLike[]; severity?: st
   }
   if (opts.bodyAreas?.length) ctx.body_areas = opts.bodyAreas
   if (opts.severity) ctx.severity = opts.severity
+  if (opts.sessionId) ctx.session_id = opts.sessionId
   return JSON.stringify(ctx)
 }

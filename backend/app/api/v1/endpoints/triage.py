@@ -88,7 +88,8 @@ async def perform_triage_chat(request: Request, current_user: Dict[str, Any] = D
     a = await run_in_threadpool(analyze_conversation, uid, symptoms or "General symptom assessment", messages, context, img, mime)
     user_lines = [str(m.get("content") or m.get("text") or "") for m in messages if str(m.get("role")) == "user"]
     if a.get("has_symptoms", True):
-        save_triage_session(uid, [(user_lines[0] if user_lines else symptoms) or "Symptom check"], a)
+        save_triage_session(uid, [(user_lines[0] if user_lines else symptoms) or "Symptom check"], a,
+                            session_id=str(context.get("session_id") or "") or None)
     return TriageChatResponse(
         assessment_id=a["assessment_id"],
         needs_more_info=a.get("needs_more_info", False),

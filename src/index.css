@@ -24,8 +24,9 @@
 }
 
 @font-face {
+  /* Self-hosted subset (only the icons the app uses, ~40 KB). Regenerate with scripts/subset-icons.py */
   font-family: 'Material Symbols Outlined';
-  src: url('https://fonts.gstatic.com/s/materialsymbolsoutlined/v138/kJF1BvYX7BgnkSrUz7mAaCZ6THa6NwDR.woff2') format('woff2');
+  src: url('./assets/fonts/material-symbols-subset.woff2') format('woff2');
   font-weight: 100 700;
   font-style: normal;
   font-display: block;
@@ -40,6 +41,11 @@
   letter-spacing: normal;
   text-transform: none;
   display: inline-flex;
+  /* Fixed box: if the icon font is slow or blocked, the ligature name must never widen the layout. */
+  width: 1em;
+  height: 1em;
+  flex: none;
+  overflow: hidden;
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
@@ -82,42 +88,71 @@ html, body, #root {
 }
 
 body {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Nunito Sans Variable', 'Nunito Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
 }
 
 /* =====================================================================
-   THEME TOKENS
-   Calm, low-saturation palette: warm neutrals + a deep teal. No glows,
-   no gradients, no blur. `--neon-*` names are kept only because many
-   components still reference them; they now just mean "brand color".
+   THEME TOKENS (generated, default = MoiDoctar logo blue)
+   These are the first-paint defaults. At runtime ThemeContext recomputes the
+   same variables from the user's chosen accent (src/lib/palette.ts) and sets
+   them on <body>, which overrides these. Regenerate with scripts/gen-theme-css.mjs.
+   Urgency colours (error/warning/success) are fixed and never follow the accent.
    ===================================================================== */
 body.light {
-  background-color: #f7f6f2;
-  color: #1a1f1d;
+  background-color: rgb(var(--rgb-background));
+  color: rgb(var(--rgb-on-background));
   color-scheme: light;
-  --rgb-background: 247 246 242;
+  --rgb-background: 246 247 249;
   --color-background: rgb(var(--rgb-background));
-  --rgb-primary: 15 107 99;
+  --rgb-primary: 39 99 235;
   --color-primary: rgb(var(--rgb-primary));
   --rgb-on-primary: 255 255 255;
   --color-on-primary: rgb(var(--rgb-on-primary));
-  --rgb-primary-container: 220 239 235;
+  --rgb-primary-container: 217 228 253;
   --color-primary-container: rgb(var(--rgb-primary-container));
-  --rgb-on-primary-container: 10 58 53;
+  --rgb-on-primary-container: 9 35 93;
   --color-on-primary-container: rgb(var(--rgb-on-primary-container));
-  --rgb-on-primary-fixed-variant: 10 58 53;
+  --rgb-on-primary-fixed-variant: 9 35 93;
   --color-on-primary-fixed-variant: rgb(var(--rgb-on-primary-fixed-variant));
-  --rgb-primary-fixed-dim: 127 185 177;
+  --rgb-primary-fixed-dim: 143 174 245;
   --color-primary-fixed-dim: rgb(var(--rgb-primary-fixed-dim));
-  --rgb-secondary: 74 84 80;
+  --rgb-secondary: 74 82 99;
   --color-secondary: rgb(var(--rgb-secondary));
   --rgb-on-secondary: 255 255 255;
   --color-on-secondary: rgb(var(--rgb-on-secondary));
-  --rgb-secondary-container: 230 233 229;
+  --rgb-secondary-container: 230 233 239;
   --color-secondary-container: rgb(var(--rgb-secondary-container));
-  --rgb-on-secondary-container: 28 35 32;
+  --rgb-on-secondary-container: 27 32 44;
   --color-on-secondary-container: rgb(var(--rgb-on-secondary-container));
+  --rgb-surface: 255 255 255;
+  --color-surface: rgb(var(--rgb-surface));
+  --rgb-on-surface: 21 25 35;
+  --color-on-surface: rgb(var(--rgb-on-surface));
+  --rgb-surface-container: 239 241 245;
+  --color-surface-container: rgb(var(--rgb-surface-container));
+  --rgb-surface-container-low: 244 245 248;
+  --color-surface-container-low: rgb(var(--rgb-surface-container-low));
+  --rgb-surface-container-lowest: 255 255 255;
+  --color-surface-container-lowest: rgb(var(--rgb-surface-container-lowest));
+  --rgb-surface-container-high: 233 235 241;
+  --color-surface-container-high: rgb(var(--rgb-surface-container-high));
+  --rgb-surface-container-highest: 223 227 236;
+  --color-surface-container-highest: rgb(var(--rgb-surface-container-highest));
+  --rgb-on-surface-variant: 79 87 105;
+  --color-on-surface-variant: rgb(var(--rgb-on-surface-variant));
+  --rgb-on-background: 21 25 35;
+  --color-on-background: rgb(var(--rgb-on-background));
+  --rgb-outline: 156 163 181;
+  --color-outline: rgb(var(--rgb-outline));
+  --rgb-outline-variant: 223 227 236;
+  --color-outline-variant: rgb(var(--rgb-outline-variant));
+  --rgb-secondary-fixed: 230 233 239;
+  --color-secondary-fixed: rgb(var(--rgb-secondary-fixed));
+  --rgb-secondary-fixed-dim: 162 169 185;
+  --color-secondary-fixed-dim: rgb(var(--rgb-secondary-fixed-dim));
+  --rgb-surface-variant: 234 237 242;
+  --color-surface-variant: rgb(var(--rgb-surface-variant));
   --rgb-error: 180 35 24;
   --color-error: rgb(var(--rgb-error));
   --rgb-on-error: 255 255 255;
@@ -126,34 +161,6 @@ body.light {
   --color-error-container: rgb(var(--rgb-error-container));
   --rgb-on-error-container: 122 26 18;
   --color-on-error-container: rgb(var(--rgb-on-error-container));
-  --rgb-surface: 255 255 255;
-  --color-surface: rgb(var(--rgb-surface));
-  --rgb-on-surface: 26 31 29;
-  --color-on-surface: rgb(var(--rgb-on-surface));
-  --rgb-surface-container: 241 240 235;
-  --color-surface-container: rgb(var(--rgb-surface-container));
-  --rgb-surface-container-low: 245 244 239;
-  --color-surface-container-low: rgb(var(--rgb-surface-container-low));
-  --rgb-surface-container-lowest: 255 255 255;
-  --color-surface-container-lowest: rgb(var(--rgb-surface-container-lowest));
-  --rgb-surface-container-high: 235 234 228;
-  --color-surface-container-high: rgb(var(--rgb-surface-container-high));
-  --rgb-surface-container-highest: 226 225 218;
-  --color-surface-container-highest: rgb(var(--rgb-surface-container-highest));
-  --rgb-on-surface-variant: 90 99 95;
-  --color-on-surface-variant: rgb(var(--rgb-on-surface-variant));
-  --rgb-on-background: 26 31 29;
-  --color-on-background: rgb(var(--rgb-on-background));
-  --rgb-outline: 185 190 183;
-  --color-outline: rgb(var(--rgb-outline));
-  --rgb-outline-variant: 226 227 220;
-  --color-outline-variant: rgb(var(--rgb-outline-variant));
-  --rgb-secondary-fixed: 230 233 229;
-  --color-secondary-fixed: rgb(var(--rgb-secondary-fixed));
-  --rgb-secondary-fixed-dim: 169 176 170;
-  --color-secondary-fixed-dim: rgb(var(--rgb-secondary-fixed-dim));
-  --rgb-surface-variant: 238 237 232;
-  --color-surface-variant: rgb(var(--rgb-surface-variant));
   --rgb-tertiary: 138 90 18;
   --color-tertiary: rgb(var(--rgb-tertiary));
   --rgb-tertiary-container: 248 231 200;
@@ -179,39 +186,67 @@ body.light {
   --rgb-on-success-container: 18 61 36;
   --color-on-success-container: rgb(var(--rgb-on-success-container));
   --glass-bg: #ffffff;
-  --glass-border: #e2e3dc;
-  --glass-shadow: 0 1px 2px rgba(20, 30, 25, 0.06);
+  --glass-border: #dfe3ec;
+  --glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   --neon-primary: rgb(var(--rgb-primary));
   --neon-accent: rgb(var(--rgb-primary-fixed-dim));
   --neon-glow-color: transparent;
 }
 
 body.dark {
-  background-color: #0f1311;
-  color: #e6ebe8;
+  background-color: rgb(var(--rgb-background));
+  color: rgb(var(--rgb-on-background));
   color-scheme: dark;
-  --rgb-background: 15 19 17;
+  --rgb-background: 16 19 25;
   --color-background: rgb(var(--rgb-background));
-  --rgb-primary: 111 194 179;
+  --rgb-primary: 96 140 240;
   --color-primary: rgb(var(--rgb-primary));
-  --rgb-on-primary: 6 35 30;
+  --rgb-on-primary: 14 23 42;
   --color-on-primary: rgb(var(--rgb-on-primary));
-  --rgb-primary-container: 29 74 67;
+  --rgb-primary-container: 24 47 98;
   --color-primary-container: rgb(var(--rgb-primary-container));
-  --rgb-on-primary-container: 207 238 232;
+  --rgb-on-primary-container: 209 222 250;
   --color-on-primary-container: rgb(var(--rgb-on-primary-container));
-  --rgb-on-primary-fixed-variant: 207 238 232;
+  --rgb-on-primary-fixed-variant: 209 222 250;
   --color-on-primary-fixed-variant: rgb(var(--rgb-on-primary-fixed-variant));
-  --rgb-primary-fixed-dim: 111 194 179;
+  --rgb-primary-fixed-dim: 134 164 234;
   --color-primary-fixed-dim: rgb(var(--rgb-primary-fixed-dim));
-  --rgb-secondary: 169 180 175;
+  --rgb-secondary: 173 180 194;
   --color-secondary: rgb(var(--rgb-secondary));
-  --rgb-on-secondary: 15 19 17;
+  --rgb-on-secondary: 23 28 38;
   --color-on-secondary: rgb(var(--rgb-on-secondary));
-  --rgb-secondary-container: 35 42 38;
+  --rgb-secondary-container: 43 51 70;
   --color-secondary-container: rgb(var(--rgb-secondary-container));
-  --rgb-on-secondary-container: 205 214 209;
+  --rgb-on-secondary-container: 223 227 236;
   --color-on-secondary-container: rgb(var(--rgb-on-secondary-container));
+  --rgb-surface: 22 27 36;
+  --color-surface: rgb(var(--rgb-surface));
+  --rgb-on-surface: 232 233 238;
+  --color-on-surface: rgb(var(--rgb-on-surface));
+  --rgb-surface-container: 27 32 44;
+  --color-surface-container: rgb(var(--rgb-surface-container));
+  --rgb-surface-container-low: 24 29 40;
+  --color-surface-container-low: rgb(var(--rgb-surface-container-low));
+  --rgb-surface-container-lowest: 14 16 22;
+  --color-surface-container-lowest: rgb(var(--rgb-surface-container-lowest));
+  --rgb-surface-container-high: 33 39 54;
+  --color-surface-container-high: rgb(var(--rgb-surface-container-high));
+  --rgb-surface-container-highest: 41 49 66;
+  --color-surface-container-highest: rgb(var(--rgb-surface-container-highest));
+  --rgb-on-surface-variant: 175 180 192;
+  --color-on-surface-variant: rgb(var(--rgb-on-surface-variant));
+  --rgb-on-background: 232 233 238;
+  --color-on-background: rgb(var(--rgb-on-background));
+  --rgb-outline: 94 102 120;
+  --color-outline: rgb(var(--rgb-outline));
+  --rgb-outline-variant: 43 51 70;
+  --color-outline-variant: rgb(var(--rgb-outline-variant));
+  --rgb-secondary-fixed: 43 51 70;
+  --color-secondary-fixed: rgb(var(--rgb-secondary-fixed));
+  --rgb-secondary-fixed-dim: 101 109 129;
+  --color-secondary-fixed-dim: rgb(var(--rgb-secondary-fixed-dim));
+  --rgb-surface-variant: 37 44 60;
+  --color-surface-variant: rgb(var(--rgb-surface-variant));
   --rgb-error: 242 133 123;
   --color-error: rgb(var(--rgb-error));
   --rgb-on-error: 58 10 6;
@@ -220,34 +255,6 @@ body.dark {
   --color-error-container: rgb(var(--rgb-error-container));
   --rgb-on-error-container: 252 208 203;
   --color-on-error-container: rgb(var(--rgb-on-error-container));
-  --rgb-surface: 22 27 24;
-  --color-surface: rgb(var(--rgb-surface));
-  --rgb-on-surface: 230 235 232;
-  --color-on-surface: rgb(var(--rgb-on-surface));
-  --rgb-surface-container: 27 33 30;
-  --color-surface-container: rgb(var(--rgb-surface-container));
-  --rgb-surface-container-low: 24 29 27;
-  --color-surface-container-low: rgb(var(--rgb-surface-container-low));
-  --rgb-surface-container-lowest: 15 19 17;
-  --color-surface-container-lowest: rgb(var(--rgb-surface-container-lowest));
-  --rgb-surface-container-high: 34 41 37;
-  --color-surface-container-high: rgb(var(--rgb-surface-container-high));
-  --rgb-surface-container-highest: 42 50 46;
-  --color-surface-container-highest: rgb(var(--rgb-surface-container-highest));
-  --rgb-on-surface-variant: 154 165 160;
-  --color-on-surface-variant: rgb(var(--rgb-on-surface-variant));
-  --rgb-on-background: 230 235 232;
-  --color-on-background: rgb(var(--rgb-on-background));
-  --rgb-outline: 58 69 64;
-  --color-outline: rgb(var(--rgb-outline));
-  --rgb-outline-variant: 41 49 45;
-  --color-outline-variant: rgb(var(--rgb-outline-variant));
-  --rgb-secondary-fixed: 35 42 38;
-  --color-secondary-fixed: rgb(var(--rgb-secondary-fixed));
-  --rgb-secondary-fixed-dim: 93 105 99;
-  --color-secondary-fixed-dim: rgb(var(--rgb-secondary-fixed-dim));
-  --rgb-surface-variant: 27 33 30;
-  --color-surface-variant: rgb(var(--rgb-surface-variant));
   --rgb-tertiary: 224 178 92;
   --color-tertiary: rgb(var(--rgb-tertiary));
   --rgb-tertiary-container: 74 53 16;
@@ -272,8 +279,8 @@ body.dark {
   --color-success-container: rgb(var(--rgb-success-container));
   --rgb-on-success-container: 207 238 219;
   --color-on-success-container: rgb(var(--rgb-on-success-container));
-  --glass-bg: #161b18;
-  --glass-border: #29312d;
+  --glass-bg: #161b24;
+  --glass-border: #2b3346;
   --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --neon-primary: rgb(var(--rgb-primary));
   --neon-accent: rgb(var(--rgb-primary-container));
@@ -282,7 +289,7 @@ body.dark {
 
 /* ===== Surfaces ===== */
 .card-shadow {
-  box-shadow: 0 1px 2px rgba(20, 30, 25, 0.05);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   border: 1px solid var(--color-outline-variant);
 }
 
