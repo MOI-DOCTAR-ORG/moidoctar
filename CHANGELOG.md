@@ -1,3 +1,48 @@
+# CHANGELOG — Phase 5
+
+Phase 5 covered two HANDOFF.md TODOs: real Nearby Care data (was 100%
+hardcoded) and real notification delivery (was a static, per-account seed
+that didn't even work for Supabase accounts). Full detail for both is in
+`HANDOFF.md` items #3 and #4.
+
+## Nearby Care — now live data
+
+- `src/pages/LocalCareDiscovery.tsx` previously showed the same six fake
+  facilities to every user; the geolocation coords it captured were never
+  used. Now queries the OpenStreetMap Overpass API (no key needed) for real
+  nearby hospitals/clinics/pharmacies once location permission is granted,
+  computed distance sorted nearest-first, with the old hardcoded list kept
+  only as a clearly-labeled fallback.
+- Also fixed the deploy failure blocking pushes to this branch
+  (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`): added a root `pxxl.toml`
+  setting `CI=true` for the install step, matching the fix pnpm's own error
+  message suggests.
+
+## Notifications — now real, persisted events
+
+- `GET /user/notifications` read a `notifications` field off the `users`
+  table row — a field that only exists for the local in-memory fallback,
+  not for Supabase accounts, so it silently returned nothing for anyone on
+  real Supabase. The dedicated `public.notifications` table already in
+  `schema.sql` was never actually used anywhere in the code.
+- Added `backend/app/services/notification_service.py`, backed by that
+  table (or the same local fallback store `auth_service` uses), and wired
+  real triggers: a new triage assessment now creates a notification
+  (urgent ones flagged distinctly), and so does adding a medication
+  reminder. Added `POST /user/notifications/read` and
+  `DELETE /user/notifications/{id}` so mark-all-read/dismiss persist
+  instead of only living in React state until the next refresh.
+
+## Verified
+
+- Backend: all edited files pass `python3 -m py_compile`. No existing
+  tests reference the old notification shape.
+- **Not build-verified this pass** — no network access in this session to
+  run `pnpm install`/`vite build`/`tsc -b` or `pytest`. Please run those
+  before trusting this in production.
+
+---
+
 # CHANGELOG — Engineering Polish Pass (Phase 4)
 
 Phase 4 covered two things: a light-mode contrast bug on the Dashboard, and

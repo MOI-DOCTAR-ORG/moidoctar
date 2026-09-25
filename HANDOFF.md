@@ -46,7 +46,46 @@ examples — that would tighten the AI's Pidgin further beyond just "the AI figu
 instruction."
 
 ## 3. "Drop" notifications (real delivery, not just a static feed)
-Status: TODO
+Status: DONE
+
+`GET /user/notifications` only ever returned whatever was baked into a user's record at
+signup (one "Welcome to MoiDoctar!" line, sometimes two) — nothing in the app ever added
+to it afterwards. Worse, for **Supabase-backed accounts it silently returned nothing at
+all**: it read `notifications` off the `users` row, which has no such column — the real
+`public.notifications` table already in `schema.sql` was never touched anywhere in the
+code.
+
+- Added `backend/app/services/notification_service.py` — the one place that creates,
+  lists, and updates notifications. Uses the `public.notifications` Supabase table when
+  configured (insert/select/update/delete), or the same local in-memory user store
+  `auth_service` already falls back to otherwise (added `find_local_user_record_by_id`
+  to `auth_service.py` so both modules share one store instead of drifting). All writes
+  are best-effort — a notification failing to save never breaks the event that
+  triggered it, it just logs and moves on, same resilience pattern as the rest of this
+  backend's Supabase-with-local-fallback code.
+- Wired real triggers: `triage_service.save_triage_session` now creates one notification
+  per *new* triage session (not on every follow-up chat turn that updates the same
+  session — those return early before reaching the new code), with the message and
+  urgency framing pulled from the actual assessment (flags urgent ones distinctly from
+  routine ones). `POST /medication/create` now creates a "Reminder set: …" notification
+  with the real medication name/dosage/time.
+- `GET /user/notifications` now calls `list_notifications()` instead of reading the
+  (often-empty) field off the user record — this alone fixes it for every Supabase
+  account. Added `POST /user/notifications/read` (mark all read) and
+  `DELETE /user/notifications/{id}` (dismiss), both persisted now instead of only
+  mutating React state that reset on refresh.
+- Frontend (`src/pages/Notifications.tsx`): backend items now carry their real `id` and
+  `read` state from the server (previously hardcoded to `read: true` for every backend
+  item, and a synthetic timestamp-based id that `dismiss`/mark-read couldn't actually
+  target). `dismiss()` and `markAllRead()` now call the new endpoints in the background
+  after their existing optimistic local-state update, so the UI still feels instant but
+  the change now survives a refresh or a different device.
+- Not in scope for this pass: push/SMS/email delivery of these (they're in-app feed
+  items only, same as before) — "real delivery" here means real, persisted, per-event
+  records instead of a static seed. Worth doing later if you want actual push notifications.
+- Not verified end-to-end: same caveat as the Nearby Care pass — no network access in
+  this session to run the backend test suite or the frontend build. Please run
+  `pytest backend/tests` and `pnpm run build` before trusting this in production.
 
 ## 4. Location data (Nearby Care)
 Status: DONE

@@ -2,6 +2,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends
 from app.schemas.medication import MedicationCreate, MedicationStop, MedicationListResponse
 from app.services.medication_service import get_user_medications, add_medication, stop_medication
+from app.services.notification_service import create_notification
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -19,6 +20,7 @@ def create_medication(
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
     meds = add_medication(current_user["_id"], med.model_dump())
+    create_notification(current_user["_id"], f"Reminder set: {med.name} ({med.dosage}) at {med.time}.")
     return MedicationListResponse(msg="Medication added successfully", data=meds)
 
 

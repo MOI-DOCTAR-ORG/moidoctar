@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.supabase import get_supabase_client, safe_supabase_rows
+from app.services.notification_service import create_notification
 
 logger = logging.getLogger("moidoctar.triage")
 
@@ -544,6 +545,17 @@ def save_triage_session(user_id: str, symptoms: List[str], assessment: Dict[str,
             _local_triage_sessions[existing] = entry
             return
     _local_triage_sessions.insert(0, entry)
+
+    # Notify once per new session (not on every follow-up chat turn that
+    # updates the same session, which returns above before reaching here).
+    condition = (assessment.get("possible_conditions") or [None])[0]
+    if urgency == "Urgent":
+        message = f"Urgent: your triage flagged {condition or 'your symptoms'} as high priority — see recommended actions now."
+    elif condition:
+        message = f"Your triage assessment is ready — possible cause: {condition}."
+    else:
+        message = "Your triage assessment is ready — view your care plan."
+    create_notification(user_id, message)
 
 
 def get_triage_history(user_id: str) -> List[Dict[str, Any]]:
