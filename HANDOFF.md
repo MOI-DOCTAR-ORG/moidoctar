@@ -46,10 +46,84 @@ examples — that would tighten the AI's Pidgin further beyond just "the AI figu
 instruction."
 
 ## 3. "Drop" notifications (real delivery, not just a static feed)
-Status: TODO
+Status: DONE
+
+`GET /user/notifications` only ever returned whatever was baked into a user's record at
+signup (one "Welcome to MoiDoctar!" line, sometimes two) — nothing in the app ever added
+to it afterwards. Worse, for **Supabase-backed accounts it silently returned nothing at
+all**: it read `notifications` off the `users` row, which has no such column — the real
+`public.notifications` table already in `schema.sql` was never touched anywhere in the
+code.
+
+- Added `backend/app/services/notification_service.py` — the one place that creates,
+  lists, and updates notifications. Uses the `public.notifications` Supabase table when
+  configured (insert/select/update/delete), or the same local in-memory user store
+  `auth_service` already falls back to otherwise (added `find_local_user_record_by_id`
+  to `auth_service.py` so both modules share one store instead of drifting). All writes
+  are best-effort — a notification failing to save never breaks the event that
+  triggered it, it just logs and moves on, same resilience pattern as the rest of this
+  backend's Supabase-with-local-fallback code.
+- Wired real triggers: `triage_service.save_triage_session` now creates one notification
+  per *new* triage session (not on every follow-up chat turn that updates the same
+  session — those return early before reaching the new code), with the message and
+  urgency framing pulled from the actual assessment (flags urgent ones distinctly from
+  routine ones). `POST /medication/create` now creates a "Reminder set: …" notification
+  with the real medication name/dosage/time.
+- `GET /user/notifications` now calls `list_notifications()` instead of reading the
+  (often-empty) field off the user record — this alone fixes it for every Supabase
+  account. Added `POST /user/notifications/read` (mark all read) and
+  `DELETE /user/notifications/{id}` (dismiss), both persisted now instead of only
+  mutating React state that reset on refresh.
+- Frontend (`src/pages/Notifications.tsx`): backend items now carry their real `id` and
+  `read` state from the server (previously hardcoded to `read: true` for every backend
+  item, and a synthetic timestamp-based id that `dismiss`/mark-read couldn't actually
+  target). `dismiss()` and `markAllRead()` now call the new endpoints in the background
+  after their existing optimistic local-state update, so the UI still feels instant but
+  the change now survives a refresh or a different device.
+- Not in scope for this pass: push/SMS/email delivery of these (they're in-app feed
+  items only, same as before) — "real delivery" here means real, persisted, per-event
+  records instead of a static seed. Worth doing later if you want actual push notifications.
+- Not verified end-to-end: same caveat as the Nearby Care pass — no network access in
+  this session to run the backend test suite or the frontend build. Please run
+  `pytest backend/tests` and `pnpm run build` before trusting this in production.
 
 ## 4. Location data (Nearby Care)
-Status: TODO — currently 100% hardcoded sample data, geolocation coords are captured but never used.
+Status: DONE
+
+`src/pages/LocalCareDiscovery.tsx` was showing the same six hardcoded facilities to
+everyone; `navigator.geolocation` coords were captured into `userLocation` but nothing
+ever read that state.
+
+- Added `fetchNearbyFacilities(lat, lng)`, which queries the OpenStreetMap Overpass API
+  (no key required — two mirror endpoints, `overpass-api.de` then `overpass.kumi.systems`,
+  tried in order) for hospitals/clinics/pharmacies/doctors within 6 km, computes real
+  distance via haversine, and sorts nearest-first. This runs automatically once
+  `getCurrentPosition` succeeds.
+- Mapped OSM tags to the existing `Facility` shape: `amenity`/`healthcare` tags decide
+  `type`; `addr:*` tags build the address; `phone`/`contact:phone` for the phone number.
+  OSM has no rating data and `opening_hours` is too free-form to parse reliably, so
+  `rating`/`openNow` are now `number | null` / `boolean | null` — the UI just omits those
+  chips when the data isn't there rather than showing a fake value (`openNow` only
+  resolves `true` for the unambiguous `24/7` case, `null` otherwise).
+- `dataProvenance` simplified from three states to two: `current` (live OSM result) and
+  `prototype` (the original hardcoded array, now only used as a fallback — relabeled
+  "Sample Data" so it doesn't look like a real recommendation). Falls back to it when
+  geolocation is denied/unavailable, Overpass returns nothing, or every mirror fails —
+  each case sets a matching `locationError` message.
+- Added a loading skeleton (reusing `SkeletonLine` from `src/components/Skeleton.tsx`)
+  while the Overpass request is in flight, and a small disclaimer under the provenance
+  legend when live data is showing, since OSM completeness varies by area.
+- Also fixed the underlying deploy failure blocking every push to this branch: pnpm was
+  aborting with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` on Pxxl's non-interactive
+  build server. Added a root `pxxl.toml` (matching the pattern already used in
+  `backend/pxxl.toml`) with `install_command = "CI=true pnpm install --frozen-lockfile"`,
+  which is exactly the fix pnpm's own error message suggests.
+- Not verified end-to-end: no network access in this session to `pnpm install` and run
+  `tsc -b` / `vite build`, so this pass is a careful manual read-through, not a build-
+  verified one. **Please run `pnpm install && pnpm run build` before trusting this in
+  production**, and watch Overpass's public rate limit if this gets real traffic (it's a
+  shared free service — fine for a demo, but a paid geocoding/places API would be the
+  next step for a production-scale version).
 
 ## 5. Google Auth — manual setup needed
 Status: TODO — code is fully wired, just needs credentials. Instructions will go here.

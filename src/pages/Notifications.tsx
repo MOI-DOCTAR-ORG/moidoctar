@@ -5,7 +5,7 @@ import Icon from '../components/Icon'
 import { api } from '../services/api'
 
 interface Notification {
-  id: number
+  id: string | number
   category: string
   barClass: string
   icon: string
@@ -60,13 +60,15 @@ export default function Notifications() {
 
   const [notifications, setNotifications] = useState<Notification[]>(buildLocalNotifications)
 
-  // Fetch backend notifications and prepend them
+  // Fetch real, persisted notifications (triage results, medication reminders,
+  // etc. — created server-side as those events actually happen) and prepend
+  // them to the locally-derived ones above.
   useEffect(() => {
-    api.get<{ msg: string; data: { message: string; date: string }[] }>('/user/notifications')
+    api.get<{ msg: string; data: { id: string; message: string; date: string; read: boolean }[] }>('/user/notifications')
       .then(res => {
         if (!res.data?.length) return
-        const backendItems: Notification[] = res.data.map((n, i) => ({
-          id: Date.now() + 1000 + i,
+        const backendItems: Notification[] = res.data.map((n) => ({
+          id: n.id,
           category: 'System',
           barClass: 'bg-tertiary',
           icon: 'notifications',
@@ -75,7 +77,7 @@ export default function Notifications() {
           title: n.message,
           time: new Date(n.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           body: '',
-          read: true,
+          read: n.read,
         }))
         setNotifications(prev => [...backendItems, ...prev])
       })
@@ -84,12 +86,16 @@ export default function Notifications() {
 
   const [activeTab, setActiveTab] = useState('All')
 
-  const dismiss = (id: number) => {
+  const dismiss = (id: string | number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id))
+    if (typeof id === 'string') {
+      api.delete(`/user/notifications/${id}`).catch(() => {/* optimistic — local removal already happened */})
+    }
   }
 
   const markAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    api.post('/user/notifications/read').catch(() => {/* optimistic — local state already updated */})
   }
 
   const filteredNotifications = activeTab === 'All'

@@ -323,6 +323,18 @@ def authenticate_google(access_token: str, token_type: str = "id_token") -> Dict
     return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
 
 
+def find_local_user_record_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    """Return the raw (unformatted) local in-memory user record matching
+    `user_id`, or None. Used by services outside auth_service (e.g.
+    notification_service) that need to read/mutate the same local fallback
+    store — there's only one local user store in the app, so we share it
+    instead of each service keeping its own copy."""
+    for u in _local_users.values():
+        if str(u.get("id")) == str(user_id):
+            return u
+    return None
+
+
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     supabase = get_supabase_client()
     if supabase:

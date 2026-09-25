@@ -4,6 +4,7 @@ from app.schemas.user import UserUpdate, UserProfileResponse
 from app.schemas.auth import ForgotPasswordRequest
 from app.services.auth_service import update_user_profile, delete_user_account, reset_user_password
 from app.services.otp_service import verify_otp
+from app.services.notification_service import list_notifications, mark_all_read, dismiss_notification
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -30,8 +31,20 @@ def update_profile(
 def get_notifications(current_user: Dict[str, Any] = Depends(get_current_user)):
     return {
         "msg": "Notifications retrieved",
-        "data": current_user.get("notifications") or [],
+        "data": list_notifications(current_user["_id"]),
     }
+
+
+@router.post("/notifications/read")
+def read_all_notifications(current_user: Dict[str, Any] = Depends(get_current_user)):
+    mark_all_read(current_user["_id"])
+    return {"msg": "Notifications marked as read"}
+
+
+@router.delete("/notifications/{notification_id}")
+def remove_notification(notification_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    dismiss_notification(current_user["_id"], notification_id)
+    return {"msg": "Notification dismissed"}
 
 
 @router.post("/forgotPassword")

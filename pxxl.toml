@@ -1,0 +1,2 @@
+install_command = "CI=true pnpm install --frozen-lockfile"
+build_command = "pnpm run build"
