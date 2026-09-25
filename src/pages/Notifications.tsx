@@ -50,7 +50,7 @@ export default function Notifications() {
         iconColor: 'text-primary',
         title: 'Welcome to MoiDoctar',
         time: 'Just now',
-        body: 'Start a triage session to log your symptoms and get AI-powered health guidance.',
+        body: 'Start a triage session to log your symptoms and get guidance from Liana.',
         actions: [{ label: 'Start Triage', primary: true, to: '/new-triage' }],
         read: false,
       })

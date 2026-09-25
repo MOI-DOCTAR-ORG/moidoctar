@@ -6,7 +6,7 @@ import { APP_NAME } from '../lib/constants'
 const features = [
   {
     icon: 'medical_services',
-    title: 'AI symptom triage',
+    title: 'Symptom triage',
     body: 'Describe how you feel in your own words and get an urgency level, possible causes, and clear next steps in seconds.',
   },
   {
@@ -66,8 +66,8 @@ export default function Landing() {
         {/* Hero */}
         <section className="mx-auto flex max-w-[1200px] flex-col items-center gap-8 px-5 pb-16 pt-10 text-center md:px-8 md:pb-24 md:pt-16">
           <span className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-primary-container/30 px-4 py-1.5 font-caption text-caption text-primary">
-            <Icon icon="bolt" size="sm" aria-hidden="true" />
-            AI-powered health triage
+            <Icon icon="health_and_safety" size="sm" aria-hidden="true" />
+            Clear, human triage guidance
           </span>
 
           <h1 className="max-w-3xl font-headline-xl text-4xl font-extrabold leading-tight text-on-background md:text-[56px] md:leading-[1.05]">

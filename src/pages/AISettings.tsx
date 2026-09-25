@@ -317,12 +317,12 @@ export default function AISettings() {
   ]
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="font-headline-md text-2xl font-semibold text-on-surface">AI settings</h1>
+      <h1 className="font-headline-md text-2xl font-semibold text-on-surface">Assistant settings</h1>
       <p className="mt-1 text-sm text-on-surface-variant">Choose how Liana talks to you and review what she remembers.</p>
       {status && !status.ai_enabled && (
         <p className="mt-4 flex items-start gap-2 rounded-xl bg-warning-container px-4 py-3 text-sm text-on-warning-container">
           <Icon icon="info" size="md" className="mt-0.5 shrink-0" />
-          No working AI key right now, so triage uses a basic safety check. Add a key under “API keys” (admins only).
+          Liana's online assessment isn't reachable right now, so triage uses a basic safety check. Add a key under “API keys” (admins only).
         </p>
       )}
       <div role="tablist" className="no-scrollbar mt-6 flex gap-1 overflow-x-auto border-b border-outline-variant">

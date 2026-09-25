@@ -40,7 +40,7 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
             </div>
             <div>
               <h2 className="font-headline-md text-headline-md text-on-surface font-bold">Welcome to MoiDoctar</h2>
-              <p className="text-caption text-secondary">AI-Powered Health Triage</p>
+              <p className="text-caption text-secondary">Guided health triage</p>
             </div>
           </div>
 

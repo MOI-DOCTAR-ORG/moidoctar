@@ -147,7 +147,7 @@ export default function SymptomTracker() {
 
         <section onClick={() => navigate('/symptom-tracker-body-map')} className="lg:col-span-12 relative h-56 rounded-[16px] overflow-hidden group cursor-pointer bg-surface border border-outline-variant">
           <img
-            alt="AI Health Analysis"
+            alt="Health analysis illustration"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKXdX56RArmULZK_NoQ0L99HNEH3Smr4pCogZr1zloxe29vQZoB26L8Iu78idg7ZwHHUDKRyrKxSMcQWXPY2GAyGcUU_L5ikTUELOgPKOWXEE9Tb7l9pndYlQwpmnKXA5JJdpiAQwriLBBeAT0YoPgHW3irIWbiaGoOPswqOnYqvrc4_ts2NWwIzdymky9Sr03DYK7taoPrRNvjZihhWh501vmdR2fLafOADCKSzevfmE2SFGH3N4vyy5sxGrLAqa6CZyr0Qwj3n4"
           />
@@ -158,9 +158,9 @@ export default function SymptomTracker() {
                   <Icon icon="psychology" size="xl" className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-headline-md text-headline-md mb-2 text-on-surface">AI Health Insights</h3>
+                  <h3 className="font-headline-md text-headline-md mb-2 text-on-surface">Health insights</h3>
                   <p className="font-body-md text-on-surface-variant leading-7">
-                    Start logging your symptoms to unlock AI-powered health insights and trends.
+                    Start logging your symptoms to see patterns and trends over time.
                   </p>
                 </div>
               </div>

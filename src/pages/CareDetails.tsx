@@ -166,7 +166,7 @@ export default function CareDetails() {
             </div>
             {reports.length === 0 ? (
               <div className="space-y-4 text-on-surface-variant leading-relaxed font-body-md">
-                <p>No symptoms have been reported yet. Use the form above to log your symptoms and get AI-powered guidance.</p>
+                <p>No symptoms have been reported yet. Use the form above to log your symptoms and get guidance from Liana.</p>
                 <div className="p-4 bg-primary/5 border-l-4 border-primary rounded-r-lg">
                   <p className="text-label-md font-label-md text-primary mb-1">Key Insight</p>
                   <p className="text-body-md">Complete a symptom assessment to unlock personalized health insights.</p>
@@ -212,7 +212,7 @@ r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKXdX56RArmULZK_NoQ0L99HNEH3Smr4pCogZr1zloxe29vQZoB26L8Iu78idg7ZwHHUDKRyrKxSMcQWXPY2GAyGcUU_L5ikTUELOgPKOWXEE9Tb7l9pndYlQwpmnKXA5JJdpiAQwriLBBeAT0YoPgHW3irIWbiaGoOPswqOnYqvrc4_ts2NWwIzdymky9Sr03DYK7taoPrRNvjZihhWh501vmdR2fLafOADCKSzevfmE2SFGH3N4vyy5sxGrLAqa6CZyr0Qwj3n4"
             />
             <div className="absolute inset-0 bg-black/50 flex items-end p-6">
-              <p className="text-white font-label-md">Your care details and AI triage insights will appear here.</p>
+              <p className="text-white font-label-md">Your care details and triage history will appear here.</p>
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@ r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-
             </div>
             <ul className="space-y-6">
               {[
-                'Log your symptoms in the <strong class="text-primary">report form</strong> above to get AI-powered guidance.',
+                'Log your symptoms in the <strong class="text-primary">report form</strong> above to get guidance from Liana.',
                 'Use the <strong>Symptom Tracker</strong> to monitor and record your health daily.',
                 'Set up medication reminders and track your prescriptions.',
                 'Review your <strong>Medical History</strong> and update your conditions.',
@@ -257,7 +257,7 @@ r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-
           </div>
           <div>
             <h4 className="font-label-md text-label-md">Medical Disclaimer</h4>
-            <p className="text-caption text-secondary">This analysis is AI-driven and for informational purposes only. In case of emergency, call local medical services immediately.</p>
+            <p className="text-caption text-secondary">This is triage guidance, not a medical diagnosis. In case of emergency, call local medical services immediately.</p>
           </div>
         </div>
         <button onClick={() => navigate('/new-triage')} className="w-full md:w-auto px-10 py-4 bg-primary text-on-primary rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-all transform active:scale-95 min-h-[44px]">

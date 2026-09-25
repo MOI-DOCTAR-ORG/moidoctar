@@ -89,8 +89,9 @@ def test_bad_model_does_not_burn_key(monkeypatch):
 
 def _ai_payload(level, **extra):
     base = {"reply": "Thanks, I noted that.", "urgency_level": level, "confidence_score": 0.8, "needs_more_info": False,
-            "rationale": "because", "possible_conditions": ["a", "b"], "recommended_actions": ["x", "y"],
-            "follow_up_questions": [], "red_flags_to_watch": ["z"], "memory_updates": {}}
+            "rationale": "because", "possible_conditions": ["a", "b"],
+            "care_plan": {"immediate_relief": ["x"], "food_and_water": ["y"], "when_to_hospital": ["z"]},
+            "follow_up_questions": [], "memory_updates": {}}
     base.update(extra)
     return base
 

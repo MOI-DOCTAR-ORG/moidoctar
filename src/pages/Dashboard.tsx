@@ -61,7 +61,7 @@ export default function Dashboard() {
         <div className="relative z-10 max-w-md">
           <div className="inline-flex items-center gap-2 bg-surface/70 rounded-full px-4 py-1.5 mb-4 border border-primary/20">
             <Icon icon="verified_user" size="sm" />
-            <span className="text-sm font-medium tracking-wide">AI-Powered Assessment</span>
+            <span className="text-sm font-medium tracking-wide">Guided by Liana</span>
           </div>
           <h3 className="font-headline-lg-mobile text-headline-lg-mobile md:text-headline-lg mb-2 md:mb-3">Feeling unwell?</h3>
           <p className="font-body-md text-body-md text-on-primary-fixed-variant mb-4 md:mb-6 opacity-90 leading-relaxed">
