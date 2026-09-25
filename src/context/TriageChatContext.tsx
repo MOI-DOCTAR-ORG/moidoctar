@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { useCreateTriageChat } from '../hooks/useMoiDoctor'
 import { buildAiContext } from '../lib/aiContext'
 import { useBodyMap } from './BodyMapContext'
+import { useAuth } from './AuthContext'
 import { scopeKey } from '../utils/storage'
 import type { TriageChatResponse } from '../types/triage'
 
@@ -102,6 +103,7 @@ const TriageChatCtx = createContext<TriageChatApi | null>(null)
 export function TriageChatProvider({ children }: { children: ReactNode }) {
   const chat = useCreateTriageChat()
   const { selectedAreas } = useBodyMap()
+  const { userChangeKey } = useAuth()
   const draftRef = useRef<Draft | null>(null)
   if (draftRef.current === null) draftRef.current = loadDraft()
   const initialDraft = draftRef.current
@@ -114,6 +116,25 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
   const [image, setImage] = useState<File | null>(null)
   const sessionIdRef = useRef(initialDraft?.sessionId ?? newSessionId())
   const lastSent = useRef<{ history: ChatMsg[]; image: File | null } | null>(null)
+  const prevUserChangeKey = useRef(userChangeKey)
+
+  // This provider lives above the router (so a page change doesn't wipe the chat), but that also
+  // means it survives sign-out/sign-in on a shared device. `userChangeKey` (from AuthContext) bumps
+  // on every login/logout/account switch — when it does, drop the in-memory state and re-load
+  // whatever draft belongs to the *new* scoped storage key, so one account's conversation can never
+  // bleed into another's.
+  useEffect(() => {
+    if (userChangeKey === prevUserChangeKey.current) return
+    prevUserChangeKey.current = userChangeKey
+    const draft = loadDraft()
+    sessionIdRef.current = draft?.sessionId ?? newSessionId()
+    setMessages(draft?.messages ?? [{ id: nextId(), role: 'ai', time: nowLabel(), text: greetingFor(selectedAreas.map((a) => a.label.toLowerCase())) }])
+    setSeverityState(draft?.severity ?? null)
+    setError(null)
+    setImage(null)
+    lastSent.current = null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userChangeKey])
 
   // Persist on every change so a refresh (or a route change) resumes the same conversation.
   useEffect(() => {
