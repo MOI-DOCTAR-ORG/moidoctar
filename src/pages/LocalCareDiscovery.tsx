@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
+import { SkeletonLine } from '../components/Skeleton'
 
 interface Facility {
   id: string
@@ -10,86 +11,156 @@ interface Facility {
   address: string
   phone: string
   distance: string
-  rating: number
-  openNow: boolean
-  dataProvenance: 'current' | 'verified' | 'prototype'
+  distanceKm: number
+  rating: number | null
+  openNow: boolean | null
+  dataProvenance: 'current' | 'prototype'
   specialties?: string[]
 }
 
+// Fallback demo data — only shown when we don't have (or couldn't use) the
+// user's real location, so it's always labeled clearly as sample data rather
+// than presented as if it were nearby.
 const sampleFacilities: Facility[] = [
   {
-    id: '1',
-    name: 'General Hospital',
-    type: 'hospital',
-    address: '123 Medical Center Drive',
-    phone: '+1-555-0100',
-    distance: '0.8 mi',
-    rating: 4.5,
-    openNow: true,
-    dataProvenance: 'verified',
-    specialties: ['Emergency', 'Cardiology', 'Neurology', 'Orthopedics'],
+    id: 'sample-1', name: 'General Hospital', type: 'hospital', address: '123 Medical Center Drive',
+    phone: '+1-555-0100', distance: '0.8 mi', distanceKm: 1.3, rating: 4.5, openNow: true,
+    dataProvenance: 'prototype', specialties: ['Emergency', 'Cardiology', 'Neurology', 'Orthopedics'],
   },
   {
-    id: '2',
-    name: 'City Health Clinic',
-    type: 'clinic',
-    address: '456 Health Avenue',
-    phone: '+1-555-0200',
-    distance: '1.2 mi',
-    rating: 4.2,
-    openNow: true,
-    dataProvenance: 'current',
-    specialties: ['General Practice', 'Pediatrics', 'Dermatology'],
+    id: 'sample-2', name: 'City Health Clinic', type: 'clinic', address: '456 Health Avenue',
+    phone: '+1-555-0200', distance: '1.2 mi', distanceKm: 1.9, rating: 4.2, openNow: true,
+    dataProvenance: 'prototype', specialties: ['General Practice', 'Pediatrics', 'Dermatology'],
   },
   {
-    id: '3',
-    name: '24/7 Emergency Center',
-    type: 'emergency',
-    address: '789 Emergency Lane',
-    phone: '+1-555-0911',
-    distance: '1.5 mi',
-    rating: 4.8,
-    openNow: true,
-    dataProvenance: 'verified',
-    specialties: ['Emergency', 'Trauma', 'Critical Care'],
+    id: 'sample-3', name: '24/7 Emergency Center', type: 'emergency', address: '789 Emergency Lane',
+    phone: '+1-555-0911', distance: '1.5 mi', distanceKm: 2.4, rating: 4.8, openNow: true,
+    dataProvenance: 'prototype', specialties: ['Emergency', 'Trauma', 'Critical Care'],
   },
   {
-    id: '4',
-    name: 'MedPlus Pharmacy',
-    type: 'pharmacy',
-    address: '321 Wellness Street',
-    phone: '+1-555-0300',
-    distance: '0.3 mi',
-    rating: 4.0,
-    openNow: true,
-    dataProvenance: 'current',
-    specialties: ['Prescription', 'OTC Medications', 'Vaccinations'],
+    id: 'sample-4', name: 'MedPlus Pharmacy', type: 'pharmacy', address: '321 Wellness Street',
+    phone: '+1-555-0300', distance: '0.3 mi', distanceKm: 0.5, rating: 4.0, openNow: true,
+    dataProvenance: 'prototype', specialties: ['Prescription', 'OTC Medications', 'Vaccinations'],
   },
   {
-    id: '5',
-    name: 'Community Health Center',
-    type: 'clinic',
-    address: '555 Community Road',
-    phone: '+1-555-0400',
-    distance: '2.1 mi',
-    rating: 4.3,
-    openNow: false,
-    dataProvenance: 'prototype',
-    specialties: ['General Practice', 'Mental Health', 'Laboratory'],
+    id: 'sample-5', name: 'Community Health Center', type: 'clinic', address: '555 Community Road',
+    phone: '+1-555-0400', distance: '2.1 mi', distanceKm: 3.4, rating: 4.3, openNow: false,
+    dataProvenance: 'prototype', specialties: ['General Practice', 'Mental Health', 'Laboratory'],
   },
   {
-    id: '6',
-    name: 'PharmaCare Drugstore',
-    type: 'pharmacy',
-    address: '888 Medicine Boulevard',
-    phone: '+1-555-0500',
-    distance: '0.7 mi',
-    rating: 4.1,
-    openNow: true,
-    dataProvenance: 'current',
-    specialties: ['Prescription', 'Health Supplements', 'Medical Devices'],
+    id: 'sample-6', name: 'PharmaCare Drugstore', type: 'pharmacy', address: '888 Medicine Boulevard',
+    phone: '+1-555-0500', distance: '0.7 mi', distanceKm: 1.1, rating: 4.1, openNow: true,
+    dataProvenance: 'prototype', specialties: ['Prescription', 'Health Supplements', 'Medical Devices'],
   },
 ]
+
+// --- Live lookup via OpenStreetMap Overpass (no API key required) ---
+
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+]
+const SEARCH_RADIUS_METERS = 6000
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+function classifyType(tags: Record<string, string>): Facility['type'] {
+  if (tags.emergency === 'yes' || tags.healthcare === 'emergency') return 'emergency'
+  if (tags.amenity === 'pharmacy') return 'pharmacy'
+  if (tags.amenity === 'hospital' || tags.healthcare === 'hospital') return 'hospital'
+  return 'clinic'
+}
+
+function formatAddress(tags: Record<string, string>): string {
+  const parts = [
+    tags['addr:housenumber'] && tags['addr:street']
+      ? `${tags['addr:housenumber']} ${tags['addr:street']}`
+      : tags['addr:street'],
+    tags['addr:city'] || tags['addr:suburb'],
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(', ') : 'Address not listed'
+}
+
+// OSM opening_hours can be arbitrarily complex; we only confidently detect
+// the common "always open" case and otherwise say "unknown" rather than guess.
+function detectOpenNow(openingHours: string | undefined): boolean | null {
+  if (!openingHours) return null
+  if (openingHours.trim() === '24/7') return true
+  return null
+}
+
+interface OverpassElement {
+  id: number
+  type: 'node' | 'way' | 'relation'
+  lat?: number
+  lon?: number
+  center?: { lat: number; lon: number }
+  tags?: Record<string, string>
+}
+
+async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility[]> {
+  const query = `
+    [out:json][timeout:20];
+    (
+      node["amenity"~"^(hospital|clinic|pharmacy|doctors)$"](around:${SEARCH_RADIUS_METERS},${lat},${lng});
+      way["amenity"~"^(hospital|clinic|pharmacy|doctors)$"](around:${SEARCH_RADIUS_METERS},${lat},${lng});
+      node["healthcare"~"^(hospital|clinic|pharmacy|doctor)$"](around:${SEARCH_RADIUS_METERS},${lat},${lng});
+    );
+    out center tags;
+  `.trim()
+
+  let lastError: unknown = null
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: query,
+      })
+      if (!res.ok) throw new Error(`Overpass responded ${res.status}`)
+      const data = (await res.json()) as { elements: OverpassElement[] }
+
+      const facilities: Facility[] = data.elements
+        .filter((el) => el.tags?.name)
+        .map((el) => {
+          const tags = el.tags as Record<string, string>
+          const elLat = el.lat ?? el.center?.lat
+          const elLon = el.lon ?? el.center?.lon
+          const distanceKm = elLat != null && elLon != null ? haversineKm(lat, lng, elLat, elLon) : Infinity
+          const phone = tags.phone || tags['contact:phone'] || ''
+          return {
+            id: `osm-${el.type}-${el.id}`,
+            name: tags.name,
+            type: classifyType(tags),
+            address: formatAddress(tags),
+            phone,
+            distance: distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`,
+            distanceKm,
+            rating: null,
+            openNow: detectOpenNow(tags.opening_hours),
+            dataProvenance: 'current' as const,
+            specialties: tags.healthcare_speciality ? tags.healthcare_speciality.split(';') : undefined,
+          }
+        })
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, 24)
+
+      return facilities
+    } catch (err) {
+      lastError = err
+      continue // try the next mirror
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Failed to reach facility lookup service')
+}
 
 const facilityTypeConfig = {
   hospital: { icon: 'local_hospital', color: 'text-primary', bg: 'bg-primary/15', border: 'border-primary/20', label: 'Hospital' },
@@ -99,31 +170,54 @@ const facilityTypeConfig = {
 }
 
 const provenanceLabels = {
-  current: { text: 'Current', color: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/20' },
-  verified: { text: 'Verified', color: 'bg-primary/15 text-primary border-primary/20' },
-  prototype: { text: 'Prototype Data', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  current: { text: 'Live (OpenStreetMap)', color: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/20' },
+  prototype: { text: 'Sample Data', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20' },
 }
 
 export default function LocalCareDiscovery() {
   const navigate = useNavigate()
   const { addSession } = useAuth()
-  const [facilities] = useState<Facility[]>(sampleFacilities)
+  const [facilities, setFacilities] = useState<Facility[]>(sampleFacilities)
   const [filter, setFilter] = useState<'all' | 'hospital' | 'clinic' | 'pharmacy' | 'emergency'>('all')
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationError, setLocationError] = useState('')
+  const [isLoadingFacilities, setIsLoadingFacilities] = useState(false)
+
+  const loadNearby = useCallback((lat: number, lng: number) => {
+    setIsLoadingFacilities(true)
+    setLocationError('')
+    fetchNearbyFacilities(lat, lng)
+      .then((results) => {
+        if (results.length === 0) {
+          setLocationError('No listed facilities found nearby. Showing sample facilities instead.')
+          setFacilities(sampleFacilities)
+        } else {
+          setFacilities(results)
+        }
+      })
+      .catch(() => {
+        setLocationError('Could not reach the facility lookup service. Showing sample facilities.')
+        setFacilities(sampleFacilities)
+      })
+      .finally(() => setIsLoadingFacilities(false))
+  }, [])
 
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude })
+          const { latitude, longitude } = position.coords
+          setUserLocation({ lat: latitude, lng: longitude })
+          loadNearby(latitude, longitude)
         },
         () => {
           setLocationError('Location access denied. Showing sample facilities.')
         }
       )
+    } else {
+      setLocationError('Location is not available on this device. Showing sample facilities.')
     }
-  }, [])
+  }, [loadNearby])
 
   const filtered = filter === 'all' ? facilities : facilities.filter(f => f.type === filter)
 
@@ -164,6 +258,13 @@ export default function LocalCareDiscovery() {
         ))}
       </div>
 
+      {facilities[0]?.dataProvenance === 'current' && (
+        <p className="mb-4 text-caption text-secondary">
+          Listings from OpenStreetMap contributors — details like phone number, hours, and
+          rating may be incomplete or out of date. Always call ahead to confirm.
+        </p>
+      )}
+
       {/* Filter Tabs */}
       <div className="mb-6 flex flex-wrap gap-2">
         {(['all', 'hospital', 'clinic', 'pharmacy', 'emergency'] as const).map((type) => {
@@ -186,8 +287,19 @@ export default function LocalCareDiscovery() {
       </div>
 
       {/* Facility List */}
+      {isLoadingFacilities && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="bg-surface rounded-2xl border border-outline-variant p-5 space-y-3">
+              <SkeletonLine w="w-2/3" h="h-4" />
+              <SkeletonLine w="w-1/2" />
+              <SkeletonLine w="w-full" />
+            </div>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map((facility) => {
+        {!isLoadingFacilities && filtered.map((facility) => {
           const typeConfig = facilityTypeConfig[facility.type]
           const provLabel = provenanceLabels[facility.dataProvenance]
           return (
@@ -215,14 +327,18 @@ export default function LocalCareDiscovery() {
                   <Icon icon="near_me" size="sm" className="text-primary" />
                   {facility.distance}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Icon icon="star" size="sm" className="text-amber-400" />
-                  {facility.rating}
-                </span>
-                <span className={`flex items-center gap-1 ${facility.openNow ? 'text-green-500' : 'text-red-500'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${facility.openNow ? 'bg-green-500' : 'bg-red-500'}`} />
-                  {facility.openNow ? 'Open Now' : 'Closed'}
-                </span>
+                {facility.rating != null && (
+                  <span className="flex items-center gap-1">
+                    <Icon icon="star" size="sm" className="text-amber-400" />
+                    {facility.rating}
+                  </span>
+                )}
+                {facility.openNow != null && (
+                  <span className={`flex items-center gap-1 ${facility.openNow ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${facility.openNow ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {facility.openNow ? 'Open Now' : 'Closed'}
+                  </span>
+                )}
               </div>
 
               {facility.specialties && facility.specialties.length > 0 && (
@@ -236,13 +352,20 @@ export default function LocalCareDiscovery() {
               )}
 
               <div className="flex gap-2">
-                <a
-                  href={`tel:${facility.phone}`}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary font-label-md text-label-md font-bold hover:bg-primary/15 transition-all min-h-[44px]"
-                >
-                  <Icon icon="call" size="sm" />
-                  Call
-                </a>
+                {facility.phone ? (
+                  <a
+                    href={`tel:${facility.phone}`}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary font-label-md text-label-md font-bold hover:bg-primary/15 transition-all min-h-[44px]"
+                  >
+                    <Icon icon="call" size="sm" />
+                    Call
+                  </a>
+                ) : (
+                  <span className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-outline-variant rounded-xl text-secondary/60 font-label-md text-label-md min-h-[44px] cursor-not-allowed">
+                    <Icon icon="call" size="sm" />
+                    No number listed
+                  </span>
+                )}
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facility.address)}`}
                   target="_blank"

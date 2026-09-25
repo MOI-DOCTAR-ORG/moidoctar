@@ -49,7 +49,42 @@ instruction."
 Status: TODO
 
 ## 4. Location data (Nearby Care)
-Status: TODO — currently 100% hardcoded sample data, geolocation coords are captured but never used.
+Status: DONE
+
+`src/pages/LocalCareDiscovery.tsx` was showing the same six hardcoded facilities to
+everyone; `navigator.geolocation` coords were captured into `userLocation` but nothing
+ever read that state.
+
+- Added `fetchNearbyFacilities(lat, lng)`, which queries the OpenStreetMap Overpass API
+  (no key required — two mirror endpoints, `overpass-api.de` then `overpass.kumi.systems`,
+  tried in order) for hospitals/clinics/pharmacies/doctors within 6 km, computes real
+  distance via haversine, and sorts nearest-first. This runs automatically once
+  `getCurrentPosition` succeeds.
+- Mapped OSM tags to the existing `Facility` shape: `amenity`/`healthcare` tags decide
+  `type`; `addr:*` tags build the address; `phone`/`contact:phone` for the phone number.
+  OSM has no rating data and `opening_hours` is too free-form to parse reliably, so
+  `rating`/`openNow` are now `number | null` / `boolean | null` — the UI just omits those
+  chips when the data isn't there rather than showing a fake value (`openNow` only
+  resolves `true` for the unambiguous `24/7` case, `null` otherwise).
+- `dataProvenance` simplified from three states to two: `current` (live OSM result) and
+  `prototype` (the original hardcoded array, now only used as a fallback — relabeled
+  "Sample Data" so it doesn't look like a real recommendation). Falls back to it when
+  geolocation is denied/unavailable, Overpass returns nothing, or every mirror fails —
+  each case sets a matching `locationError` message.
+- Added a loading skeleton (reusing `SkeletonLine` from `src/components/Skeleton.tsx`)
+  while the Overpass request is in flight, and a small disclaimer under the provenance
+  legend when live data is showing, since OSM completeness varies by area.
+- Also fixed the underlying deploy failure blocking every push to this branch: pnpm was
+  aborting with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` on Pxxl's non-interactive
+  build server. Added a root `pxxl.toml` (matching the pattern already used in
+  `backend/pxxl.toml`) with `install_command = "CI=true pnpm install --frozen-lockfile"`,
+  which is exactly the fix pnpm's own error message suggests.
+- Not verified end-to-end: no network access in this session to `pnpm install` and run
+  `tsc -b` / `vite build`, so this pass is a careful manual read-through, not a build-
+  verified one. **Please run `pnpm install && pnpm run build` before trusting this in
+  production**, and watch Overpass's public rate limit if this gets real traffic (it's a
+  shared free service — fine for a demo, but a paid geocoding/places API would be the
+  next step for a production-scale version).
 
 ## 5. Google Auth — manual setup needed
 Status: TODO — code is fully wired, just needs credentials. Instructions will go here.
