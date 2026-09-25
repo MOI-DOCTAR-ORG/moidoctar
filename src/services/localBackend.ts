@@ -133,6 +133,19 @@ export function generateTriageAssessment(symptoms: string): TriageChatResponse {
         'Acute Neurological Event',
         'Acute Systemic Reaction'
       ],
+      care_plan: {
+        immediate_relief: [
+          'Sit or lie down somewhere comfortable and stay calm',
+          'Loosen tight clothing while you wait for help',
+        ],
+        food_and_water: [
+          "Don't eat or drink anything until you've been seen",
+        ],
+        when_to_hospital: [
+          'Go now — call emergency services or get to the nearest emergency department',
+          "Don't drive yourself; have someone else take you or call an ambulance",
+        ],
+      },
       recommended_actions: [
         'Call emergency medical services (911 / 112) or go to the nearest emergency department immediately',
         'Do not drive yourself to the emergency facility',
@@ -149,7 +162,7 @@ export function generateTriageAssessment(symptoms: string): TriageChatResponse {
         'Loss of consciousness, syncope, or sudden extreme confusion',
         'Cyanosis (bluish tint around lips or fingernails)'
       ],
-      disclaimer: 'MoiDoctar provides AI triage guidance, not a medical diagnosis. In a life-threatening emergency, call 911 or emergency services immediately.'
+      disclaimer: 'MoiDoctar provides triage guidance, not a medical diagnosis. In a life-threatening emergency, call 911 or emergency services immediately.'
     }
   }
 
@@ -166,6 +179,20 @@ export function generateTriageAssessment(symptoms: string): TriageChatResponse {
         'Gastroenteritis / Acute GI Irritation',
         'Musculoskeletal Strain / Inflammation'
       ],
+      care_plan: {
+        immediate_relief: [
+          'Rest and avoid strenuous activity',
+          'Paracetamol at the pack dose can help with pain or fever',
+        ],
+        food_and_water: [
+          'Sip water or an oral rehydration drink often, small amounts if nauseous',
+          'Eat light, easy food if you have an appetite',
+        ],
+        when_to_hospital: [
+          "Go if a high fever doesn't ease after 2 days on medication",
+          "Go if you can't keep fluids down for several hours",
+        ],
+      },
       recommended_actions: [
         'Schedule a consultation with a primary healthcare provider or visit an urgent care center',
         'Maintain oral hydration with water and electrolyte-balanced fluids',
@@ -182,7 +209,7 @@ export function generateTriageAssessment(symptoms: string): TriageChatResponse {
         'Inability to tolerate liquids for more than 24 hours',
         'Severe stiff neck accompanied by light sensitivity'
       ],
-      disclaimer: 'MoiDoctar provides AI triage guidance, not a medical diagnosis. If symptoms rapidly deteriorate, seek urgent medical care.'
+      disclaimer: 'MoiDoctar provides triage guidance, not a medical diagnosis. If symptoms rapidly deteriorate, seek urgent medical care.'
     }
   }
 
@@ -198,6 +225,20 @@ export function generateTriageAssessment(symptoms: string): TriageChatResponse {
       'Mild Allergic Rhinitis',
       'Benign Stress / Fatigue Reaction'
     ],
+    care_plan: {
+      immediate_relief: [
+        'Rest and give your body time to recover',
+        'A warm compress or a simple pain reliever can help if needed',
+      ],
+      food_and_water: [
+        'Keep drinking water through the day',
+        "Eat normally as you're able to",
+      ],
+      when_to_hospital: [
+        'Go if symptoms get worse or last more than a week',
+        'Go if you develop a high fever, severe pain, or trouble breathing',
+      ],
+    },
     recommended_actions: [
       'Practice supportive self-care: adequate rest, warm fluids, and balanced nutrition',
       'Log any changes in symptoms over the next 48 to 72 hours',
@@ -211,7 +252,7 @@ export function generateTriageAssessment(symptoms: string): TriageChatResponse {
       'Onset of high fever, chills, or difficulty breathing',
       'Sudden development of sharp, localized pain'
     ],
-    disclaimer: 'MoiDoctar provides AI triage guidance, not a medical diagnosis. Consult a licensed physician for clinical decisions.'
+    disclaimer: 'MoiDoctar provides triage guidance, not a medical diagnosis. Consult a licensed physician for clinical decisions.'
   }
 }
 

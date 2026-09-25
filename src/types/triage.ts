@@ -21,6 +21,12 @@ export type TriageChatRequest = {
   image?: File | Blob
 }
 
+export type CarePlan = {
+  immediate_relief: string[]
+  food_and_water: string[]
+  when_to_hospital: string[]
+}
+
 export type TriageChatResponse = {
   assessment_id: string
   needs_more_info: boolean
@@ -28,6 +34,9 @@ export type TriageChatResponse = {
   confidence_score: number
   rationale: string
   possible_conditions: string[]
+  /** Locked 3-part care plan: immediate relief, food & water, when to go to hospital. */
+  care_plan?: CarePlan
+  /** Kept for older sessions: recommended_actions/red_flags_to_watch mirror care_plan. */
   recommended_actions: string[]
   follow_up_questions: string[]
   red_flags_to_watch: string[]

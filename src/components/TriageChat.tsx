@@ -28,7 +28,19 @@ const severityOptions: Severity[] = ['Mild', 'Moderate', 'Severe']
 function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; onAsk: (q: string) => void; severity: Severity | null }) {
   const navigate = useNavigate()
   const { addSession } = useAuth()
-  const pct = Math.round(Math.max(0, Math.min(1, result.confidence_score)) * 100)
+
+  // The care plan is the locked 3-part shape: immediate relief, food & water, when to go to hospital.
+  // Older sessions only have the flat recommended_actions/red_flags_to_watch fields, so fall back to those.
+  const carePlan = result.care_plan ?? {
+    immediate_relief: result.recommended_actions ?? [],
+    food_and_water: [],
+    when_to_hospital: result.red_flags_to_watch ?? [],
+  }
+  const planSections: { key: string; label: string; icon: string; items: string[] }[] = [
+    { key: 'immediate_relief', label: 'Immediate relief', icon: 'healing', items: carePlan.immediate_relief },
+    { key: 'food_and_water', label: 'Food & water', icon: 'water_drop', items: carePlan.food_and_water },
+    { key: 'when_to_hospital', label: 'When to go to hospital', icon: 'local_hospital', items: carePlan.when_to_hospital },
+  ]
 
   const saveAndOpen = () => {
     addSession({
@@ -76,7 +88,6 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
         <span className={`rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${urgencyStyle(result.urgency_level)}`}>
           {result.urgency_level}
         </span>
-        <span className="text-xs text-on-surface-variant" title="How sure the assistant is">{pct}% confidence</span>
       </div>
 
       {result.rationale && <p className="mt-3 text-on-surface-variant">{result.rationale}</p>}
@@ -92,30 +103,27 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
         </div>
       )}
 
-      {result.recommended_actions.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">What to do</p>
-          <ul className="mt-1.5 space-y-1.5">
-            {result.recommended_actions.map((a) => (
-              <li key={a} className="flex gap-2 text-on-surface">
-                <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
-                <span>{a}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {result.red_flags_to_watch.length > 0 && (
-        <div className="mt-3 rounded-lg border border-error/30 bg-error-container/50 p-3">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-on-error-container">
-            <Icon icon="warning" size="sm" /> Go to emergency care if
-          </p>
-          <ul className="mt-1.5 space-y-1 text-xs text-on-error-container">
-            {result.red_flags_to_watch.map((f) => <li key={f}>• {f}</li>)}
-          </ul>
-        </div>
-      )}
+      {/* Locked 3-part care plan: immediate relief, food & water, when to go to hospital. */}
+      <div className="mt-4 rounded-xl border border-outline-variant overflow-hidden divide-y divide-outline-variant">
+        <p className="bg-surface-container-low px-3 py-2 text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+          Your care plan
+        </p>
+        {planSections.map((section) => {
+          if (section.items.length === 0) return null
+          const isHospital = section.key === 'when_to_hospital'
+          return (
+            <div key={section.key} className={`p-3 ${isHospital ? 'bg-error-container/40' : ''}`}>
+              <p className={`flex items-center gap-1.5 text-xs font-semibold ${isHospital ? 'text-on-error-container' : 'text-on-surface'}`}>
+                <Icon icon={section.icon} size="sm" />
+                {section.label}
+              </p>
+              <ul className={`mt-1.5 space-y-1 text-xs ${isHospital ? 'text-on-error-container' : 'text-on-surface'}`}>
+                {section.items.map((item) => <li key={item}>• {item}</li>)}
+              </ul>
+            </div>
+          )
+        })}
+      </div>
 
       {result.follow_up_questions.length > 0 && !showAnswerBox && (
         <div className="mt-3">
@@ -251,7 +259,7 @@ function Bubble({ msg, severity, onAsk, isLatest }: { msg: ChatMsg; severity: Se
         {result && result.ai_source !== 'gemini' && (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs text-on-warning-container">
             <Icon icon="info" size="sm" className="mt-px shrink-0" />
-            {result.ai_notice || (result.ai_source === 'offline' ? 'Server not reachable, showing an offline safety check.' : 'AI is unavailable, showing a basic safety check.')}
+            {result.ai_notice || (result.ai_source === 'offline' ? "We can't reach the server right now, so here's an offline safety check." : "We couldn't reach Liana's online assessment, so here's a basic safety check.")}
           </p>
         )}
         {result?.memory_notes && result.memory_notes.length > 0 && (

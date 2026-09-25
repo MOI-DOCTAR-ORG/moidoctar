@@ -156,14 +156,14 @@ export default function SymptomTrackerBodyMap() {
 
         <section className="lg:col-span-12 relative h-48 rounded-[16px] overflow-hidden group cursor-pointer">
           <img
-            alt="AI Health Analysis"
+            alt="Health analysis illustration"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKXdX56RArmULZK_NoQ0L99HNEH3Smr4pCogZr1zloxe29vQZoB26L8Iu78idg7ZwHHUDKRyrKxSMcQWXPY2GAyGcUU_L5ikTUELOgPKOWXEE9Tb7l9pndYlQwpmnKXA5JJdpiAQwriLBBeAT0YoPgHW3irIWbiaGoOPswqOnYqvrc4_ts2NWwIzdymky9Sr03DYK7taoPrRNvjZihhWh501vmdR2fLafOADCKSzevfmE2SFGH3N4vyy5sxGrLAqa6CZyr0Qwj3n4"
           />
           <div className="absolute inset-0 bg-primary/80 flex items-center p-stack-lg">
             <div className="max-w-md text-white">
-              <h3 className="font-headline-md text-headline-md mb-2">AI Health Insights</h3>
-              <p className="font-body-md opacity-90">Start logging your symptoms to unlock AI-powered health insights and trends.</p>
+              <h3 className="font-headline-md text-headline-md mb-2">Health insights</h3>
+              <p className="font-body-md opacity-90">Start logging your symptoms to see patterns and trends over time.</p>
             </div>
           </div>
         </section>
