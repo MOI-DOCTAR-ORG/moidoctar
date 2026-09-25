@@ -12,6 +12,7 @@ import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import App from './App'
 import { queryClient } from './lib/queryClient'
+import { GOOGLE_CLIENT_ID } from './lib/constants'
 import '@fontsource-variable/quicksand/wght.css'
 import '@fontsource-variable/nunito-sans/wght.css'
 import './index.css'
@@ -38,7 +39,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'missing-client-id'}>
+        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || 'missing-client-id'}>
           <BrowserRouter>
             <ThemeProvider>
               <BodyMapProvider>
