@@ -7,6 +7,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import { BodyMapProvider } from './context/BodyMapContext'
+import { TriageChatProvider } from './context/TriageChatContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import App from './App'
@@ -43,8 +44,10 @@ createRoot(document.getElementById('root')!).render(
               <BodyMapProvider>
                 <AuthProvider>
                   <ToastProvider>
-                    <App />
-                    <ReactQueryDevtools initialIsOpen={false} />
+                    <TriageChatProvider>
+                      <App />
+                      <ReactQueryDevtools initialIsOpen={false} />
+                    </TriageChatProvider>
                   </ToastProvider>
                 </AuthProvider>
               </BodyMapProvider>
