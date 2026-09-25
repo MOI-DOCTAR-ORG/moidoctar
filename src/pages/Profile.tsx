@@ -6,6 +6,8 @@ import Icon from '../components/Icon'
 import { PremiumDateInput, PremiumSelect, premiumControlClass } from '../components/ui/PremiumFormControls'
 import { scopeKey } from '../utils/storage'
 import { api } from '../services/api'
+import { getPermissionState, requestLocationPermission, requestNotificationPermission, type PermissionResult } from '../utils/permissions'
+import { resetTourCompleted, REPLAY_TOUR_EVENT } from '../components/OnboardingTour'
 import {
   type PatientProfile,
   type Medication,
@@ -57,7 +59,37 @@ export default function Profile() {
     medical: true,
     emergency: true,
     appSpecific: true,
+    permissions: true,
   })
+
+  const [locationPerm, setLocationPerm] = useState<PermissionResult | 'prompt' | 'unknown' | 'requesting'>('unknown')
+  const [notificationPerm, setNotificationPerm] = useState<PermissionResult | 'prompt' | 'unknown' | 'requesting'>('unknown')
+
+  useEffect(() => {
+    let cancelled = false
+    getPermissionState('geolocation').then(s => { if (!cancelled) setLocationPerm(s) })
+    getPermissionState('notifications').then(s => { if (!cancelled) setNotificationPerm(s) })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleEnablePermissions = async () => {
+    setLocationPerm('requesting')
+    setNotificationPerm('requesting')
+    const [loc, notif] = await Promise.all([requestLocationPermission(), requestNotificationPermission()])
+    setLocationPerm(loc)
+    setNotificationPerm(notif)
+    if (loc === 'granted' || notif === 'granted') {
+      addToast('Permissions updated', 'success')
+    } else {
+      addToast('Permission requests were blocked — enable them in your browser\u2019s site settings.', 'error')
+    }
+  }
+
+  const handleReplayTour = () => {
+    resetTourCompleted()
+    navigate('/dashboard')
+    window.dispatchEvent(new Event(REPLAY_TOUR_EVENT))
+  }
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [passwordConfirmValue, setPasswordConfirmValue] = useState('')
@@ -651,6 +683,42 @@ export default function Profile() {
           </div>
         </SectionCard>
 
+        {/* Section: App Permissions & Tour */}
+        <SectionCard
+          title="App Permissions & Tour"
+          icon="verified_user"
+          isOpen={sectionsOpen.permissions}
+          onToggle={() => toggleSection('permissions')}
+          completed={locationPerm === 'granted' && notificationPerm === 'granted'}
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <PermissionRow icon="location_on" label="Location" status={locationPerm} note="Used by Nearby Care to find facilities close to you." />
+              <PermissionRow icon="notifications" label="Notifications" status={notificationPerm} note="Used for medication and triage reminders." />
+            </div>
+            <button
+              type="button"
+              onClick={handleEnablePermissions}
+              disabled={locationPerm === 'requesting'}
+              className="w-full sm:w-auto px-6 py-3 rounded-full bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
+            >
+              <Icon icon="location_on" size="md" />
+              Enable location & notifications
+            </button>
+            <div className="pt-2 border-t border-outline-variant">
+              <p className="text-caption text-secondary mb-2">Want a refresher on how MoiDoctar works?</p>
+              <button
+                type="button"
+                onClick={handleReplayTour}
+                className="px-5 py-2.5 rounded-full border border-outline-variant text-on-surface hover:bg-primary/5 transition-colors font-label-md text-label-md flex items-center gap-2 min-h-[40px]"
+              >
+                <Icon icon="restart_alt" size="md" />
+                Replay welcome tour
+              </button>
+            </div>
+          </div>
+        </SectionCard>
+
         {/* Save + Delete */}
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mt-4">
           <button
@@ -814,6 +882,47 @@ function SectionCard({
           {children}
         </div>
       )}
+    </div>
+  )
+}
+
+/* One row in the App Permissions section: icon, label, and a status badge. */
+function PermissionRow({
+  icon,
+  label,
+  status,
+  note,
+}: {
+  icon: string
+  label: string
+  status: 'granted' | 'denied' | 'unsupported' | 'prompt' | 'unknown' | 'requesting'
+  note: string
+}) {
+  const badge = (() => {
+    switch (status) {
+      case 'granted':
+        return { text: 'Enabled', className: 'bg-green-500/15 text-green-600 dark:text-green-400' }
+      case 'denied':
+        return { text: 'Blocked', className: 'bg-error/15 text-error' }
+      case 'unsupported':
+        return { text: 'Unavailable', className: 'bg-outline-variant/50 text-secondary' }
+      case 'requesting':
+        return { text: 'Requesting…', className: 'bg-primary/15 text-primary' }
+      default:
+        return { text: 'Not set', className: 'bg-outline-variant/50 text-secondary' }
+    }
+  })()
+
+  return (
+    <div className="flex items-start gap-3 bg-background rounded-xl border border-outline-variant px-4 py-3">
+      <Icon icon={icon} size="lg" className="text-primary mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-label-md text-label-md text-on-surface font-bold">{label}</p>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.className}`}>{badge.text}</span>
+        </div>
+        <p className="text-caption text-secondary mt-0.5">{note}</p>
+      </div>
     </div>
   )
 }
