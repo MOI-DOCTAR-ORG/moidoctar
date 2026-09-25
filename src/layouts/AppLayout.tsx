@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar'
 import MobileBottomNav from '../components/MobileBottomNav'
 import OfflineBanner from '../components/OfflineBanner'
 import SafetyDisclaimer, { hasAcceptedDisclaimer } from '../components/SafetyDisclaimer'
+import OnboardingTour, { hasCompletedTour, REPLAY_TOUR_EVENT } from '../components/OnboardingTour'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
@@ -46,6 +47,21 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(hasAcceptedDisclaimer())
+  const [showTour, setShowTour] = useState(false)
+
+  // Re-check per account: userChangeKey changes on login/logout/switch, and the tour's
+  // "seen it" flag is scoped per account (see OnboardingTour.tsx), so a second account on
+  // this device should still get the tour even though AppLayout itself doesn't remount.
+  useEffect(() => {
+    setShowTour(!hasCompletedTour())
+  }, [userChangeKey])
+
+  // Lets Profile's "Replay welcome tour" button re-open the tour without a full page reload.
+  useEffect(() => {
+    const handler = () => setShowTour(true)
+    window.addEventListener(REPLAY_TOUR_EVENT, handler)
+    return () => window.removeEventListener(REPLAY_TOUR_EVENT, handler)
+  }, [])
   const isDark = theme === 'dark'
   // The chat owns the full screen height on phones (its own input bar replaces the bottom nav).
   const isChat = pathname.startsWith('/new-triage')
@@ -66,6 +82,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background text-on-background font-body-md">
+      {showTour && <OnboardingTour onFinish={() => setShowTour(false)} />}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="fixed top-0 left-0 right-0 md:left-[var(--spacing-sidebar-width,232px)] z-30">

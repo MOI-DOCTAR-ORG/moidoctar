@@ -274,3 +274,53 @@ the full request path from React through both axios clients into FastAPI.
 The rest of the checklist in the original brief (full endpoint-by-endpoint
 review, DB/model review, frontend screen-by-screen pass, admin panel,
 medication/symptom services, etc.) has not been audited yet in this pass.
+
+---
+
+# CHANGELOG — Phase 6
+
+Covered a live Pxxl deploy failure and the "no permissions/onboarding" gap
+Peter flagged. Full detail in `HANDOFF.md` items #5 and #6.
+
+## Pxxl deploy — root cause found and fixed
+
+- `Static release packaging failed: invalid pxxl.toml: strict mode: fields
+  in the document are missing in the target struct`, happening *after* a
+  successful build, at the static-release packaging step.
+- Root cause: `pxxl.toml` (root) and `backend/pxxl.toml` used snake_case
+  keys (`install_command`, `build_command`, `start_command`). Pxxl's real
+  schema is camelCase (confirmed against docs.pxxl.app) —
+  `installCommand`, `buildCommand`, `startCommand`, `outputDirectory`,
+  `packageManager`. Every key in both files was an unrecognized field,
+  which strict-mode TOML deserialization rejects outright.
+- Fixed both files; added `outputDirectory = "dist"` to the root one.
+  **Not verified against a live redeploy** (no network access in this
+  session) — please confirm the next Pxxl deploy completes.
+
+## Onboarding tour + permissions request
+
+- New `src/components/OnboardingTour.tsx`: a short, skippable multi-step
+  tour shown once per account (scoped like the rest of the app's
+  per-account local storage, so a second account on a shared device still
+  sees it) after the safety disclaimer. Ends with a single button that
+  requests both location (for Nearby Care) and notification (for
+  reminders) permissions via `src/utils/permissions.ts`.
+- New "App Permissions & Tour" section in Profile: shows live status for
+  both permissions (Enabled / Blocked / Unavailable), a button to
+  request them again, and a "Replay welcome tour" button.
+- Neither permission is requested automatically on page load — both only
+  fire from an explicit button click, which is what makes the browser's
+  native prompt reliable in the first place (silent auto-prompts are
+  often suppressed).
+
+## Bug scan
+
+- Read through the Google Sign-In path end to end (frontend button →
+  `@react-oauth/google` → `AuthContext.signInWithGoogle` → `POST
+  /auth/google` → `_verify_google_id_token`) — already correctly wired
+  from a previous pass (see BUG_FIXES.md #7/#8); no code bug found. The
+  `Error 401: invalid_client` Peter hit is a Google Cloud Console
+  configuration issue (see HANDOFF.md #5), not something fixable in this
+  repo.
+- No leftover `console.log`/`debugger` statements or `TODO`/`FIXME`
+  markers found in `src` or `backend/app`.
