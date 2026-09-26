@@ -88,19 +88,19 @@ def test_bad_model_does_not_burn_key(monkeypatch):
 
 
 def _ai_payload(level, **extra):
-    base = {"reply": "Thanks, I noted that.", "urgency_level": level, "confidence_score": 0.8, "needs_more_info": False,
-            "rationale": "because", "possible_conditions": ["a", "b"],
-            "care_plan": {"immediate_relief": ["x"], "food_and_water": ["y"], "when_to_hospital": ["z"]},
-            "follow_up_questions": [], "memory_updates": {}}
+    """A model answer in the handoff contract shape."""
+    base = {"status": "complete", "urgency": level, "has_symptoms": True, "summary": "Thanks, I noted that.",
+            "reason": "because", "next_steps": ["Rest and drink clean water."], "follow_up_question": None,
+            "escalation": {"required": level in ("EMERGENCY", "URGENT")}}
     base.update(extra)
     return base
 
 
 def test_ai_cannot_lower_urgency(monkeypatch):
     ai_keys.add_key(KEY_A, "A")
-    monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("Stable")))
+    monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("SELF_CARE")))
     res = triage_service.analyze_conversation("u1", "I have crushing chest pain", [{"role": "user", "content": "I have crushing chest pain"}])
-    assert res["urgency_level"] == "Urgent"
+    assert res["urgency"] == "URGENT" and res["urgency_level"] == "Urgent"
     assert res["ai_source"] == "gemini"
 
 
@@ -109,31 +109,25 @@ def test_fallback_when_ai_down(monkeypatch):
     assert res["ai_source"] == "rules" and res["ai_notice"]
 
 
-def test_memory_tracks_changes(monkeypatch):
+def test_prompt_sends_reply_preferences_not_the_health_record(monkeypatch):
+    """Handoff section 8: don't send unnecessary personal or health information to the model."""
     ai_keys.add_key(KEY_A, "A")
-    upd = {"preferences": {"response_style": "concise"}, "allergies_add": ["penicillin"], "facts": ["Prefers evening reminders"]}
-    monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("Moderate", memory_updates=upd)))
-    res = triage_service.analyze_conversation("u2", "headache", [{"role": "user", "content": "headache, keep it short, allergic to penicillin"}])
-    assert len(res["memory_notes"]) == 3
-    mem = ai_memory.load("u2")
-    assert mem["preferences"]["response_style"] == "concise"
-    assert "penicillin" in mem["health_context"]["allergies"]
-    assert {h["source"] for h in mem["history"]} == {"ai"}
+    ai_memory.sync_health_context("u2", {"allergies": ["penicillin"], "conditions": ["asthma"]}, "profile")
     ai_memory.set_preferences("u2", {"tone": "direct", "units": "bogus"})
     mem = ai_memory.load("u2")
     assert mem["preferences"]["tone"] == "direct" and mem["preferences"]["units"] == "metric"
-    assert mem["history"][-1]["source"] == "user"
-    # the next prompt includes what was remembered
     seen = {}
 
     def spy(key, model, body, timeout):
         seen["body"] = json.loads(body)
-        return _reply(_ai_payload("Stable"))
+        return _reply(_ai_payload("SELF_CARE"))
 
     monkeypatch.setattr(gemini_client, "_post", spy)
-    triage_service.analyze_conversation("u2", "cough", [{"role": "user", "content": "cough"}])
+    res = triage_service.analyze_conversation("u2", "cough", [{"role": "user", "content": "cough"}])
     sys_text = seen["body"]["systemInstruction"]["parts"][0]["text"]
-    assert "penicillin" in sys_text and "Tone: direct" in sys_text
+    assert "'tone': 'direct'" in sys_text
+    assert "penicillin" not in sys_text and "asthma" not in sys_text
+    assert res["memory_notes"] == []
 
 
 def test_endpoints(monkeypatch):
@@ -152,11 +146,12 @@ def test_endpoints(monkeypatch):
         assert c.patch(f"/api/v1/ai/keys/{kid}", json={"enabled": False}).json()["keys"][0]["enabled"] is False
         assert c.delete(f"/api/v1/ai/keys/{kid}").json()["keys"] == []
         assert c.put("/api/v1/ai/preferences", json={"response_style": "detailed"}).json()["preferences"]["response_style"] == "detailed"
-        monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("Moderate")))
+        monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("SOON")))
         ai_keys.add_key(KEY_B, "B")
         r = c.post("/api/v1/triage/chat", json={"symptoms": "fever", "messages": [{"role": "ai", "text": "Hi"}, {"role": "user", "content": "fever 2 days"}]})
         assert r.status_code == 200, r.text
         assert r.json()["reply"] and r.json()["ai_source"] == "gemini"
+        assert r.json()["urgency"] == "SOON" and r.json()["indicator"]["color"] == "yellow"
         r = c.post("/api/v1/triage/chat", data={"symptoms": "fever", "messages": "[]", "context": json.dumps({"profile": {"allergies": ["dust"]}})},
                    files={"image": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")})
         assert r.status_code == 200

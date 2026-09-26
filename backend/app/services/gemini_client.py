@@ -49,12 +49,17 @@ def generate(
     json_mode: bool = True,
     temperature: float = 0.2,
     only_key_id: Optional[str] = None,
+    max_output_tokens: Optional[int] = None,
 ) -> Tuple[str, Dict[str, str]]:
     """Return (text, {"model":..., "key_id":...}). Raises GeminiUnavailable."""
     body: Dict[str, Any] = {
         "contents": contents,
         "generationConfig": {"temperature": temperature},
     }
+    if max_output_tokens:
+        # Flash models spend part of this on internal "thinking", so it caps the whole
+        # call, not just the visible JSON (which is usually 150-300 tokens).
+        body["generationConfig"]["maxOutputTokens"] = int(max_output_tokens)
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
     if system_instruction:

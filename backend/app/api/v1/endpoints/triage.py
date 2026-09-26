@@ -21,6 +21,16 @@ router = APIRouter()
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 
+_CONTRACT_KEYS = ("status", "urgency", "indicator", "summary", "reason", "next_steps", "escalation",
+                  "facility_action", "follow_up_question", "safety_note", "red_flags", "warning_signs",
+                  "rule_version", "medication_notice")
+
+
+def _contract(a: Dict[str, Any]) -> Dict[str, Any]:
+    """The handoff result contract, passed through alongside the older fields."""
+    return {k: a[k] for k in _CONTRACT_KEYS if k in a}
+
+
 def _as_obj(value: Any, default: Any) -> Any:
     if isinstance(value, str):
         try:
@@ -78,6 +88,7 @@ async def perform_triage(request: Request, current_user: Dict[str, Any] = Depend
         assessment_id=a["assessment_id"], urgency_level=a["urgency_level"], rationale=a["rationale"],
         possible_conditions=a["possible_conditions"], recommended_actions=a["recommended_actions"],
         disclaimer=a["disclaimer"], ai_source=a["ai_source"], ai_notice=a["ai_notice"],
+        **_contract(a),
     )
 
 
@@ -94,7 +105,7 @@ async def perform_triage_chat(request: Request, current_user: Dict[str, Any] = D
         assessment_id=a["assessment_id"],
         needs_more_info=a.get("needs_more_info", False),
         urgency_level=a.get("urgency_level", "Stable"),
-        confidence_score=a.get("confidence_score", 0.9),
+        confidence_score=a.get("confidence_score"),
         rationale=a.get("rationale", ""),
         possible_conditions=a.get("possible_conditions", []),
         recommended_actions=a.get("recommended_actions", []),
@@ -107,6 +118,7 @@ async def perform_triage_chat(request: Request, current_user: Dict[str, Any] = D
         ai_source=a.get("ai_source", "rules"),
         ai_notice=a.get("ai_notice", ""),
         memory_notes=a.get("memory_notes", []),
+        **_contract(a),
     )
 
 

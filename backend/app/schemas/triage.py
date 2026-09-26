@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -16,6 +16,22 @@ class TriageResponse(BaseModel):
     disclaimer: str
     ai_source: str = "rules"
     ai_notice: str = ""
+    # The AI Engineer Handoff result contract (section 4). The fields above are kept
+    # for the current frontend and are derived from these.
+    status: Optional[str] = None
+    urgency: Optional[str] = None
+    indicator: Optional[Dict[str, Any]] = None
+    summary: Optional[str] = None
+    reason: Optional[str] = None
+    next_steps: List[str] = []
+    escalation: Optional[Dict[str, Any]] = None
+    facility_action: Optional[str] = None
+    follow_up_question: Optional[Dict[str, Any]] = None
+    safety_note: Optional[str] = None
+    red_flags: List[str] = []
+    warning_signs: List[str] = []
+    rule_version: Optional[str] = None
+    medication_notice: str = ""
 
 
 class TriageChatRequest(BaseModel):
@@ -27,7 +43,8 @@ class TriageChatResponse(BaseModel):
     assessment_id: str
     needs_more_info: bool
     urgency_level: str
-    confidence_score: float
+    # No longer produced: the old values were fixed numbers, not a measured confidence.
+    confidence_score: Optional[float] = None
     rationale: str
     possible_conditions: List[str]
     recommended_actions: List[str]
@@ -40,6 +57,22 @@ class TriageChatResponse(BaseModel):
     ai_source: str = "rules"  # "gemini" | "rules"
     ai_notice: str = ""
     memory_notes: List[str] = []
+    # The AI Engineer Handoff result contract (section 4). The fields above are kept
+    # for the current frontend and are derived from these.
+    status: Optional[str] = None
+    urgency: Optional[str] = None
+    indicator: Optional[Dict[str, Any]] = None
+    summary: Optional[str] = None
+    reason: Optional[str] = None
+    next_steps: List[str] = []
+    escalation: Optional[Dict[str, Any]] = None
+    facility_action: Optional[str] = None
+    follow_up_question: Optional[Dict[str, Any]] = None
+    safety_note: Optional[str] = None
+    red_flags: List[str] = []
+    warning_signs: List[str] = []
+    rule_version: Optional[str] = None
+    medication_notice: str = ""
 
 
 class BackendTriageStatus(BaseModel):
