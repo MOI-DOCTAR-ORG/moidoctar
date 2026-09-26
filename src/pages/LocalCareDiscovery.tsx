@@ -17,6 +17,8 @@ interface Facility {
   openNow: boolean | null
   dataProvenance: 'current' | 'prototype'
   specialties?: string[]
+  lat?: number
+  lng?: number
 }
 
 // Fallback demo data — only shown when we don't have (or couldn't use) the
@@ -80,14 +82,90 @@ function classifyType(tags: Record<string, string>): Facility['type'] {
   return 'clinic'
 }
 
-function formatAddress(tags: Record<string, string>): string {
-  const parts = [
+// Quick-jump shortcuts for popular Nigerian metropolitan areas
+export interface QuickArea {
+  name: string
+  lat: number
+  lng: number
+}
+
+export const POPULAR_NIGERIAN_AREAS: QuickArea[] = [
+  { name: 'Ikeja', lat: 6.6018, lng: 3.3515 },
+  { name: 'Lekki / VI', lat: 6.4311, lng: 3.4682 },
+  { name: 'Yaba', lat: 6.5168, lng: 3.3857 },
+  { name: 'Surulere', lat: 6.4969, lng: 3.3578 },
+  { name: 'Lagos Island', lat: 6.4549, lng: 3.3986 },
+  { name: 'Abuja (CBD)', lat: 9.0579, lng: 7.4951 },
+  { name: 'Ibadan', lat: 7.3775, lng: 3.9470 },
+  { name: 'Port Harcourt', lat: 4.8156, lng: 7.0498 },
+  { name: 'Enugu', lat: 6.4584, lng: 7.5464 },
+  { name: 'Kano', lat: 12.0022, lng: 8.5920 },
+]
+
+// Reverse geocode lat/lng to human-readable neighborhood/city name via Nominatim
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) return ''
+    const data = (await res.json()) as {
+      display_name?: string
+      address?: Record<string, string>
+    }
+    if (data && data.address) {
+      const a = data.address
+      const neighborhood = a.suburb || a.neighbourhood || a.village || a.residential || a.district
+      const city = a.city || a.town || a.county || a.state
+      if (neighborhood && city) return `${neighborhood}, ${city}`
+      if (city) return city
+    }
+    if (data.display_name) {
+      return data.display_name.split(',').slice(0, 2).join(', ')
+    }
+  } catch {
+    // fallback gracefully
+  }
+  return ''
+}
+
+function formatAddress(tags: Record<string, string>, areaContext?: string): string {
+  // 1. Look for explicit full address
+  if (tags['addr:full']) return tags['addr:full']
+
+  // 2. Look for street + number
+  const streetPart =
     tags['addr:housenumber'] && tags['addr:street']
       ? `${tags['addr:housenumber']} ${tags['addr:street']}`
-      : tags['addr:street'],
-    tags['addr:city'] || tags['addr:suburb'],
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join(', ') : 'Address not listed'
+      : tags['addr:street'] || tags['contact:street']
+
+  const areaPart =
+    tags['addr:suburb'] ||
+    tags['suburb'] ||
+    tags['addr:neighbourhood'] ||
+    tags['neighbourhood'] ||
+    tags['addr:place'] ||
+    tags['addr:district']
+
+  const cityPart = tags['addr:city'] || tags['city'] || tags['addr:state']
+
+  const parts = [streetPart, areaPart, cityPart].filter(Boolean)
+  if (parts.length > 0) {
+    return parts.join(', ')
+  }
+
+  // 3. Fallback to operator name if given
+  if (tags.operator) {
+    return `Operated by ${tags.operator}`
+  }
+
+  // 4. Fallback to searched/current neighborhood context
+  if (areaContext) {
+    const cleanArea = areaContext.replace(/\s*\((Approximate|GPS)\)/i, '').trim()
+    return `${cleanArea} area • Coordinates mapped`
+  }
+
+  return 'Location mapped (tap Directions)'
 }
 
 // OSM opening_hours can be arbitrarily complex; we only confidently detect
@@ -107,7 +185,7 @@ interface OverpassElement {
   tags?: Record<string, string>
 }
 
-async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility[]> {
+async function fetchNearbyFacilities(lat: number, lng: number, areaContext?: string): Promise<Facility[]> {
   const query = `
     [out:json][timeout:20];
     (
@@ -141,7 +219,7 @@ async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility
             id: `osm-${el.type}-${el.id}`,
             name: tags.name,
             type: classifyType(tags),
-            address: formatAddress(tags),
+            address: formatAddress(tags, areaContext),
             phone,
             distance: distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`,
             distanceKm,
@@ -149,6 +227,8 @@ async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility
             openNow: detectOpenNow(tags.opening_hours),
             dataProvenance: 'current' as const,
             specialties: tags.healthcare_speciality ? tags.healthcare_speciality.split(';') : undefined,
+            lat: elLat,
+            lng: elLon,
           }
         })
         .sort((a, b) => a.distanceKm - b.distanceKm)
@@ -193,13 +273,13 @@ export default function LocalCareDiscovery() {
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(false)
   const [locationPermission, setLocationPermission] = useState<LocationPermissionState>('unknown')
 
-  const loadNearby = useCallback((lat: number, lng: number) => {
+  const loadNearby = useCallback((lat: number, lng: number, areaContext?: string) => {
     setIsLoadingFacilities(true)
     setLocationError('')
-    fetchNearbyFacilities(lat, lng)
+    fetchNearbyFacilities(lat, lng, areaContext)
       .then((results) => {
         if (results.length === 0) {
-          setLocationError('No listed facilities found nearby. Showing sample facilities instead.')
+          setLocationError('No listed facilities found nearby in OpenStreetMap. Showing sample facilities instead.')
           setFacilities(sampleFacilities)
         } else {
           setFacilities(results)
@@ -236,7 +316,7 @@ export default function LocalCareDiscovery() {
       setLocationName(name)
       setLocationPermission('approximate')
       setCachedLocation({ lat, lng, city: name, source: 'ip', timestamp: Date.now() })
-      loadNearby(lat, lng)
+      loadNearby(lat, lng, name)
     } catch {
       setLocationError('Could not reach the location search service. Please try again.')
     } finally {
@@ -244,48 +324,76 @@ export default function LocalCareDiscovery() {
     }
   }
 
-  // Triggers the browser's native location prompt, falling back automatically to IP location
-  const requestLocation = useCallback(() => {
+  // Quick-select preset Nigerian cities / metropolitan areas
+  const handleSelectArea = (area: QuickArea) => {
+    setUserLocation({ lat: area.lat, lng: area.lng })
+    setLocationName(area.name)
+    setSearchQuery(area.name)
+    setLocationPermission('approximate')
+    setCachedLocation({ lat: area.lat, lng: area.lng, city: area.name, source: 'ip', timestamp: Date.now() })
+    loadNearby(area.lat, area.lng, area.name)
+  }
+
+  // High-accuracy GPS request with reverse geocoding
+  const requestPreciseGps = useCallback(() => {
     setLocationPermission('requesting')
     setLocationError('')
 
-    const fallbackToIp = async () => {
-      try {
-        const ip = await fetchIpLocation()
-        setUserLocation({ lat: ip.lat, lng: ip.lng })
-        setLocationName(ip.city ? `${ip.city} (Approximate)` : 'Approximate')
-        setLocationPermission('approximate')
-        loadNearby(ip.lat, ip.lng)
-      } catch {
-        setLocationPermission('denied')
-        setLocationError('Could not detect location. Search your city or neighborhood below.')
-      }
-    }
-
     if (!('geolocation' in navigator)) {
-      fallbackToIp()
+      setLocationError('Geolocation is not supported by your browser. Please select an area below.')
+      setLocationPermission('approximate')
       return
     }
 
-    try {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          setLocationPermission('granted')
-          setLocationName('GPS Active')
-          setUserLocation({ lat: latitude, lng: longitude })
-          setCachedLocation({ lat: latitude, lng: longitude, source: 'gps', timestamp: Date.now() })
-          loadNearby(latitude, longitude)
-        },
-        () => {
-          fallbackToIp()
-        },
-        { timeout: 4000, enableHighAccuracy: false }
-      )
-    } catch {
-      fallbackToIp()
-    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        setUserLocation({ lat: latitude, lng: longitude })
+        setLocationPermission('granted')
+
+        let areaLabel = 'Precise GPS'
+        try {
+          const resolved = await reverseGeocode(latitude, longitude)
+          if (resolved) {
+            areaLabel = `${resolved} (GPS)`
+          }
+        } catch {
+          // ignore
+        }
+
+        setLocationName(areaLabel)
+        const cleanName = areaLabel.replace(/\s*\(GPS\)$/, '')
+        setCachedLocation({
+          lat: latitude,
+          lng: longitude,
+          city: cleanName,
+          source: 'gps',
+          timestamp: Date.now(),
+        })
+        loadNearby(latitude, longitude, cleanName)
+      },
+      (err) => {
+        let msg = 'Could not acquire precise GPS. Showing approximate area. Tap an area chip below to choose your neighborhood.'
+        if (err.code === 1) {
+          msg = 'Location permission was denied. Tap any popular area below to view local care.'
+        } else if (err.code === 3) {
+          msg = 'GPS acquisition timed out. Tap an area chip below to choose your neighborhood.'
+        }
+        setLocationError(msg)
+        setLocationPermission('approximate')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    )
   }, [loadNearby])
+
+  // Triggers location request, falling back automatically to IP location
+  const requestLocation = useCallback(() => {
+    requestPreciseGps()
+  }, [requestPreciseGps])
 
   // On mount: check cached location first, or auto-fetch IP location so the page is populated
   useEffect(() => {
@@ -294,7 +402,7 @@ export default function LocalCareDiscovery() {
       setUserLocation({ lat: cached.lat, lng: cached.lng })
       setLocationName(cached.city ? `${cached.city} (${cached.source === 'gps' ? 'GPS' : 'Approximate'})` : '')
       setLocationPermission(cached.source === 'gps' ? 'granted' : 'approximate')
-      loadNearby(cached.lat, cached.lng)
+      loadNearby(cached.lat, cached.lng, cached.city)
       return
     }
 
@@ -304,7 +412,7 @@ export default function LocalCareDiscovery() {
         setUserLocation({ lat: ip.lat, lng: ip.lng })
         setLocationName(ip.city ? `${ip.city} (Approximate)` : 'Approximate')
         setLocationPermission('approximate')
-        loadNearby(ip.lat, ip.lng)
+        loadNearby(ip.lat, ip.lng, ip.city)
       }
     })
   }, [loadNearby])
@@ -326,14 +434,14 @@ export default function LocalCareDiscovery() {
         {userLocation && (
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-caption text-green-600 dark:text-green-400 font-bold">
-              <Icon icon="my_location" size="sm" />
+              <Icon icon={locationPermission === 'granted' ? 'gps_fixed' : 'my_location'} size="sm" />
               {locationName || 'Location Active'}
             </div>
             {locationPermission === 'approximate' && (
               <button
                 type="button"
-                onClick={requestLocation}
-                className="px-3 py-1 bg-surface border border-outline-variant hover:border-primary/40 rounded-full text-caption text-secondary hover:text-primary transition-colors flex items-center gap-1"
+                onClick={requestPreciseGps}
+                className="px-3 py-1 bg-surface border border-outline-variant hover:border-primary/40 rounded-full text-caption text-secondary hover:text-primary transition-colors flex items-center gap-1 font-medium"
               >
                 <Icon icon="gps_fixed" size="sm" />
                 Use Precise GPS
@@ -344,7 +452,7 @@ export default function LocalCareDiscovery() {
       </header>
 
       {/* City / Area Search Form */}
-      <form onSubmit={handleSearchCity} className="mb-4 flex items-center gap-2">
+      <form onSubmit={handleSearchCity} className="mb-3 flex items-center gap-2">
         <div className="relative flex-1">
           <Icon icon="search" size="md" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary pointer-events-none" />
           <input
@@ -364,6 +472,33 @@ export default function LocalCareDiscovery() {
           {isSearchingLocation ? 'Searching…' : 'Find Care'}
         </button>
       </form>
+
+      {/* Quick Select Popular Nigerian Areas */}
+      <div className="mb-5">
+        <p className="text-caption text-secondary mb-2 flex items-center gap-1.5 font-medium">
+          <Icon icon="explore" size="sm" className="text-primary" />
+          Quick areas:
+        </p>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none no-scrollbar">
+          {POPULAR_NIGERIAN_AREAS.map((area) => {
+            const isSelected = locationName.toLowerCase().includes(area.name.toLowerCase().split('/')[0].trim())
+            return (
+              <button
+                key={area.name}
+                type="button"
+                onClick={() => handleSelectArea(area)}
+                className={`px-3 py-1.5 rounded-full text-caption font-medium shrink-0 transition-all ${
+                  isSelected
+                    ? 'bg-primary text-on-primary font-bold shadow-sm'
+                    : 'bg-surface border border-outline-variant text-secondary hover:border-primary/40 hover:text-on-surface'
+                }`}
+              >
+                {area.name}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
       {(locationPermission === 'prompt' || locationPermission === 'unknown' || locationPermission === 'requesting') && !userLocation && (
         <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
@@ -528,7 +663,13 @@ export default function LocalCareDiscovery() {
                   </span>
                 )}
                 <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facility.address)}`}
+                  href={
+                    facility.lat && facility.lng
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${facility.lat},${facility.lng}`
+                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          `${facility.name} ${facility.address !== 'Location mapped (tap Directions)' ? facility.address : ''}`
+                        )}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-outline-variant rounded-xl text-secondary font-label-md text-label-md font-bold hover:border-primary/30 hover:text-on-surface transition-all min-h-[44px]"
@@ -550,16 +691,25 @@ export default function LocalCareDiscovery() {
           </div>
           <div>
             <p className="font-label-md text-label-md text-red-600 dark:text-red-400 font-bold">Emergency?</p>
-            <p className="text-caption text-secondary">Call emergency services immediately</p>
+            <p className="text-caption text-secondary">Dial toll-free national or state emergency dispatch immediately</p>
           </div>
         </div>
-        <a
-          href="tel:911"
-          className="w-full sm:w-auto sm:ml-auto px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-2 min-h-[44px]"
-        >
-          <Icon icon="call" size="md" />
-          Call 911
-        </a>
+        <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
+          <a
+            href="tel:112"
+            className="flex-1 sm:flex-initial px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-2 min-h-[44px]"
+          >
+            <Icon icon="call" size="md" />
+            Call 112
+          </a>
+          <a
+            href="tel:767"
+            className="flex-1 sm:flex-initial px-4 py-2.5 bg-surface border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-1.5 min-h-[44px]"
+          >
+            <Icon icon="phone_in_talk" size="sm" />
+            767 (Lagos)
+          </a>
+        </div>
       </div>
     </main>
   )
