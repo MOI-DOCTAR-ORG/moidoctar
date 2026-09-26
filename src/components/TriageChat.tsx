@@ -630,7 +630,7 @@ export default function TriageChat() {
       </div>
       <div>
         <dt className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Assistant</dt>
-        <dd className="mt-0.5 text-on-surface-variant">Uses your profile, medications and saved preferences. <Link className="text-primary underline underline-offset-2" to="/ai-settings">Review what it remembers</Link></dd>
+        <dd className="mt-0.5 text-on-surface-variant">Follows your Assistant Settings (length, tone, language, units, emergency number) and your long-term conditions. <Link className="text-primary underline underline-offset-2" to="/ai-settings">Review what it remembers</Link></dd>
       </div>
     </dl>
   )

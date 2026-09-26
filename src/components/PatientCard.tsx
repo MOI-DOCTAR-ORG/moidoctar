@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import Icon from './Icon'
+import { useAiMemory } from '../hooks/useMoiDoctor'
 import { loadProfile } from '../types/profile'
 import { scopeKey } from '../utils/storage'
 import type { AgeBand, PatientInfo } from '../types/triage'
@@ -41,6 +43,8 @@ const WHO: { value: PatientInfo['for']; label: string; icon: string }[] = [
   { value: 'other', label: 'Someone else', icon: 'group' },
 ]
 
+const LB_TO_KG = 0.45359237
+
 const num = (v: string): number | null => {
   if (v.trim() === '') return null
   const n = Number(v)
@@ -53,6 +57,11 @@ export default function PatientCard({ value, onChange }: { value: PatientInfo; o
   const showMonths = value.for !== 'self' && (value.age_years == null || value.age_years < 2)
   const showPregnancy = value.for !== 'child' && band !== 'under_6' && band !== 'pediatric_6_plus'
   const set = (patch: Partial<PatientInfo>) => onChange({ ...value, ...patch })
+  // Weight is stored in kg (the server and the dosage tables use kg); shown in the user's units.
+  const imperial = useAiMemory().data?.preferences.units === 'imperial'
+  const [weightDraft, setWeightDraft] = useState<string | null>(null)
+  const weightShown = value.weight_kg == null ? '' : imperial
+    ? String(Math.round(value.weight_kg / LB_TO_KG * 10) / 10) : String(value.weight_kg)
 
   const field = 'w-full rounded-lg border border-outline-variant bg-background px-3 py-2 text-sm text-on-surface outline-none focus:border-primary'
 
@@ -100,9 +109,14 @@ export default function PatientCard({ value, onChange }: { value: PatientInfo; o
           </label>
         )}
         <label className="text-[11px] text-on-surface-variant">
-          Weight (kg, optional)
-          <input inputMode="decimal" className={field} placeholder="e.g. 12" value={value.weight_kg ?? ''}
-            onChange={(e) => set({ weight_kg: num(e.target.value) })} />
+          Weight ({imperial ? 'lb' : 'kg'}, optional)
+          <input inputMode="decimal" className={field} placeholder={imperial ? 'e.g. 26' : 'e.g. 12'}
+            value={weightDraft ?? weightShown} onBlur={() => setWeightDraft(null)}
+            onChange={(e) => {
+              setWeightDraft(e.target.value)
+              const n = num(e.target.value)
+              set({ weight_kg: n == null ? null : imperial ? Math.round(n * LB_TO_KG * 100) / 100 : n })
+            }} />
         </label>
         {showPregnancy && (
           <label className="text-[11px] text-on-surface-variant">
