@@ -15,16 +15,69 @@ from app.core.config import settings
 logger = logging.getLogger("moidoctar.email")
 
 # Module-level circuit breaker: if raw TCP SMTP times out (e.g. cloud provider firewall
-# blocking ports 465/587), disable SMTP attempts for 5 minutes so subsequent requests don't hang.
+# blocking ports 465/587), disable SMTP attempts for 3 minutes so subsequent requests don't hang.
 _smtp_circuit_broken_until: float = 0.0
+
+
+def _connect_smtp_ipv4(host: str, port: int, use_ssl: bool, timeout: float = 6.0) -> Tuple[smtplib.SMTP, str]:
+    """Connect to SMTP forcing IPv4 (socket.AF_INET).
+    
+    This avoids the Linux/Debian dual-stack IPv6 black hole where getaddrinfo returns
+    an IPv6 address that has no outbound route in Docker/containerized cloud environments,
+    causing connections to silently hang until timeout.
+    """
+    try:
+        addr_infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        ipv4_addrs = [ai[4][0] for ai in addr_infos]
+    except Exception as e:
+        logger.warning(f"Failed to resolve IPv4 for {host}: {e}")
+        ipv4_addrs = [host]
+
+    last_exc = None
+    for ip in ipv4_addrs:
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect((ip, port))
+
+            if use_ssl:
+                ctx = ssl.create_default_context()
+                ssl_sock = ctx.wrap_socket(sock, server_hostname=host)
+                server = smtplib.SMTP_SSL(host=host, port=port, timeout=timeout)
+                server.sock = ssl_sock
+                server.file = ssl_sock.makefile('rb')
+                (code, msg) = server.getreply()
+                if code >= 400:
+                    raise smtplib.SMTPResponseError(code, msg)
+                return server, ip
+            else:
+                server = smtplib.SMTP(host=host, port=port, timeout=timeout)
+                server.sock = sock
+                server.file = sock.makefile('rb')
+                (code, msg) = server.getreply()
+                if code >= 400:
+                    raise smtplib.SMTPResponseError(code, msg)
+                server.ehlo()
+                ctx = ssl.create_default_context()
+                server.starttls(context=ctx)
+                server.ehlo()
+                return server, ip
+        except Exception as e:
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+            last_exc = e
+
+    raise last_exc or TimeoutError(f"Could not connect to {host}:{port}")
 
 
 def _send_via_brevo(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
     """Send an email using Brevo's (formerly Sendinblue) REST API (https://brevo.com).
     
-    Brevo operates over standard HTTPS (Port 443), so it is NEVER blocked by cloud
-    hosting firewalls or edge platforms. The free tier includes 300 emails/day forever
-    and allows sending to ANY recipient using a verified email (no custom domain required).
+    Brevo operates over standard HTTPS (Port 443).
     """
     api_key = settings.effective_brevo_api_key
     if not api_key:
@@ -142,7 +195,7 @@ def _smtp_configured() -> bool:
 
 
 def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
-    """Send an email via standard SMTP with automatic port/SSL fallback and circuit breaker."""
+    """Send an email via standard SMTP with IPv4 forced socket, dual-port fallback, and circuit breaker."""
     global _smtp_circuit_broken_until
     import email.utils
 
@@ -159,7 +212,6 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
     password = settings.effective_smtp_password
     primary_port = settings.effective_smtp_port
     primary_use_ssl = settings.effective_smtp_use_ssl
-    use_tls = settings.effective_smtp_use_tls
 
     from_header = settings.effective_smtp_from
     recipient = to_email.strip().lower()
@@ -168,7 +220,7 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
     # not a formatted display name like "MoiDoctar <user@gmail.com>".
     # For Gmail specifically, envelope sender MUST be the authenticated user.
     _, parsed_from = email.utils.parseaddr(from_header)
-    if "gmail.com" in host.lower() and user and "@" in user:
+    if ("gmail.com" in host.lower() or "googlemail" in host.lower()) and user and "@" in user:
         envelope_from = user
     elif parsed_from:
         envelope_from = parsed_from
@@ -183,37 +235,34 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     # Build fallback connection strategies:
-    # 1. Primary configured port & SSL mode
+    # 1. Primary configured port & SSL mode on primary host
     # 2. Alternative resilient mode (465 SSL <-> 587 STARTTLS)
-    strategies = [(primary_port, primary_use_ssl, "primary")]
-    if primary_use_ssl or primary_port == 465:
-        strategies.append((587, False, "fallback (587 STARTTLS)"))
-    else:
-        strategies.append((465, True, "fallback (465 SSL)"))
+    # 3. Googlemail host fallback for Gmail accounts
+    hosts_to_try = [host]
+    if "gmail.com" in host.lower() and "googlemail" not in host.lower():
+        hosts_to_try.append("smtp.googlemail.com")
+
+    strategies = []
+    for h in hosts_to_try:
+        strategies.append((h, primary_port, primary_use_ssl, "primary" if h == host else "alternate-host"))
+        if primary_use_ssl or primary_port == 465:
+            strategies.append((h, 587, False, "fallback 587 STARTTLS"))
+        else:
+            strategies.append((h, 465, True, "fallback 465 SSL"))
 
     last_error_msg = ""
     had_timeout = False
 
-    # Use a fast 3.5s timeout. If the host network blocks port 465/587, it will fail
-    # in ~3.5s per port instead of hanging the user's browser for 15-30s.
-    for port, use_ssl, label in strategies:
+    # Each attempt forces IPv4 with a 5.0s timeout to bypass IPv6 black holes
+    for target_host, port, use_ssl, label in strategies:
+        server = None
         try:
-            logger.info(f"Attempting SMTP connection to {host}:{port} ({label}, ssl={use_ssl})")
-            if use_ssl:
-                context = ssl.create_default_context()
-                with smtplib.SMTP_SSL(host, port, context=context, timeout=3.5) as server:
-                    server.login(user, password)
-                    server.sendmail(envelope_from, [recipient], msg.as_string())
-            else:
-                with smtplib.SMTP(host, port, timeout=3.5) as server:
-                    server.ehlo()
-                    context = ssl.create_default_context()
-                    server.starttls(context=context)
-                    server.ehlo()
-                    server.login(user, password)
-                    server.sendmail(envelope_from, [recipient], msg.as_string())
-
-            logger.info(f"Email successfully sent via SMTP ({host}:{port}, {label}) to {recipient}")
+            logger.info(f"Attempting SMTP connection to {target_host}:{port} ({label}, ssl={use_ssl}, ipv4=True)")
+            server, connected_ip = _connect_smtp_ipv4(target_host, port, use_ssl, timeout=5.0)
+            server.login(user, password)
+            server.sendmail(envelope_from, [recipient], msg.as_string())
+            server.quit()
+            logger.info(f"Email successfully sent via SMTP ({target_host}:{port} @ {connected_ip}, {label}) to {recipient}")
             return True, f"Delivered via SMTP ({port})"
         except Exception as e:
             err_name = type(e).__name__
@@ -221,15 +270,20 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
             if isinstance(e, (TimeoutError, socket.timeout)) or "timed out" in str(e).lower():
                 had_timeout = True
             logger.warning(
-                f"SMTP attempt failed for {recipient} on {host}:{port} ({label}): {last_error_msg}"
+                f"SMTP attempt failed for {recipient} on {target_host}:{port} ({label}): {last_error_msg}"
             )
+        finally:
+            if server:
+                try:
+                    server.close()
+                except Exception:
+                    pass
 
-    # If both ports timed out, the cloud provider has blocked outbound raw SMTP ports.
-    # Activate circuit breaker for 5 minutes so future requests fail fast without lag.
+    # If all attempts timed out, activate circuit breaker for 3 minutes
     if had_timeout:
-        _smtp_circuit_broken_until = time.time() + 300
+        _smtp_circuit_broken_until = time.time() + 180
         logger.warning(
-            f"Outbound SMTP ports blocked by hosting firewall. Activated SMTP circuit breaker for 300s."
+            f"Outbound SMTP ports blocked or unreachable. Activated SMTP circuit breaker for 180s."
         )
 
     logger.error(f"All SMTP delivery attempts failed for {recipient}: {last_error_msg}")
@@ -238,28 +292,28 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
 
 
 def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
-    """Send an email via Brevo, Resend, or SMTP based on configuration and provider availability."""
+    """Send an email via SMTP, Resend, or Brevo based on configuration and provider availability."""
     recipient = to_email.strip().lower()
     errors = []
 
-    has_brevo = bool(settings.effective_brevo_api_key)
-    has_resend = bool(settings.effective_resend_api_key)
     has_smtp = _smtp_configured()
+    has_resend = bool(settings.effective_resend_api_key)
+    has_brevo = bool(settings.effective_brevo_api_key)
     pref = settings.email_provider_preference
 
-    # 1. Brevo (HTTPS port 443 - works everywhere, immune to hosting firewall port blocks)
-    if has_brevo and pref in ("brevo", "auto"):
-        logger.info(f"Attempting email delivery via Brevo to {recipient}")
-        ok, detail = _send_via_brevo(recipient, subject, html_body, text_body)
-        if ok:
-            return True, detail
-        errors.append(f"Brevo: {detail}")
+    # 1. SMTP (preferred by user, sends from authenticated Gmail account with full DMARC/SPF compliance)
+    if has_smtp and pref in ("smtp", "auto"):
+        import time
+        if time.time() >= _smtp_circuit_broken_until:
+            logger.info(f"Attempting email delivery via SMTP to {recipient}")
+            ok, detail = _send_via_smtp(recipient, subject, html_body, text_body)
+            if ok:
+                return True, detail
+            errors.append(f"SMTP: {detail}")
 
     # 2. Resend (HTTPS port 443)
     if has_resend and pref in ("resend", "auto"):
         resend_is_sandbox = "onboarding@resend.dev" in settings.effective_resend_from.lower()
-        # If in sandbox mode, only attempt Resend if recipient is the account owner (lateefedidi4@gmail.com)
-        # to avoid guaranteed 403 sandbox failure for other recipients
         if not resend_is_sandbox or (recipient == "lateefedidi4@gmail.com"):
             logger.info(f"Attempting email delivery via Resend to {recipient}")
             ok, detail = _send_via_resend(recipient, subject, html_body, text_body)
@@ -269,20 +323,20 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> T
         else:
             errors.append("Resend: Sandbox mode only allows delivering to lateefedidi4@gmail.com (verify domain at resend.com/domains)")
 
-    # 3. SMTP (Raw TCP socket - ports 465/587)
-    if has_smtp:
-        logger.info(f"Attempting email delivery via SMTP to {recipient}")
-        ok, detail = _send_via_smtp(recipient, subject, html_body, text_body)
-        if ok:
-            return True, detail
-        errors.append(f"SMTP: {detail}")
-
-    # 4. Fallback to Brevo if not tried yet
-    if has_brevo and not any("Brevo:" in e for e in errors):
+    # 3. Brevo (HTTPS port 443)
+    if has_brevo and pref in ("brevo", "auto"):
+        logger.info(f"Attempting email delivery via Brevo to {recipient}")
         ok, detail = _send_via_brevo(recipient, subject, html_body, text_body)
         if ok:
             return True, detail
         errors.append(f"Brevo: {detail}")
+
+    # 4. Fallback to SMTP if not tried yet
+    if has_smtp and not any("SMTP:" in e for e in errors):
+        ok, detail = _send_via_smtp(recipient, subject, html_body, text_body)
+        if ok:
+            return True, detail
+        errors.append(f"SMTP: {detail}")
 
     last_error = " | ".join(errors) if errors else "No email service configured"
     logger.error(f"Email delivery could not be completed for {recipient}: {last_error}")
