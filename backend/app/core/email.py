@@ -74,7 +74,7 @@ def _connect_smtp_ipv4(host: str, port: int, use_ssl: bool, timeout: float = 6.0
     raise last_exc or TimeoutError(f"Could not connect to {host}:{port}")
 
 
-def _send_via_emailjs(to_email: str, subject: str, html_body: str, text_body: str, code: str = "") -> Tuple[bool, str]:
+def _send_via_emailjs(to_email: str, subject: str, html_body: str, text_body: str, code: str = "", heading: str = "") -> Tuple[bool, str]:
     """Send an email using EmailJS REST API (https://emailjs.com).
     
     EmailJS bridges HTTP requests directly into your connected personal Gmail account,
@@ -91,19 +91,57 @@ def _send_via_emailjs(to_email: str, subject: str, html_body: str, text_body: st
     url = "https://api.emailjs.com/api/v1.0/email/send"
     recipient = to_email.strip().lower()
 
+    # Calculate formatted 10-minute expiry time
+    import datetime
+    now = datetime.datetime.now()
+    expiry_dt = now + datetime.timedelta(minutes=10)
+    expiry_str = expiry_dt.strftime("%I:%M %p")
+
     payload = {
         "service_id": service_id,
         "template_id": template_id,
         "user_id": public_key,
         "template_params": {
+            # Recipient variables
             "to_email": recipient,
             "email": recipient,
+            "user_email": recipient,
             "to": recipient,
-            "subject": subject,
-            "code": code,
+            "recipient": recipient,
+            "to_name": recipient.split("@")[0].title(),
+
+            # OTP / code variables across all standard naming conventions
+            "otp": code,
             "otp_code": code,
+            "code": code,
+            "passcode": code,
+            "pin": code,
+            "token": code,
+            "password": code,
+            "verification_code": code,
+
+            # Branding variables
+            "company_name": "MoiDoctar",
+            "Company_Name": "MoiDoctar",
+            "company": "MoiDoctar",
+            "app_name": "MoiDoctar",
+            "from_name": "MoiDoctar",
+
+            # Expiration and timing
+            "time": expiry_str,
+            "valid_till": expiry_str,
+            "expiry_time": expiry_str,
+            "expiry": "10 minutes",
+            "expiration": "10 minutes",
+
+            # Subject and body variables
+            "subject": subject,
+            "heading": heading or "Verify your email",
             "message": text_body,
+            "body": text_body,
             "html_content": html_body,
+            "html_message": html_body,
+            "content": html_body,
         },
     }
     if private_key:
@@ -350,7 +388,7 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
 
 
 
-def send_email(to_email: str, subject: str, html_body: str, text_body: str, code: str = "") -> Tuple[bool, str]:
+def send_email(to_email: str, subject: str, html_body: str, text_body: str, code: str = "", heading: str = "") -> Tuple[bool, str]:
     """Send an email via EmailJS, SMTP, Resend, or Brevo based on configuration and provider availability."""
     recipient = to_email.strip().lower()
     errors = []
@@ -364,7 +402,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str, code
     # 1. EmailJS (HTTPS port 443 - connects directly to user's Gmail account, no domain needed!)
     if has_emailjs and pref in ("emailjs", "auto"):
         logger.info(f"Attempting email delivery via EmailJS to {recipient}")
-        ok, detail = _send_via_emailjs(recipient, subject, html_body, text_body, code=code)
+        ok, detail = _send_via_emailjs(recipient, subject, html_body, text_body, code=code, heading=heading)
         if ok:
             return True, detail
         errors.append(f"EmailJS: {detail}")
@@ -401,7 +439,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str, code
 
     # 5. Fallback to EmailJS if not tried yet
     if has_emailjs and not any("EmailJS:" in e for e in errors):
-        ok, detail = _send_via_emailjs(recipient, subject, html_body, text_body, code=code)
+        ok, detail = _send_via_emailjs(recipient, subject, html_body, text_body, code=code, heading=heading)
         if ok:
             return True, detail
         errors.append(f"EmailJS: {detail}")
@@ -445,7 +483,7 @@ def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
   <p style="color: #9ca3af; font-size: 12px; margin: 0;">MoiDoctar &middot; AI-powered clinical symptom triage & health navigation</p>
 </div>
 """
-    ok, detail = send_email(recipient, subject, html_body, text_body, code=code)
+    ok, detail = send_email(recipient, subject, html_body, text_body, code=code, heading=heading)
     if not ok:
         logger.warning(f"[OTP Fallback] Email delivery not completed for {recipient}. Code: {code}. Reason: {detail}")
     return ok, detail
