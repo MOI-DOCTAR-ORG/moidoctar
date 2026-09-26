@@ -168,6 +168,78 @@ def _match(answer: str, options: List[str]) -> Optional[int]:
     return starts[0] if len(starts) == 1 else None
 
 
+_WORDNUM = {"one": 1, "a": 1, "an": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+            "eight": 8, "nine": 9, "ten": 10, "few": 3, "couple": 2, "several": 4}
+_UNIT_DAYS = {"hour": 1 / 24, "day": 1, "night": 1, "week": 7, "month": 30}
+_DURATION = re.compile(r"\b(\d+(?:\.\d+)?|one|a|an|two|three|four|five|six|seven|eight|nine|ten|few|couple|several)"
+                       r"\s*(?:of\s+)?(hour|day|night|week|month)s?\b")
+_YES = re.compile(r"^(yes|yeah|yea|yep|yup|y|sure|correct|true|e dey|i dey|it is|he is|she is|dem dey|na so)\b")
+_NO = re.compile(r"^(no|nope|nah|n|not really|never|none|e no dey|i no|no be so|nothing)\b")
+_UNSURE = re.compile(r"^(not sure|dont know|don't know|i don't know|i dont know|no idea|unsure|maybe|i no know)\b")
+
+# Set by triage_service: (answer, question_text, options) -> option index or None. Model-backed,
+# so a typed answer in any wording can still land on an approved option.
+classifier = None
+
+
+def _duration_days(text: str) -> Optional[float]:
+    t = (text or "").lower()
+    if re.search(r"\b(today|this morning|this afternoon|tonight|since morning|just now|few hours)\b", t):
+        return 0.5
+    if re.search(r"\b(yesterday|last night)\b", t):
+        return 1
+    m = _DURATION.search(t)
+    if not m:
+        return None
+    n = m.group(1)
+    count = float(n) if n[0].isdigit() else _WORDNUM.get(n, 1)
+    return count * _UNIT_DAYS[m.group(2)]
+
+
+def _duration_option(days: float, options: List[str]) -> Optional[int]:
+    """Map a stated duration onto options written as week buckets."""
+    lows = [o.lower() for o in options]
+    if not all("week" in o for o in lows):
+        return None
+    if days <= 10:
+        target = next((i for i, o in enumerate(lows) if "or less" in o or "a week" in o), None)
+    elif days <= 17:
+        target = next((i for i, o in enumerate(lows) if "two" in o or "2" in o), None)
+    else:
+        target = next((i for i, o in enumerate(lows) if "or more" in o or "three" in o), None)
+    return target
+
+
+def match_answer(answer: str, options: List[str], question_text: str = "") -> Optional[int]:
+    """A tapped option, or a typed reply mapped onto one. None when it cannot be placed safely."""
+    i = _match(answer, options)
+    if i is not None:
+        return i
+    a = _norm(answer)
+    lows = [_norm(o) for o in options]
+    for pat, word in ((_UNSURE, ("not sure", "i do not", "unknown")), (_NO, ("no",)), (_YES, ("yes",))):
+        if pat.search(a):
+            hits = [k for k, o in enumerate(lows) if any(re.match(rf"{w}\b", o) for w in word)]
+            if len(hits) == 1:
+                return hits[0]
+    days = _duration_days(answer)
+    if days is not None:
+        k = _duration_option(days, options)
+        if k is not None:
+            return k
+    if classifier is not None:
+        try:
+            k = classifier(answer, question_text, options)
+        except Exception:  # noqa: BLE001 - a failed lookup just re-asks
+            k = None
+        if isinstance(k, int) and 0 <= k < len(options):
+            return k
+    return None
+
+
+NOT_MATCHED = "I couldn't match that to one of the answers. Please tap the one closest to what you mean."
+
+
 def question(qid: str, text: str, options: List[str]) -> Dict[str, Any]:
     return {"id": qid, "text": text, "type": "single_choice", "options": options, "required": True}
 
@@ -199,25 +271,28 @@ def step(flow: Dict[str, Any], patient: Dict[str, Any], answer: str, all_text: s
       ("free", {"flow": flow})            -> model-led assessment
     """
     pending = flow.get("pending")
+    missed = False
 
     # 1. Age profile. A profile card value wins; otherwise ask once.
     if patient.get("band"):
         flow["band"] = patient["band"]
     if pending == AGE_QUESTION["id"]:
-        i = _match(answer, [o[0] for o in AGE_QUESTION["options"]])
+        i = match_answer(answer, [o[0] for o in AGE_QUESTION["options"]], AGE_QUESTION["text"])
+        missed = i is None
         if i is not None:
             flow["band"] = AGE_QUESTION["options"][i][1]
     if not flow.get("band"):
         flow["pending"] = AGE_QUESTION["id"]
         return "ask", {"question": question(AGE_QUESTION["id"], AGE_QUESTION["text"],
                                             [o[0] for o in AGE_QUESTION["options"]]),
-                       "summary": "Before I guide you, one quick question.", "flow": flow}
+                       "summary": NOT_MATCHED if missed else "Before I guide you, one quick question.", "flow": flow}
 
     # 2. Under 6: danger and dehydration checks, then professional review.
     if flow["band"] == "under_6":
         if pending and pending.startswith("u6."):
             check = next(c for c in UNDER6_CHECKS if c["id"] == pending)
-            i = _match(answer, [o[0] for o in check["options"]])
+            i = match_answer(answer, [o[0] for o in check["options"]], check["text"])
+            missed = i is None
             if i is not None:
                 flow["u6"][pending] = i
         worst, reasons = "SOON", []
@@ -236,7 +311,8 @@ def step(flow: Dict[str, Any], patient: Dict[str, Any], answer: str, all_text: s
             if c["id"] not in flow["u6"]:
                 flow["pending"] = c["id"]
                 return "ask", {"question": question(c["id"], c["text"], [o[0] for o in c["options"]]),
-                               "summary": "Because this is a young child, I will check a few important signs.",
+                               "summary": NOT_MATCHED if missed else
+                               "Because this is a young child, I will check a few important signs.",
                                "flow": flow}
         flow["pending"] = None
         return "result", {"urgency": worst, "reasons": reasons,
@@ -249,7 +325,7 @@ def step(flow: Dict[str, Any], patient: Dict[str, Any], answer: str, all_text: s
 
     # 4. Which approved table?
     if pending == "concern":
-        i = _match(answer, [o[0] for o in CONCERN_OPTIONS])
+        i = match_answer(answer, [o[0] for o in CONCERN_OPTIONS], "Which is closest to what is worrying you most?")
         if i is not None:
             chosen = CONCERN_OPTIONS[i][1]
             if chosen == "other":
@@ -274,7 +350,8 @@ def step(flow: Dict[str, Any], patient: Dict[str, Any], answer: str, all_text: s
         qid = pending.split(".", 1)[1]
         q = next((x for x in qs if x["id"] == qid), None)
         if q:
-            i = _match(answer, [o["text"] for o in q["options"]])
+            i = match_answer(answer, [o["text"] for o in q["options"]], q["prompt"])
+            missed = i is None
             if i is not None:
                 flow["answers"][qid] = q["options"][i]["id"]
     red = [q for q in qs if q["id"] in flow["answers"]
@@ -289,7 +366,7 @@ def step(flow: Dict[str, Any], patient: Dict[str, Any], answer: str, all_text: s
             flow["pending"] = f"{concern}.{q['id']}"
             n = len(flow["answers"]) + 1
             return "ask", {"question": question(flow["pending"], q["prompt"], [o["text"] for o in q["options"]]),
-                           "summary": f"Question {n} of {len(qs)}.", "flow": flow}
+                           "summary": NOT_MATCHED if missed else f"Question {n} of {len(qs)}.", "flow": flow}
     out = pack_decide(concern, flow["answers"])
     flow["pending"] = None
     level = TO_LEVEL[out["urgency"]]

@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.supabase import get_supabase_client, safe_supabase_rows
 from app.services.notification_service import create_notification
-from app.services import pathways, red_flags
+from app.services import pathways, red_flags, reply_prefs
 from app.services import triage_contract as contract
 
 logger = logging.getLogger("moidoctar.triage")
@@ -171,17 +171,36 @@ def _app_context(urgent: List[str], asked: int, prefs: Dict[str, Any], body_area
         lines.append("- The person is pregnant. Choose the safer level when unsure.")
     if body_areas:
         lines.append(f"- Body areas the user selected: {str(body_areas)[:120]}.")
-    style = {k: prefs.get(k) for k in ("response_style", "language", "tone") if prefs.get(k)}
-    if style:
-        lines.append(f"- Reply preferences: {style}.")
     return "\n".join(lines)
 
 
-def _ask_model(contents, system: str) -> Dict[str, Any]:
+def _ask_model(contents, system: str, opts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """One model call, validated. `opts` carries the user's settings (see _settings)."""
     from app.services.gemini_client import generate, parse_json_object
-    text, _meta = generate(contents, system_instruction=system, json_mode=True, temperature=0.2,
-                           max_output_tokens=1024)
-    return contract.validate(parse_json_object(text))
+    opts = opts or {}
+    text, _meta = generate(contents, system_instruction=(system + opts.get("block", "")), json_mode=True,
+                           temperature=0.2, max_output_tokens=1024)
+    raw = parse_json_object(text)
+    shown = contract.validate(raw)
+    if reply_prefs.needs_check_copy(opts.get("lang")):
+        # The safety patterns are English, so a reply in another language is checked
+        # through the English copy the model returns beside it. No copy, no answer.
+        eng = raw.get("english") if isinstance(raw.get("english"), dict) else None
+        if not eng:
+            raise contract.InvalidResult("no English copy to check")
+        q = raw.get("follow_up_question") if isinstance(raw.get("follow_up_question"), dict) else None
+        contract.validate({**raw, "summary": eng.get("summary"), "reason": eng.get("reason"),
+                           "next_steps": eng.get("next_steps") or [],
+                           "follow_up_question": {**q, "text": eng.get("question") or q.get("text")} if q else None})
+        texts = [str(eng.get("summary") or ""), str(eng.get("reason") or ""), *map(str, eng.get("next_steps") or [])]
+    else:
+        texts = []
+    texts += [shown["summary"], shown["reason"] or "", *shown["next_steps"]]
+    other = reply_prefs.other_number(texts, opts.get("prefs") or {})
+    if other:
+        raise contract.InvalidResult(f"tells the user to call {other}")
+    shown["remember"] = raw.get("remember") if isinstance(raw.get("remember"), dict) else None
+    return shown
 
 
 def _to_contents(messages: List[Dict[str, str]], symptoms: str,
@@ -209,12 +228,33 @@ def _to_contents(messages: List[Dict[str, str]], symptoms: str,
 
 
 
-def _free_assessment(contents, system: str, floor: Optional[str], asked: int, is_greeting: bool):
+def _classify_answer(answer: str, question_text: str, options: List[str]) -> Optional[int]:
+    """Place a typed reply on one approved option. The model only picks from the list; it
+    never writes an answer, and anything it is unsure about comes back None (re-ask)."""
+    from app.services.gemini_client import generate, parse_json_object
+    numbered = "\n".join(f"{i}: {o}" for i, o in enumerate(options))
+    prompt = (f"Question: {question_text}\nOptions:\n{numbered}\nUser reply: {answer}\n\n"
+              "Which option means the same as the reply? The reply may be English, Nigerian Pidgin, Yoruba, "
+              "Hausa, Igbo or another language. "
+              'Return {"index": n} for one clear match, or {"index": null} if none fits or it is unclear.')
+    text, _ = generate([{"role": "user", "parts": [{"text": prompt}]}], json_mode=True, temperature=0,
+                       max_output_tokens=256)
+    idx = parse_json_object(text).get("index")
+    return int(idx) if isinstance(idx, int) else None
+
+
+pathways.classifier = _classify_answer
+
+
+def _free_assessment(contents, system: str, floor: Optional[str], asked: int, is_greeting: bool,
+                     opts: Optional[Dict[str, Any]] = None):
     """Model-led assessment, for greetings and concerns outside the approved tables."""
     from app.services.gemini_client import GeminiUnavailable
     ai_source, ai_notice = "rules", ""
+    opts = opts if opts is not None else {}
     try:
-        ai = _ask_model(contents, system)
+        ai = _ask_model(contents, system, opts)
+        opts["learned"] = ai.get("remember")
         ai_source = "gemini"
         has_symptoms = ai["has_symptoms"] and not is_greeting
         urgency, status = ai["urgency"], ai["status"]
@@ -249,15 +289,33 @@ def _free_assessment(contents, system: str, floor: Optional[str], asked: int, is
     return res, has_symptoms, ai_source, ai_notice
 
 
-def _explain(contents, level: str, why: str) -> Optional[Dict[str, Any]]:
+def _explain(contents, level: str, why: str, opts: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """Ask the model only to word a level the rules already decided. None -> use fixed copy."""
     from app.services.gemini_client import GeminiUnavailable
     try:
-        ai = _ask_model(contents, _SYSTEM_PROMPT + "\n\n" + _EXPLAIN_INSTRUCTION.format(level=level, why=why))
+        ai = _ask_model(contents, _SYSTEM_PROMPT + "\n\n" + _EXPLAIN_INSTRUCTION.format(level=level, why=why), opts)
     except (GeminiUnavailable, contract.InvalidResult, ValueError) as exc:
         logger.warning("%s wording from fixed copy: %s", level, exc)
         return None
     return ai if ai["urgency"] == level else None
+
+
+def _settings(mem: Dict[str, Any], patient: Dict[str, Any]) -> Dict[str, Any]:
+    """The user's Assistant Settings for this request: the prompt block and what it enforces."""
+    prefs = mem["preferences"]
+    explicit = any(h.get("field") == "preferences.language" and h.get("source") == "user"
+                   for h in mem.get("history") or [])
+    lang = reply_prefs.language(prefs, explicit)
+    remember = bool(prefs.get("remember_conversations", True))
+    # Stored health details describe the user, so they are used only when the user is the
+    # one who is unwell. With memory off, only what they put in their profile is used.
+    own = (patient or {}).get("for") in (None, "", "self")
+    conditions: List[str] = []
+    if own:
+        conditions = list(mem["health_context"].get("conditions") or []) if remember \
+            else list((mem.get("profile_items") or {}).get("conditions") or [])
+    return {"prefs": prefs, "lang": lang, "remember": remember and own, "learned": None,
+            "block": reply_prefs.instructions(prefs, lang, conditions, remember and own)}
 
 
 def analyze_conversation(
@@ -289,12 +347,14 @@ def analyze_conversation(
 
     if isinstance(context.get("profile"), dict):
         ai_memory.sync_health_context(user_id, context["profile"], source="profile")
-    prefs = ai_memory.load(user_id)["preferences"]
+    mem = ai_memory.load(user_id)
+    prefs = mem["preferences"]
     contents = _to_contents(messages, symptoms, image_bytes, image_mime)
 
     ai_source, ai_notice = "rules", ""
     flow = pathways.clean_flow(context.get("flow"))
     patient = pathways.patient_from_context(context)
+    opts = _settings(mem, patient)
     answer = user_turns[-1] if user_turns else symptoms
     floor = "URGENT" if urgent else None
     kind, step = ("", {})
@@ -302,7 +362,9 @@ def analyze_conversation(
         # Red flag: EMERGENCY is fixed and routine questioning stops. The model may only word it.
         res = contract.build("EMERGENCY", status="emergency_stop")
         try:
-            ai = _ask_model(contents, _SYSTEM_PROMPT + "\n\n" + _EMERGENCY_INSTRUCTION.format(flags=", ".join(emergency)))
+            ai = _ask_model(contents, _SYSTEM_PROMPT + "\n\n" + _EMERGENCY_INSTRUCTION.format(flags=", ".join(emergency)),
+                            opts)
+            opts["learned"] = ai.get("remember")
             steps = [res["next_steps"][0]] + [s for s in ai["next_steps"] if s != res["next_steps"][0]][:2]
             res = contract.build("EMERGENCY", status="emergency_stop", summary=ai["summary"] or None,
                                  reason=ai["reason"] or res["reason"], next_steps=steps)
@@ -319,11 +381,11 @@ def analyze_conversation(
         asked = _questions_asked(messages)
         system = _SYSTEM_PROMPT + "\n" + _app_context(urgent, asked, prefs, context.get("body_areas"),
                                                       context.get("severity"), patient)
-        res, has_symptoms, ai_source, ai_notice = _free_assessment(contents, system, floor, asked, is_greeting)
+        res, has_symptoms, ai_source, ai_notice = _free_assessment(contents, system, floor, asked, is_greeting, opts)
         flow = {}
     elif is_greeting and not context.get("flow"):
         res, has_symptoms, ai_source, ai_notice = _free_assessment(
-            contents, _SYSTEM_PROMPT + "\n" + _app_context(urgent, 0, prefs, None, None, patient), None, 0, True)
+            contents, _SYSTEM_PROMPT + "\n" + _app_context(urgent, 0, prefs, None, None, patient), None, 0, True, opts)
         flow = {}
     else:
         kind, step = pathways.step(flow, patient, answer, user_text[-6000:])
@@ -343,7 +405,9 @@ def analyze_conversation(
                 reason = " ".join(reason.split()[:contract.MAX_SUMMARY_WORDS]).rstrip(",;") + "…"
             why = f"the approved {step['table']}" if step.get("table") else "the under-6 safety check"
             why += f"; signs selected: {reason}" if reason else "; no warning signs were selected"
-            ai = _explain(contents, level, why)
+            ai = _explain(contents, level, why, opts)
+            if ai:
+                opts["learned"] = ai.get("remember")
             res = contract.build(level, status="emergency_stop" if level == "EMERGENCY" else "complete",
                                  summary=ai["summary"] if ai and ai["summary"] else None, reason=reason,
                                  next_steps=steps[:contract.MAX_STEPS])
@@ -352,9 +416,20 @@ def analyze_conversation(
             asked = flow.get("free_asked", 0)
             system = _SYSTEM_PROMPT + "\n" + _app_context(urgent, asked, prefs, context.get("body_areas"),
                                                           context.get("severity"), patient)
-            res, has_symptoms, ai_source, ai_notice = _free_assessment(contents, system, floor, asked, is_greeting)
+            res, has_symptoms, ai_source, ai_notice = _free_assessment(contents, system, floor, asked, is_greeting,
+                                                                        opts)
             if res["status"] == "question":
                 flow["free_asked"] = asked + 1
+
+    # The settings that do not depend on the model: length limits and the user's number.
+    res = reply_prefs.fit(res, prefs)
+    loc = lambda t: reply_prefs.localize(t, prefs)  # noqa: E731
+    res = {**res, "summary": loc(res["summary"]), "reason": loc(res["reason"]) if res.get("reason") else res.get("reason"),
+           "next_steps": [loc(x) for x in res["next_steps"]], "safety_note": loc(res["safety_note"])}
+    ai_notice = loc(ai_notice)
+    memory_notes: List[str] = []
+    if opts["remember"] and opts.get("learned"):
+        memory_notes = ai_memory.apply_ai_updates(user_id, opts["learned"])
 
     medication_notice = contract.MEDICATION_REVIEW_MESSAGE if _MEDICATION_ASK.search(user_text.lower()) else ""
     legacy = contract.legacy_fields(res)
@@ -384,7 +459,9 @@ def analyze_conversation(
         "medication_notice": medication_notice,
         "ai_source": ai_source,
         "ai_notice": ai_notice,
-        "memory_notes": [],
+        "memory_notes": memory_notes,
+        "emergency_number": reply_prefs.emergency_number(prefs),
+        "reply_language": opts["lang"] or "auto",
     }
 
 
