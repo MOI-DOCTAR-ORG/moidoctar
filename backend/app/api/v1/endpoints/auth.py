@@ -234,6 +234,29 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
     }
 
 
+@router.get("/test-brevo")
+def test_brevo(to: str = "lateefedidi4@gmail.com"):
+    """Test sending an email directly via Brevo's HTTPS REST API."""
+    from app.core.email import _send_via_brevo
+    key = settings.effective_brevo_api_key
+    if not key:
+        return {
+            "ok": False,
+            "configured": False,
+            "detail": "BREVO_API_KEY is not set in environment variables.",
+            "to": to,
+        }
+    ok, detail = _send_via_brevo(to, "MoiDoctar Brevo Test", "<p>Test email from MoiDoctar via Brevo</p>", "Test email from MoiDoctar via Brevo")
+    return {
+        "ok": ok,
+        "configured": True,
+        "detail": detail,
+        "from_email": settings.effective_brevo_from_email,
+        "from_name": settings.effective_brevo_from_name,
+        "to": to,
+    }
+
+
 @router.get("/test-email")
 def test_email(to: str = "lateefedidi4@gmail.com"):
     """Comprehensive test endpoint to diagnose which provider is selected and test real delivery."""
@@ -244,6 +267,11 @@ def test_email(to: str = "lateefedidi4@gmail.com"):
         "detail": detail,
         "recipient": to,
         "provider_preference": settings.email_provider_preference,
+        "brevo": {
+            "configured": bool(settings.effective_brevo_api_key),
+            "from_email": settings.effective_brevo_from_email,
+            "from_name": settings.effective_brevo_from_name,
+        },
         "resend": {
             "configured": bool(settings.effective_resend_api_key),
             "from": settings.effective_resend_from,

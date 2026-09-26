@@ -216,14 +216,49 @@ class Settings(BaseSettings):
         return "MoiDoctar <noreply@moidoctar.com>"
 
     @property
+    def effective_brevo_api_key(self) -> str:
+        return (
+            os.getenv("BREVO_API_KEY")
+            or os.getenv("BREVO_KEY")
+            or os.getenv("SENDINBLUE_API_KEY")
+            or os.getenv("SIB_API_KEY")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_brevo_from_email(self) -> str:
+        raw = (
+            os.getenv("BREVO_FROM_EMAIL")
+            or os.getenv("BREVO_FROM")
+            or os.getenv("SENDINBLUE_FROM")
+            or self.effective_smtp_user
+            or ""
+        ).strip().strip("'\" \t\r\n")
+        if "@" in raw:
+            import email.utils
+            _, addr = email.utils.parseaddr(raw)
+            if addr:
+                return addr
+        return self.effective_smtp_user or "feromarkethub@gmail.com"
+
+    @property
+    def effective_brevo_from_name(self) -> str:
+        return (
+            os.getenv("BREVO_FROM_NAME")
+            or "MoiDoctar"
+        ).strip()
+
+    @property
     def email_provider_preference(self) -> str:
-        """Returns 'smtp', 'resend', or 'auto'."""
+        """Returns 'brevo', 'smtp', 'resend', or 'auto'."""
         provider = (
             os.getenv("EMAIL_PROVIDER")
             or os.getenv("MAIL_PROVIDER")
             or os.getenv("EMAIL_BACKEND")
             or ""
         ).strip().lower()
+        if provider in ("brevo", "sendinblue", "sib"):
+            return "brevo"
         if provider in ("smtp", "mail"):
             return "smtp"
         if provider == "resend":
