@@ -171,3 +171,17 @@ def test_caring_for_someone_else_uses_and_saves_nothing_about_the_user(monkeypat
 
 def test_trailing_comma_in_model_json_is_tolerated():
     assert gemini_client.parse_json_object('x {"a": [1, 2,], "b": {"c": 1,},} y') == {"a": [1, 2], "b": {"c": 1}}
+
+
+def test_settings_survive_a_read_only_data_dir(monkeypatch, tmp_path):
+    """Pxxl mounts the app read-only and app_settings may be missing: keep them in the temp dir."""
+    from app.services import kv_store
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, so no directory can be made under it (even as root)")
+    monkeypatch.setattr(kv_store, "_DATA_DIR", str(blocker / "data"))
+    monkeypatch.setattr(kv_store, "_TMP_DIR", str(tmp_path / "tmp"))
+    monkeypatch.setattr(kv_store, "get_supabase_client", lambda: None)
+    ai_memory.set_preferences("ro1", {"response_style": "concise", "emergency_number": "199"})
+    prefs = ai_memory.load("ro1")["preferences"]
+    assert prefs["response_style"] == "concise" and prefs["emergency_number"] == "199"
+    assert (tmp_path / "tmp").is_dir()
