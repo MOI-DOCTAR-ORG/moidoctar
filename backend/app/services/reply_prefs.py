@@ -97,6 +97,9 @@ def instructions(prefs: Dict[str, Any], lang: Optional[str], conditions: List[st
              "Never write any other phone number."]
     lines.append("- Units: use °F for temperature and lb for weight." if imperial
                  else "- Units: use °C for temperature and kg for weight.")
+    if not lang:
+        lines.append("- Language: reply in the language of the user's latest message. If they wrote in English, "
+                     "reply in English; use Nigerian Pidgin only when they write in Pidgin.")
     if lang:
         lines.append(f"- Write \"summary\", \"reason\", \"next_steps\" and the question text and options in {lang}, "
                      "even if the user writes in another language. Keep the instruction to get help unmistakable.")

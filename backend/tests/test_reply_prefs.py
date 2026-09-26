@@ -104,6 +104,7 @@ def test_units_reach_the_model(monkeypatch):
 def test_untouched_default_language_still_mirrors_the_user(monkeypatch):
     _, system = _run(monkeypatch, "l1", _ai_payload("SELF_CARE"))
     assert "Write \"summary\"" not in system          # no forced language
+    assert "If they wrote in English, reply in English" in system
     assert "mirror how the user writes" in system     # the base prompt's rule stands
 
 
@@ -166,3 +167,7 @@ def test_caring_for_someone_else_uses_and_saves_nothing_about_the_user(monkeypat
                        context=CHILD)
     assert "asthma" not in system and '"remember"' not in system
     assert "epilepsy" not in ai_memory.load("m3")["health_context"]["conditions"]
+
+
+def test_trailing_comma_in_model_json_is_tolerated():
+    assert gemini_client.parse_json_object('x {"a": [1, 2,], "b": {"c": 1,},} y') == {"a": [1, 2], "b": {"c": 1}}

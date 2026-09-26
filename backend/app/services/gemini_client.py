@@ -121,7 +121,8 @@ def parse_json_object(text: str) -> Dict[str, Any]:
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if not m:
             raise ValueError("no JSON object in model output")
-        obj = json.loads(m.group(0))
+        # The model now and then leaves a trailing comma before a closing bracket.
+        obj = json.loads(re.sub(r",\s*([}\]])", r"\1", m.group(0)))
     if not isinstance(obj, dict):
         raise ValueError("model output is not an object")
     return obj
