@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { SkeletonLine } from '../components/Skeleton'
-import { isLocationPolicyBlocked, isEmbeddedFrame } from '../utils/permissions'
+import { getCachedLocation, setCachedLocation, fetchIpLocation } from '../utils/permissions'
 
 interface Facility {
   id: string
@@ -178,7 +178,7 @@ const provenanceLabels = {
 // Geolocation permission states we distinguish in the UI. `navigator.permissions` isn't
 // available everywhere (notably Safari for the geolocation permission itself), so we treat
 // 'unknown' as "haven't asked yet, browser support unclear" rather than assuming denial.
-type LocationPermissionState = 'unknown' | 'prompt' | 'granted' | 'denied' | 'policy_blocked' | 'unsupported' | 'requesting'
+type LocationPermissionState = 'unknown' | 'prompt' | 'granted' | 'approximate' | 'denied' | 'unsupported' | 'requesting'
 
 export default function LocalCareDiscovery() {
   const navigate = useNavigate()
@@ -232,8 +232,10 @@ export default function LocalCareDiscovery() {
       const lat = parseFloat(results[0].lat)
       const lng = parseFloat(results[0].lon)
       setUserLocation({ lat, lng })
-      setLocationName(results[0].display_name.split(',').slice(0, 2).join(', '))
-      setLocationPermission('granted')
+      const name = results[0].display_name.split(',').slice(0, 2).join(', ')
+      setLocationName(name)
+      setLocationPermission('approximate')
+      setCachedLocation({ lat, lng, city: name, source: 'ip', timestamp: Date.now() })
       loadNearby(lat, lng)
     } catch {
       setLocationError('Could not reach the location search service. Please try again.')
@@ -242,83 +244,70 @@ export default function LocalCareDiscovery() {
     }
   }
 
-  // Triggers the browser's native location prompt. Must be called from a user gesture (a
-  // button click) for reliable behavior.
+  // Triggers the browser's native location prompt, falling back automatically to IP location
   const requestLocation = useCallback(() => {
-    if (isLocationPolicyBlocked()) {
-      setLocationPermission('policy_blocked')
-      setLocationError('Location is blocked because this page is running inside an embedded preview frame. Open MoiDoctar in a new tab to use live GPS, or type your city below.')
-      return
-    }
-    if (!('geolocation' in navigator)) {
-      setLocationPermission('unsupported')
-      setLocationError('Location is not available on this device. Showing sample facilities, or type your city below.')
-      return
-    }
     setLocationPermission('requesting')
     setLocationError('')
+
+    const fallbackToIp = async () => {
+      try {
+        const ip = await fetchIpLocation()
+        setUserLocation({ lat: ip.lat, lng: ip.lng })
+        setLocationName(ip.city ? `${ip.city} (Approximate)` : 'Approximate')
+        setLocationPermission('approximate')
+        loadNearby(ip.lat, ip.lng)
+      } catch {
+        setLocationPermission('denied')
+        setLocationError('Could not detect location. Search your city or neighborhood below.')
+      }
+    }
+
+    if (!('geolocation' in navigator)) {
+      fallbackToIp()
+      return
+    }
+
     try {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
           setLocationPermission('granted')
-          setLocationName('')
+          setLocationName('GPS Active')
           setUserLocation({ lat: latitude, lng: longitude })
+          setCachedLocation({ lat: latitude, lng: longitude, source: 'gps', timestamp: Date.now() })
           loadNearby(latitude, longitude)
         },
-        (err) => {
-          const isPolicy =
-            isLocationPolicyBlocked() ||
-            (isEmbeddedFrame() && err.code === err.PERMISSION_DENIED) ||
-            (err.message && /permissions[- ]policy|policy/i.test(err.message))
-
-          if (isPolicy) {
-            setLocationPermission('policy_blocked')
-            setLocationError('Location is blocked by the embedded preview frame. Open MoiDoctar in a new tab, or type your city below.')
-          } else if (err.code === err.PERMISSION_DENIED) {
-            setLocationPermission('denied')
-            setLocationError('Location access is blocked for this site. Enable it in your browser’s site settings, or type your city below.')
-          } else {
-            setLocationPermission('prompt')
-            setLocationError('Could not get your location. Showing sample facilities, or type your city below.')
-          }
+        () => {
+          fallbackToIp()
         },
-        { timeout: 10000, enableHighAccuracy: false }
+        { timeout: 4000, enableHighAccuracy: false }
       )
     } catch {
-      if (isLocationPolicyBlocked() || isEmbeddedFrame()) {
-        setLocationPermission('policy_blocked')
-      } else {
-        setLocationPermission('prompt')
-      }
+      fallbackToIp()
     }
   }, [loadNearby])
 
-  // On mount: only auto-request location if the browser can tell us permission was already
-  // granted in a previous visit.
+  // On mount: check cached location first, or auto-fetch IP location so the page is populated
   useEffect(() => {
-    if (isLocationPolicyBlocked()) {
-      setLocationPermission('policy_blocked')
+    const cached = getCachedLocation()
+    if (cached) {
+      setUserLocation({ lat: cached.lat, lng: cached.lng })
+      setLocationName(cached.city ? `${cached.city} (${cached.source === 'gps' ? 'GPS' : 'Approximate'})` : '')
+      setLocationPermission(cached.source === 'gps' ? 'granted' : 'approximate')
+      loadNearby(cached.lat, cached.lng)
       return
     }
-    if (!('geolocation' in navigator)) {
-      setLocationPermission('unsupported')
-      setLocationError('Location is not available on this device. Showing sample facilities, or search your city below.')
-      return
-    }
-    if (!('permissions' in navigator) || !navigator.permissions?.query) {
-      setLocationPermission('prompt')
-      return
-    }
-    navigator.permissions
-      .query({ name: 'geolocation' as PermissionName })
-      .then((status) => {
-        setLocationPermission(status.state as LocationPermissionState)
-        if (status.state === 'granted') requestLocation()
-        status.onchange = () => setLocationPermission(status.state as LocationPermissionState)
-      })
-      .catch(() => setLocationPermission('prompt'))
-  }, [requestLocation])
+
+    // Auto-detect location via IP so the user immediately gets real care listings
+    fetchIpLocation().then((ip) => {
+      if (ip) {
+        setUserLocation({ lat: ip.lat, lng: ip.lng })
+        setLocationName(ip.city ? `${ip.city} (Approximate)` : 'Approximate')
+        setLocationPermission('approximate')
+        loadNearby(ip.lat, ip.lng)
+      }
+    })
+  }, [loadNearby])
 
   const filtered = filter === 'all' ? facilities : facilities.filter(f => f.type === filter)
 
@@ -335,9 +324,21 @@ export default function LocalCareDiscovery() {
           <p className="text-body-md text-secondary mt-1">Locate healthcare facilities and resources near you</p>
         </div>
         {userLocation && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-caption text-green-600 dark:text-green-400">
-            <Icon icon="my_location" size="sm" />
-            {locationName ? `Location: ${locationName}` : 'Location Active'}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-caption text-green-600 dark:text-green-400 font-bold">
+              <Icon icon="my_location" size="sm" />
+              {locationName || 'Location Active'}
+            </div>
+            {locationPermission === 'approximate' && (
+              <button
+                type="button"
+                onClick={requestLocation}
+                className="px-3 py-1 bg-surface border border-outline-variant hover:border-primary/40 rounded-full text-caption text-secondary hover:text-primary transition-colors flex items-center gap-1"
+              >
+                <Icon icon="gps_fixed" size="sm" />
+                Use Precise GPS
+              </button>
+            )}
           </div>
         )}
       </header>
@@ -383,35 +384,6 @@ export default function LocalCareDiscovery() {
         </div>
       )}
 
-      {locationPermission === 'policy_blocked' && !userLocation && (
-        <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Icon icon="warning" size="lg" className="text-amber-500 shrink-0" />
-            <div>
-              <p className="text-body-sm text-on-surface font-bold">Location blocked by preview frame</p>
-              <p className="text-caption text-secondary">
-                Browsers restrict location access inside embedded previews or iframes. Open MoiDoctar directly in a new tab, or use the city search above.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.open(window.location.href, '_blank')}
-              className="px-4 min-h-[44px] bg-primary text-on-primary rounded-xl text-label-md font-label-md font-bold hover:opacity-90 flex items-center gap-1.5 transition-all"
-            >
-              <Icon icon="open_in_new" size="sm" />
-              Open in New Tab
-            </button>
-            <button
-              onClick={requestLocation}
-              className="px-4 min-h-[44px] bg-surface border border-outline-variant text-on-surface rounded-xl text-label-md font-label-md font-bold hover:border-primary/30 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
-
       {locationPermission === 'denied' && !userLocation && (
         <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
@@ -421,27 +393,16 @@ export default function LocalCareDiscovery() {
               <p className="text-caption text-secondary">Enable it for this site in your browser settings, or use the city search above.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {isEmbeddedFrame() && (
-              <button
-                onClick={() => window.open(window.location.href, '_blank')}
-                className="px-4 min-h-[44px] bg-primary text-on-primary rounded-xl text-label-md font-label-md font-bold hover:opacity-90 flex items-center gap-1.5 transition-all"
-              >
-                <Icon icon="open_in_new" size="sm" />
-                Open in New Tab
-              </button>
-            )}
-            <button
-              onClick={requestLocation}
-              className="px-4 min-h-[44px] bg-surface border border-outline-variant text-on-surface rounded-xl text-label-md font-label-md font-bold hover:border-primary/30 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
+          <button
+            onClick={requestLocation}
+            className="px-4 min-h-[44px] bg-surface border border-outline-variant text-on-surface rounded-xl text-label-md font-label-md font-bold hover:border-primary/30 transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      {locationError && locationPermission !== 'denied' && locationPermission !== 'policy_blocked' && (
+      {locationError && locationPermission !== 'denied' && (
         <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-caption text-amber-600 dark:text-amber-400">
           <Icon icon="info" size="sm" />
           {locationError}

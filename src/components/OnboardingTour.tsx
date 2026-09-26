@@ -88,8 +88,8 @@ export default function OnboardingTour({ onFinish }: Props) {
   }
 
   const statusLabel = (status: PermissionResult | 'idle' | 'requesting') => {
-    if (status === 'granted') return { text: 'Enabled', className: 'text-green-600 dark:text-green-400' }
-    if (status === 'policy_blocked') return { text: 'Blocked by preview frame — open app in new tab to enable', className: 'text-amber-500 font-semibold' }
+    if (status === 'granted') return { text: 'Enabled (GPS)', className: 'text-green-600 dark:text-green-400 font-semibold' }
+    if (status === 'approximate') return { text: 'Enabled (Approximate location)', className: 'text-green-600 dark:text-green-400 font-semibold' }
     if (status === 'denied') return { text: 'Blocked — enable in browser settings', className: 'text-error' }
     if (status === 'unsupported') return { text: 'Not available on this device', className: 'text-secondary' }
     if (status === 'requesting') return { text: 'Requesting…', className: 'text-secondary' }
@@ -160,16 +160,6 @@ export default function OnboardingTour({ onFinish }: Props) {
                   <p className={statusLabel(locationStatus)?.className}>Location: {statusLabel(locationStatus)?.text}</p>
                   <p className={statusLabel(notificationStatus)?.className}>Notifications: {statusLabel(notificationStatus)?.text}</p>
                 </div>
-              )}
-              {locationStatus === 'policy_blocked' && (
-                <button
-                  type="button"
-                  onClick={() => window.open(window.location.href, '_blank')}
-                  className="w-full mt-2 py-2 px-3 rounded-xl border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Icon icon="open_in_new" size="sm" />
-                  Open in new tab to allow location
-                </button>
               )}
             </div>
           )}

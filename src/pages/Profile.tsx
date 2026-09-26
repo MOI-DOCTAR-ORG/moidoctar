@@ -78,10 +78,8 @@ export default function Profile() {
     const [loc, notif] = await Promise.all([requestLocationPermission(), requestNotificationPermission()])
     setLocationPerm(loc)
     setNotificationPerm(notif)
-    if (loc === 'granted' || notif === 'granted') {
+    if (loc === 'granted' || loc === 'approximate' || notif === 'granted') {
       addToast('Permissions updated', 'success')
-    } else if (loc === 'policy_blocked') {
-      addToast('Location is blocked inside the preview frame. Open MoiDoctar in a new tab.', 'info')
     } else {
       addToast('Permission requests were blocked — enable them in your browser’s site settings.', 'error')
     }
@@ -698,16 +696,6 @@ export default function Profile() {
               <PermissionRow icon="location_on" label="Location" status={locationPerm} note="Used by Nearby Care to find facilities close to you." />
               <PermissionRow icon="notifications" label="Notifications" status={notificationPerm} note="Used for medication and triage reminders." />
             </div>
-            {locationPerm === 'policy_blocked' && (
-              <button
-                type="button"
-                onClick={() => window.open(window.location.href, '_blank')}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Icon icon="open_in_new" size="sm" />
-                Open in new tab to enable location
-              </button>
-            )}
             <button
               type="button"
               onClick={handleEnablePermissions}
@@ -907,15 +895,15 @@ function PermissionRow({
 }: {
   icon: string
   label: string
-  status: 'granted' | 'denied' | 'unsupported' | 'prompt' | 'policy_blocked' | 'unknown' | 'requesting'
+  status: 'granted' | 'approximate' | 'denied' | 'unsupported' | 'prompt' | 'unknown' | 'requesting'
   note: string
 }) {
   const badge = (() => {
     switch (status) {
       case 'granted':
-        return { text: 'Enabled', className: 'bg-green-500/15 text-green-600 dark:text-green-400' }
-      case 'policy_blocked':
-        return { text: 'Blocked by frame', className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' }
+        return { text: 'Enabled (GPS)', className: 'bg-green-500/15 text-green-600 dark:text-green-400' }
+      case 'approximate':
+        return { text: 'Enabled (Approximate)', className: 'bg-green-500/15 text-green-600 dark:text-green-400' }
       case 'denied':
         return { text: 'Blocked', className: 'bg-error/15 text-error' }
       case 'unsupported':
