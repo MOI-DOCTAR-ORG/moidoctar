@@ -5,6 +5,7 @@ import LianaAvatar from './LianaAvatar'
 import { TriageResultSkeleton } from './Skeleton'
 import EmergencyEscalation from './EmergencyEscalation'
 import TriageFeedback from './TriageFeedback'
+import PatientCard, { BAND_LABEL, bandOf } from './PatientCard'
 import { useAuth, type TriageSession } from '../context/AuthContext'
 import { useBodyMap } from '../context/BodyMapContext'
 import { useTriageChat, type ChatMsg, type Severity } from '../context/TriageChatContext'
@@ -272,11 +273,16 @@ function ContractResultCard({ result, severity }: { result: TriageChatResponse &
 
   return (
     <div className={`mt-3 rounded-xl border-2 p-4 text-sm ${display.panel}`}>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${display.badge}`}>
           <Icon icon={display.icon} size="xs" />
           {display.label}
         </span>
+        {result.profile && (
+          <span className="rounded-md border border-outline-variant px-2 py-1 text-[11px] font-semibold text-on-surface-variant">
+            Profile: {result.profile.label}{result.profile.age ? ` · ${result.profile.age}` : ''}
+          </span>
+        )}
       </div>
       <p className="mt-2 text-xs font-semibold text-on-surface">
         {result.ai_source === 'offline' ? "We can't assess this while offline." : display.action}
@@ -333,14 +339,17 @@ function QuestionPrompt({ question, onAnswer, active }: { question: FollowUpQues
     <div className="mt-2 rounded-xl border border-outline-variant bg-surface px-4 py-3">
       <p className="text-[15px] font-semibold leading-relaxed text-on-surface">{question.text}</p>
       {question.options.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        // Approved-table options are whole sentences: stack them so each reads in full.
+        <div className={`mt-2 ${question.options.some((o) => o.length > 28) ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2'}`}>
           {question.options.map((opt) => (
             <button
               key={opt}
               type="button"
               disabled={!active}
               onClick={() => onAnswer(opt)}
-              className="min-h-10 rounded-full border border-primary/40 px-4 text-sm text-on-surface transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-on-surface"
+              className={`min-h-10 border border-primary/40 px-4 py-2 text-sm text-on-surface transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-on-surface ${
+                question.options.some((o) => o.length > 28) ? 'rounded-xl text-left' : 'rounded-full'
+              }`}
             >
               {opt}
             </button>
@@ -372,7 +381,8 @@ function Bubble({ msg, severity, onAsk, isLatest, isLast }: { msg: ChatMsg; seve
         <div className="rounded-2xl rounded-tl-md border border-outline-variant bg-surface-container-low px-4 py-2.5">
           <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-on-surface">{msg.text}</p>
         </div>
-        {result && result.ai_source !== 'gemini' && (
+        {/* New-contract answers carry their own notice; the rules deciding is not a failure. */}
+        {result && result.ai_source !== 'gemini' && (!usesContract(result) || Boolean(result.ai_notice)) && (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs text-on-warning-container">
             <Icon icon="info" size="sm" className="mt-px shrink-0" />
             {result.ai_notice || (result.ai_source === 'offline' ? "We can't reach the server right now, so here's an offline safety check." : "We couldn't reach Liana's online assessment, so here's a basic safety check.")}
@@ -780,6 +790,15 @@ export default function TriageChat() {
 
         <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-6" role="log" aria-live="polite">
           <div className="mx-auto w-full max-w-3xl space-y-5">
+            {!chat.hasStarted ? (
+              <PatientCard value={chat.patient} onChange={chat.setPatient} />
+            ) : (
+              <p className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                <Icon icon="person" size="xs" />
+                Checking for {chat.patient.for === 'self' ? 'you' : chat.patient.for === 'child' ? 'your child' : 'someone else'}
+                {(() => { const b = bandOf(chat.patient); return b ? ` · ${BAND_LABEL[b]}` : '' })()}
+              </p>
+            )}
             {chat.messages.map((m, i) => (
               <Bubble key={m.id} msg={m} severity={chat.severity} onAsk={(q) => chat.send(q)} isLatest={m.id === latestId}
                 isLast={i === chat.messages.length - 1 && !chat.pending} />

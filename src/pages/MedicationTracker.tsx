@@ -119,15 +119,22 @@ export default function MedicationTracker() {
 
         {showForm && (
           <div className="bg-surface rounded-xl border border-outline-variant p-6 mb-6">
-            <h3 className="font-headline-md text-headline-md text-on-surface mb-4">New Medication</h3>
+            <h3 className="font-headline-md text-headline-md text-on-surface mb-2">New Medication</h3>
+            {/* OTC addendum, sections 9–10: this records instructions a health worker or the label gave;
+                it never suggests, calculates or changes a dose. */}
+            <p className="mb-4 flex items-start gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-caption text-on-surface-variant">
+              <Icon icon="info" size="sm" className="mt-px shrink-0" />
+              Record the dose exactly as your health worker, prescription or medicine label says. Moi Doctar does not
+              choose or change doses. Medication guidance is currently under medical review.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <div className="flex flex-col gap-1">
                 <label className="font-label-md text-caption text-secondary">Medication Name</label>
                 <PremiumInput placeholder="e.g. Lisinopril" value={medName} onChange={e => setMedName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="font-label-md text-caption text-secondary">Dosage</label>
-                <PremiumInput placeholder="e.g. 10mg" value={medDosage} onChange={e => setMedDosage(e.target.value)} />
+                <label className="font-label-md text-caption text-secondary">Dose (as prescribed or on the label)</label>
+                <PremiumInput placeholder="Copy it from your prescription or label" value={medDosage} onChange={e => setMedDosage(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="font-label-md text-caption text-secondary">Time</label>

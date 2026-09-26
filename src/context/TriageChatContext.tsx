@@ -4,7 +4,7 @@ import { buildAiContext } from '../lib/aiContext'
 import { useBodyMap } from './BodyMapContext'
 import { useAuth } from './AuthContext'
 import { scopeKey } from '../utils/storage'
-import type { FollowUpQuestion, TriageChatResponse } from '../types/triage'
+import type { FollowUpQuestion, PatientInfo, TriageChatResponse } from '../types/triage'
 import { usesContract } from '../lib/triageDisplay'
 
 export type ChatMsg = {
@@ -18,6 +18,8 @@ export type ChatMsg = {
   question?: FollowUpQuestion
   /** Fixed app copy shown under the message, e.g. the medication-under-review notice. */
   notice?: string
+  /** Approved-flow state returned with this answer; the next message sends it back. */
+  flow?: Record<string, unknown> | null
 }
 
 export type Severity = 'Mild' | 'Moderate' | 'Severe'
@@ -49,7 +51,7 @@ function errorText(err: unknown): string {
 // person closes the tab or explicitly starts a new triage.
 const DRAFT_KEY = () => scopeKey('doctarr_triage_draft')
 
-type Draft = { messages: ChatMsg[]; severity: Severity | null; sessionId: string }
+type Draft = { messages: ChatMsg[]; severity: Severity | null; sessionId: string; patient?: PatientInfo }
 
 function loadDraft(): Draft | null {
   try {
@@ -57,7 +59,7 @@ function loadDraft(): Draft | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<Draft>
     if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-      return { messages: parsed.messages, severity: parsed.severity ?? null, sessionId: parsed.sessionId || newSessionId() }
+      return { messages: parsed.messages, severity: parsed.severity ?? null, sessionId: parsed.sessionId || newSessionId(), patient: parsed.patient }
     }
   } catch {
     // Corrupt or unavailable storage — just start fresh.
@@ -94,6 +96,9 @@ type TriageChatApi = {
   image: File | null
   setImage: (f: File | null) => void
   sessionId: string
+  /** Who this check is for (addendum: age profile before assessment). */
+  patient: PatientInfo
+  setPatient: (p: PatientInfo) => void
   /** True once the person has said something — used to know whether resuming a real draft or starting fresh. */
   hasStarted: boolean
 }
@@ -117,6 +122,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
     () => initialDraft?.messages ?? [{ id: nextId(), role: 'ai', time: nowLabel(), text: greetingFor(selectedAreas.map((a) => a.label.toLowerCase())) }],
   )
   const [severity, setSeverityState] = useState<Severity | null>(initialDraft?.severity ?? null)
+  const [patient, setPatientState] = useState<PatientInfo>(initialDraft?.patient ?? { for: 'self' })
   const [error, setError] = useState<string | null>(null)
   const [image, setImage] = useState<File | null>(null)
   const sessionIdRef = useRef(initialDraft?.sessionId ?? newSessionId())
@@ -135,6 +141,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
     sessionIdRef.current = draft?.sessionId ?? newSessionId()
     setMessages(draft?.messages ?? [{ id: nextId(), role: 'ai', time: nowLabel(), text: greetingFor(selectedAreas.map((a) => a.label.toLowerCase())) }])
     setSeverityState(draft?.severity ?? null)
+    setPatientState(draft?.patient ?? { for: 'self' })
     setError(null)
     setImage(null)
     lastSent.current = null
@@ -143,8 +150,8 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
 
   // Persist on every change so a refresh (or a route change) resumes the same conversation.
   useEffect(() => {
-    saveDraft({ messages, severity, sessionId: sessionIdRef.current })
-  }, [messages, severity])
+    saveDraft({ messages, severity, sessionId: sessionIdRef.current, patient })
+  }, [messages, severity, patient])
 
   // If nobody has started the conversation yet and the person marks body-map areas, fold that
   // into the still-untouched greeting. Once a real exchange has happened, leave it alone.
@@ -175,7 +182,10 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
             role: m.role === 'ai' ? 'model' : 'user',
             content: m.question ? `${m.text} ${m.question.text}` : m.text,
           }))),
-          context: buildAiContext({ bodyAreas: selectedAreas, severity, sessionId: sessionIdRef.current }),
+          context: buildAiContext({
+            bodyAreas: selectedAreas, severity, sessionId: sessionIdRef.current, patient,
+            flow: [...history].reverse().find((m) => m.role === 'ai')?.flow ?? null,
+          }),
           image: img ?? undefined,
         })
         const data = res.data
@@ -194,6 +204,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
               question: data.status === 'question' && data.follow_up_question ? data.follow_up_question : undefined,
               // A completed result shows ai_notice itself; a question needs it here.
               notice: data.medication_notice || (complete ? undefined : data.ai_notice) || undefined,
+              flow: data.flow ?? null,
             },
           ])
           return
@@ -214,7 +225,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chat.mutateAsync, selectedAreas, severity],
+    [chat.mutateAsync, selectedAreas, severity, patient],
   )
 
   const send = useCallback(
@@ -237,6 +248,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
   }, [run, chat.isPending])
 
   const setSeverity = useCallback((s: Severity | null) => setSeverityState(s), [])
+  const setPatient = useCallback((p: PatientInfo) => setPatientState(p), [])
 
   const reset = useCallback(() => {
     clearDraft()
@@ -244,6 +256,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
     setMessages([{ id: nextId(), role: 'ai', time: nowLabel(), text: greetingFor(selectedAreas.map((a) => a.label.toLowerCase())) }])
     setError(null)
     setSeverityState(null)
+    setPatientState({ for: 'self' })
     setImage(null)
     lastSent.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -253,7 +266,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
     <TriageChatCtx.Provider
       value={{
         messages, latest, pending: chat.isPending, error, retry, send, reset,
-        severity, setSeverity, image, setImage, sessionId: sessionIdRef.current, hasStarted,
+        severity, setSeverity, image, setImage, sessionId: sessionIdRef.current, hasStarted, patient, setPatient,
       }}
     >
       {children}

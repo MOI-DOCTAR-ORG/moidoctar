@@ -1,5 +1,6 @@
 import { loadProfile } from '../types/profile'
 import { scopeKey } from '../utils/storage'
+import type { PatientInfo } from '../types/triage'
 
 export type BodyAreaLike = { label: string; severity: string; notes?: string }
 
@@ -15,7 +16,14 @@ function ageFromDob(dob: string): number | undefined {
  * triage message so the assistant does not have to ask again. The server also
  * stores it (with a change log) so it can be reviewed in AI settings.
  */
-export function buildAiContext(opts: { bodyAreas?: BodyAreaLike[]; severity?: string | null; sessionId?: string } = {}) {
+export function buildAiContext(opts: {
+  bodyAreas?: BodyAreaLike[]
+  severity?: string | null
+  sessionId?: string
+  patient?: PatientInfo | null
+  /** The last answer's approved-flow state. Always sent (null to start) so the server knows this client follows flows. */
+  flow?: Record<string, unknown> | null
+} = {}) {
   const profile = loadProfile(scopeKey('doctarr_patient_profile'))
   const ctx: Record<string, unknown> = {}
   if (profile) {
@@ -31,5 +39,7 @@ export function buildAiContext(opts: { bodyAreas?: BodyAreaLike[]; severity?: st
   if (opts.bodyAreas?.length) ctx.body_areas = opts.bodyAreas
   if (opts.severity) ctx.severity = opts.severity
   if (opts.sessionId) ctx.session_id = opts.sessionId
+  if (opts.patient) ctx.patient = opts.patient
+  ctx.flow = opts.flow ?? null
   return JSON.stringify(ctx)
 }

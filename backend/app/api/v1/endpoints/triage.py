@@ -23,7 +23,7 @@ MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 _CONTRACT_KEYS = ("status", "urgency", "indicator", "summary", "reason", "next_steps", "escalation",
                   "facility_action", "follow_up_question", "safety_note", "red_flags", "warning_signs",
-                  "rule_version", "medication_notice")
+                  "rule_version", "medication_notice", "flow", "profile", "pathway")
 
 
 def _contract(a: Dict[str, Any]) -> Dict[str, Any]:

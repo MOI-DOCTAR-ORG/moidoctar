@@ -84,6 +84,24 @@ export type TriageChatResponse = {
   warning_signs?: string[]
   rule_version?: string
   medication_notice?: string
+  /** Approved-flow state: sent back unchanged on the next message. */
+  flow?: Record<string, unknown> | null
+  /** The age profile the assessment used (addendum section 4). */
+  profile?: { band: AgeBand; label: string; age: string | null; weight_kg: number | null; for: PatientFor } | null
+  /** Which approved table was used (typhoid, respiratory, hypertension, diarrhea, under_6), if any. */
+  pathway?: string | null
+}
+
+export type AgeBand = 'adult' | 'pediatric_6_plus' | 'under_6'
+export type PatientFor = 'self' | 'child' | 'other'
+
+/** Who the check is for. Weight is recorded for the future dosage module; triage does not use it. */
+export type PatientInfo = {
+  for: PatientFor
+  age_years?: number | null
+  age_months?: number | null
+  weight_kg?: number | null
+  pregnant?: 'yes' | 'no' | 'not_sure' | null
 }
 
 export type CacheStats = {
