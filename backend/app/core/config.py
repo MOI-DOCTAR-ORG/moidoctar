@@ -136,21 +136,47 @@ class Settings(BaseSettings):
             or os.getenv("MAIL_PORT")
             or os.getenv("EMAIL_PORT")
             or str(self.SMTP_PORT)
-            or "587"
+            or ""
         ).strip().strip("'\" \t\r\n")
+
+        # Check if user explicitly set secure/SSL (e.g. SMTP_SECURE=true or SMTP_SSL=true)
+        raw_secure = (
+            os.getenv("SMTP_SECURE")
+            or os.getenv("MAIL_SECURE")
+            or os.getenv("EMAIL_SECURE")
+            or os.getenv("SMTP_SSL")
+            or os.getenv("SMTP_USE_SSL")
+            or ""
+        ).strip().lower()
+        is_secure = raw_secure in ("true", "1", "yes", "on")
+
         try:
-            return int(raw)
+            port = int(raw) if raw else (465 if is_secure else 587)
         except (ValueError, TypeError):
-            return 587
+            port = 465 if is_secure else 587
+
+        # If secure/SSL is explicitly requested (e.g. SMTP_SECURE=true) and port was set to 587,
+        # automatically normalize to 465, because direct SSL on port 587 fails with WRONG_VERSION_NUMBER.
+        if is_secure and port == 587:
+            return 465
+
+        # If host is Gmail and port was not explicitly specified or secure is true, default to 465 SSL
+        if "gmail.com" in self.effective_smtp_host.lower() and (not raw or is_secure):
+            return 465
+
+        return port
 
     @property
     def effective_smtp_use_ssl(self) -> bool:
         raw = (
             os.getenv("SMTP_USE_SSL")
             or os.getenv("SMTP_SSL")
+            or os.getenv("SMTP_SECURE")
             or os.getenv("MAIL_USE_SSL")
             or os.getenv("MAIL_SSL")
+            or os.getenv("MAIL_SECURE")
             or os.getenv("EMAIL_USE_SSL")
+            or os.getenv("EMAIL_SECURE")
         )
         if raw is not None:
             return str(raw).strip().lower() in ("true", "1", "yes", "on")

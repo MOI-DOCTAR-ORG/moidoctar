@@ -80,14 +80,14 @@ def _smtp_configured() -> bool:
 
 
 def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
-    """Send an email via standard SMTP."""
+    """Send an email via standard SMTP with automatic port/SSL fallback (465 SSL <-> 587 STARTTLS)."""
     import email.utils
 
     host = settings.effective_smtp_host
     user = settings.effective_smtp_user
     password = settings.effective_smtp_password
-    port = settings.effective_smtp_port
-    use_ssl = settings.effective_smtp_use_ssl
+    primary_port = settings.effective_smtp_port
+    primary_use_ssl = settings.effective_smtp_use_ssl
     use_tls = settings.effective_smtp_use_tls
 
     from_header = settings.effective_smtp_from
@@ -95,9 +95,13 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
 
     # CRITICAL: RFC 5321 envelope sender must be a bare email address,
     # not a formatted display name like "MoiDoctar <user@gmail.com>".
-    # Otherwise strict SMTP servers (Gmail, Zoho, Postfix) reject with "501 Syntax error".
-    _, envelope_from = email.utils.parseaddr(from_header)
-    if not envelope_from:
+    # For Gmail specifically, envelope sender MUST be the authenticated user.
+    _, parsed_from = email.utils.parseaddr(from_header)
+    if "gmail.com" in host.lower() and user and "@" in user:
+        envelope_from = user
+    elif parsed_from:
+        envelope_from = parsed_from
+    else:
         envelope_from = user if ("@" in user) else from_header
 
     msg = MIMEMultipart("alternative")
@@ -107,26 +111,43 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
     msg.attach(MIMEText(text_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    try:
-        if use_ssl:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=15) as server:
-                server.login(user, password)
-                server.sendmail(envelope_from, [recipient], msg.as_string())
-        else:
-            with smtplib.SMTP(host, port, timeout=15) as server:
-                server.ehlo()
-                if use_tls:
+    # Build fallback connection strategies:
+    # 1. Primary configured port & SSL mode
+    # 2. Alternative resilient mode (e.g. if 465 SSL fails, try 587 STARTTLS; if 587 fails, try 465 SSL)
+    strategies = [(primary_port, primary_use_ssl, "primary")]
+    if primary_use_ssl or primary_port == 465:
+        strategies.append((587, False, "fallback (587 STARTTLS)"))
+    else:
+        strategies.append((465, True, "fallback (465 SSL)"))
+
+    last_error_msg = ""
+    for port, use_ssl, label in strategies:
+        try:
+            logger.info(f"Attempting SMTP connection to {host}:{port} ({label}, ssl={use_ssl})")
+            if use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, context=context, timeout=12) as server:
+                    server.login(user, password)
+                    server.sendmail(envelope_from, [recipient], msg.as_string())
+            else:
+                with smtplib.SMTP(host, port, timeout=12) as server:
+                    server.ehlo()
                     context = ssl.create_default_context()
                     server.starttls(context=context)
                     server.ehlo()
-                server.login(user, password)
-                server.sendmail(envelope_from, [recipient], msg.as_string())
-        logger.info(f"Email successfully sent via SMTP ({host}:{port}) to {recipient}")
-        return True, "Delivered via SMTP"
-    except Exception as e:
-        logger.error(f"Failed to send email via SMTP ({host}:{port}) to {recipient}: {e}")
-        return False, f"SMTP Error ({host}:{port}): {e}"
+                    server.login(user, password)
+                    server.sendmail(envelope_from, [recipient], msg.as_string())
+
+            logger.info(f"Email successfully sent via SMTP ({host}:{port}, {label}) to {recipient}")
+            return True, f"Delivered via SMTP ({port})"
+        except Exception as e:
+            last_error_msg = f"{type(e).__name__}: {e}"
+            logger.warning(
+                f"SMTP attempt failed for {recipient} on {host}:{port} ({label}): {last_error_msg}"
+            )
+
+    logger.error(f"All SMTP delivery attempts failed for {recipient}: {last_error_msg}")
+    return False, f"SMTP Error ({host}): {last_error_msg}"
 
 
 
