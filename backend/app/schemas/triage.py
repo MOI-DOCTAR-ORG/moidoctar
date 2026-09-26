@@ -32,6 +32,10 @@ class TriageResponse(BaseModel):
     warning_signs: List[str] = []
     rule_version: Optional[str] = None
     medication_notice: str = ""
+    # Approved-flow state (sent back by the client) and the age profile used (addendum 4).
+    flow: Optional[Dict[str, Any]] = None
+    profile: Optional[Dict[str, Any]] = None
+    pathway: Optional[str] = None
 
 
 class TriageChatRequest(BaseModel):
@@ -73,6 +77,10 @@ class TriageChatResponse(BaseModel):
     warning_signs: List[str] = []
     rule_version: Optional[str] = None
     medication_notice: str = ""
+    # Approved-flow state (sent back by the client) and the age profile used (addendum 4).
+    flow: Optional[Dict[str, Any]] = None
+    profile: Optional[Dict[str, Any]] = None
+    pathway: Optional[str] = None
 
 
 class BackendTriageStatus(BaseModel):

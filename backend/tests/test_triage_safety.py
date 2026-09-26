@@ -59,8 +59,13 @@ def answer(level="SELF_CARE", **extra):
     return base
 
 
-def run(text, messages=None):
-    return triage_service.analyze_conversation("u1", text, messages or [{"role": "user", "content": text}])
+# The model-led path: an adult whose concern is outside the approved tables ("Something else").
+FREE = {"patient": {"for": "self", "age_years": 30}, "flow": {"band": "adult", "stage": "free"}}
+
+
+def run(text, messages=None, context=None):
+    return triage_service.analyze_conversation("u1", text, messages or [{"role": "user", "content": text}],
+                                               context if context is not None else json.loads(json.dumps(FREE)))
 
 
 # ── red flags ───────────────────────────────────────────────────────────────
@@ -194,7 +199,7 @@ def test_question_limit_forces_a_result(monkeypatch):
     for i in range(5):
         history += [{"role": "user", "content": f"answer {i}"}, {"role": "assistant", "content": f"Question {i}?"}]
     history.append({"role": "user", "content": "headache"})
-    res = run("headache", history)
+    res = run("headache", history, {**FREE, "flow": {"band": "adult", "stage": "free", "free_asked": 5}})
     assert res["status"] == "complete" and res["urgency"] == "SOON"
 
 

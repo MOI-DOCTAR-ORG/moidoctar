@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.supabase import get_supabase_client, safe_supabase_rows
 from app.services.notification_service import create_notification
-from app.services import red_flags
+from app.services import pathways, red_flags
 from app.services import triage_contract as contract
 
 logger = logging.getLogger("moidoctar.triage")
@@ -126,6 +126,13 @@ Do not change the urgency level and do not ask questions.
 Return {{"status": "emergency_stop", "urgency": "EMERGENCY", "has_symptoms": true, "summary": one short explanation,
 "reason": null, "next_steps": up to 3 short steps, "follow_up_question": null, "escalation": {{"required": true}}}}."""
 
+_EXPLAIN_INSTRUCTION = """The application has already classified this case as {level} using {why}.
+Do not change the urgency level and do not ask questions. Only explain the result in one short, plain summary.
+Return {{"status": "complete", "urgency": "{level}", "has_symptoms": true, "summary": one short explanation,
+"reason": null, "next_steps": [], "follow_up_question": null,
+"escalation": {{"required": true when {level} is EMERGENCY or URGENT, else false}}}}.
+If {level} is EMERGENCY use "status": "emergency_stop"."""
+
 _MEDICATION_ASK = re.compile(
     r"\b(dose|dosage|how many (tablets?|pills?|mg|ml|spoons?)|how much (should|can|do) (i|we|he|she) (take|give)|"
     r"what (drug|medicine|tablet) (should|can|do)|which (drug|medicine)|can i take|wetin i fit take|which drug)\b")
@@ -142,7 +149,8 @@ def _questions_asked(messages: List[Dict[str, str]]) -> int:
                if str(m.get("role", "")).lower() != "user" and "?" in str(m.get("content") or m.get("text") or ""))
 
 
-def _app_context(urgent: List[str], asked: int, prefs: Dict[str, Any], body_areas: Any, severity: Any) -> str:
+def _app_context(urgent: List[str], asked: int, prefs: Dict[str, Any], body_areas: Any, severity: Any,
+                 patient: Optional[Dict[str, Any]] = None) -> str:
     """Only what the model needs. No stored conditions, allergies, medicines or history (handoff section 8)."""
     lines = ["", "APPLICATION CONTEXT (from app code, trust this):",
              f"- Assessment questions already asked: {asked} of {contract.MAX_QUESTIONS}."]
@@ -152,6 +160,15 @@ def _app_context(urgent: List[str], asked: int, prefs: Dict[str, Any], body_area
         lines.append(f"- Approved warning signs present: {', '.join(urgent)}. The urgency must be URGENT or higher.")
     if severity:
         lines.append(f"- The user rated severity: {str(severity)[:20]}.")
+    band = (patient or {}).get("band")
+    if band:
+        who = {"self": "the user", "child": "the user's child", "other": "someone the user is caring for"}.get(
+            patient.get("for"), "the user")
+        lines.append(f"- The person who is unwell is {who}; profile: {pathways.BANDS[band]}.")
+        if band != "adult":
+            lines.append("- This is a child. Speak to the caregiver. Choose the safer level when unsure.")
+    if (patient or {}).get("pregnant") == "yes":
+        lines.append("- The person is pregnant. Choose the safer level when unsure.")
     if body_areas:
         lines.append(f"- Body areas the user selected: {str(body_areas)[:120]}.")
     style = {k: prefs.get(k) for k in ("response_style", "language", "tone") if prefs.get(k)}
@@ -192,6 +209,57 @@ def _to_contents(messages: List[Dict[str, str]], symptoms: str,
 
 
 
+def _free_assessment(contents, system: str, floor: Optional[str], asked: int, is_greeting: bool):
+    """Model-led assessment, for greetings and concerns outside the approved tables."""
+    from app.services.gemini_client import GeminiUnavailable
+    ai_source, ai_notice = "rules", ""
+    try:
+        ai = _ask_model(contents, system)
+        ai_source = "gemini"
+        has_symptoms = ai["has_symptoms"] and not is_greeting
+        urgency, status = ai["urgency"], ai["status"]
+        if urgency == "EMERGENCY":
+            status = "emergency_stop"
+        if floor and _LEVEL_ORDER[urgency] > _LEVEL_ORDER[floor] and has_symptoms:
+            # The model under-called an approved warning sign: its wording described a milder
+            # level, so show the fixed copy for the rule level instead.
+            res = contract.build(floor, status="complete")
+        elif status == "question" and asked >= contract.MAX_QUESTIONS:
+            level = "SOON" if urgency == "INSUFFICIENT_INFORMATION" else urgency
+            res = contract.build(level, status="complete")
+        elif status == "complete" and urgency == "INSUFFICIENT_INFORMATION":
+            res = contract.build("SOON", status="complete")
+        else:
+            res = contract.build(urgency, status=status, summary=ai["summary"] or None, reason=ai["reason"],
+                                 next_steps=ai["next_steps"] if status != "question" else [],
+                                 question=ai["follow_up_question"])
+    except GeminiUnavailable as exc:
+        logger.warning("AI unavailable, fixed fallback: %s", exc)
+        has_symptoms = not is_greeting
+        res = contract.build(floor or ("INSUFFICIENT_INFORMATION" if is_greeting else "SOON"),
+                             status="question" if is_greeting else "complete",
+                             question={"id": "open_concern", "text": "What are you feeling right now?",
+                                       "type": "short_text", "options": [], "required": True} if is_greeting else None)
+        ai_notice = contract.FALLBACK_MESSAGE
+    except (contract.InvalidResult, ValueError) as exc:
+        logger.warning("AI response rejected: %s", exc)
+        has_symptoms = not is_greeting
+        res = contract.build(floor or "SOON", status="complete")
+        ai_notice = contract.FALLBACK_MESSAGE
+    return res, has_symptoms, ai_source, ai_notice
+
+
+def _explain(contents, level: str, why: str) -> Optional[Dict[str, Any]]:
+    """Ask the model only to word a level the rules already decided. None -> use fixed copy."""
+    from app.services.gemini_client import GeminiUnavailable
+    try:
+        ai = _ask_model(contents, _SYSTEM_PROMPT + "\n\n" + _EXPLAIN_INSTRUCTION.format(level=level, why=why))
+    except (GeminiUnavailable, contract.InvalidResult, ValueError) as exc:
+        logger.warning("%s wording from fixed copy: %s", level, exc)
+        return None
+    return ai if ai["urgency"] == level else None
+
+
 def analyze_conversation(
     user_id: str,
     symptoms: str,
@@ -225,6 +293,11 @@ def analyze_conversation(
     contents = _to_contents(messages, symptoms, image_bytes, image_mime)
 
     ai_source, ai_notice = "rules", ""
+    flow = pathways.clean_flow(context.get("flow"))
+    patient = pathways.patient_from_context(context)
+    answer = user_turns[-1] if user_turns else symptoms
+    floor = "URGENT" if urgent else None
+    kind, step = ("", {})
     if emergency:
         # Red flag: EMERGENCY is fixed and routine questioning stops. The model may only word it.
         res = contract.build("EMERGENCY", status="emergency_stop")
@@ -237,42 +310,51 @@ def analyze_conversation(
         except (GeminiUnavailable, contract.InvalidResult, ValueError) as exc:
             logger.warning("emergency wording from fixed copy: %s", exc)
         has_symptoms = True
+        flow["pending"] = None
+        if patient.get("band"):
+            flow["band"] = patient["band"]
+    elif "flow" not in context:
+        # A client that predates the approved flows never sends `flow` back, so a
+        # multi-step flow would restart on every answer. Keep the model-led path for it.
+        asked = _questions_asked(messages)
+        system = _SYSTEM_PROMPT + "\n" + _app_context(urgent, asked, prefs, context.get("body_areas"),
+                                                      context.get("severity"), patient)
+        res, has_symptoms, ai_source, ai_notice = _free_assessment(contents, system, floor, asked, is_greeting)
+        flow = {}
+    elif is_greeting and not context.get("flow"):
+        res, has_symptoms, ai_source, ai_notice = _free_assessment(
+            contents, _SYSTEM_PROMPT + "\n" + _app_context(urgent, 0, prefs, None, None, patient), None, 0, True)
+        flow = {}
     else:
-        floor = "URGENT" if urgent else None
-        system = _SYSTEM_PROMPT + "\n" + _app_context(urgent, asked, prefs, context.get("body_areas"), context.get("severity"))
-        try:
-            ai = _ask_model(contents, system)
-            ai_source = "gemini"
-            has_symptoms = ai["has_symptoms"] and not is_greeting
-            urgency, status = ai["urgency"], ai["status"]
-            if urgency == "EMERGENCY":
-                status = "emergency_stop"
-            if floor and _LEVEL_ORDER[urgency] > _LEVEL_ORDER[floor] and has_symptoms:
-                # The model under-called an approved warning sign: its wording described a milder
-                # level, so show the fixed copy for the rule level instead.
-                res = contract.build(floor, status="complete")
-            elif status == "question" and asked >= contract.MAX_QUESTIONS:
-                level = "SOON" if urgency == "INSUFFICIENT_INFORMATION" else urgency
-                res = contract.build(level, status="complete")
-            elif status == "complete" and urgency == "INSUFFICIENT_INFORMATION":
-                res = contract.build("SOON", status="complete")
-            else:
-                res = contract.build(urgency, status=status, summary=ai["summary"] or None, reason=ai["reason"],
-                                     next_steps=ai["next_steps"] if status != "question" else [],
-                                     question=ai["follow_up_question"])
-        except GeminiUnavailable as exc:
-            logger.warning("AI unavailable, fixed fallback: %s", exc)
-            has_symptoms = not is_greeting
-            res = contract.build(floor or ("INSUFFICIENT_INFORMATION" if is_greeting else "SOON"),
-                                 status="question" if is_greeting else "complete",
-                                 question={"id": "concern", "text": "What are you feeling right now?",
-                                           "type": "short_text", "options": [], "required": True} if is_greeting else None)
-            ai_notice = contract.FALLBACK_MESSAGE
-        except (contract.InvalidResult, ValueError) as exc:
-            logger.warning("AI response rejected: %s", exc)
-            has_symptoms = not is_greeting
-            res = contract.build(floor or "SOON", status="complete")
-            ai_notice = contract.FALLBACK_MESSAGE
+        kind, step = pathways.step(flow, patient, answer, user_text[-6000:])
+        flow = step["flow"]
+        has_symptoms = True
+        if kind == "ask":
+            res = contract.build("INSUFFICIENT_INFORMATION", status="question",
+                                 summary=step["summary"] or "Thanks. Next question.", question=step["question"])
+        elif kind == "result":
+            level = step["urgency"] if not floor or _LEVEL_ORDER[step["urgency"]] <= _LEVEL_ORDER[floor] else floor
+            fixed = contract.FIXED[level]["next_steps"]
+            steps = ([fixed[0]] if level in ("EMERGENCY", "URGENT") else []) + list(step["steps"])
+            if len(steps) < 2:
+                steps += [s for s in fixed if s not in steps]
+            reason = "; ".join(step["reasons"]) if step["reasons"] else None
+            if reason and len(reason.split()) > contract.MAX_SUMMARY_WORDS:
+                reason = " ".join(reason.split()[:contract.MAX_SUMMARY_WORDS]).rstrip(",;") + "…"
+            why = f"the approved {step['table']}" if step.get("table") else "the under-6 safety check"
+            why += f"; signs selected: {reason}" if reason else "; no warning signs were selected"
+            ai = _explain(contents, level, why)
+            res = contract.build(level, status="emergency_stop" if level == "EMERGENCY" else "complete",
+                                 summary=ai["summary"] if ai and ai["summary"] else None, reason=reason,
+                                 next_steps=steps[:contract.MAX_STEPS])
+            ai_source = "gemini" if ai else "rules"
+        else:
+            asked = flow.get("free_asked", 0)
+            system = _SYSTEM_PROMPT + "\n" + _app_context(urgent, asked, prefs, context.get("body_areas"),
+                                                          context.get("severity"), patient)
+            res, has_symptoms, ai_source, ai_notice = _free_assessment(contents, system, floor, asked, is_greeting)
+            if res["status"] == "question":
+                flow["free_asked"] = asked + 1
 
     medication_notice = contract.MEDICATION_REVIEW_MESSAGE if _MEDICATION_ASK.search(user_text.lower()) else ""
     legacy = contract.legacy_fields(res)
@@ -283,8 +365,8 @@ def analyze_conversation(
                        "recommended_actions": [], "red_flags_to_watch": []})
 
     # Rule version and flag ids only: no symptom text in the log.
-    logger.info("triage rules=%s flags=%s signs=%s urgency=%s source=%s", red_flags.RULES_VERSION,
-                emergency, urgent, res["urgency"], ai_source)
+    logger.info("triage rules=%s flags=%s signs=%s urgency=%s source=%s step=%s", red_flags.RULES_VERSION,
+                emergency, urgent, res["urgency"], ai_source, kind or "model")
     return {
         **res,
         **legacy,
@@ -294,7 +376,11 @@ def analyze_conversation(
         "is_conversational": not has_symptoms,
         "red_flags": emergency,
         "warning_signs": urgent,
-        "rule_version": red_flags.RULES_VERSION,
+        "rule_version": f"{red_flags.RULES_VERSION}; {pathways.PATHWAYS_VERSION}",
+        # Sent back by the client on the next turn; re-checked against the approved package.
+        "flow": flow or None,
+        "profile": pathways.profile_view(flow or {}, patient),
+        "pathway": step.get("pathway") if kind == "result" else (flow or {}).get("concern"),
         "medication_notice": medication_notice,
         "ai_source": ai_source,
         "ai_notice": ai_notice,

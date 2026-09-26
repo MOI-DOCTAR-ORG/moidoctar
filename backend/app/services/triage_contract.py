@@ -97,6 +97,16 @@ _DOSE = re.compile(r"\b\d+(\.\d+)?\s?(mg|mcg|ml|g|iu|tablets?|tabs?|caplets?|cap
 _DIAGNOSIS = re.compile(r"\byou (have|are having|'ve got|got) (a |an )?(malaria|typhoid|cholera|pneumonia|covid|"
                         r"meningitis|appendicitis|diabetes|hypertension|infection|ulcer|asthma|tuberculosis|tb)\b"
                         r"|\bdiagnos|\bit(?:'s| is) (definitely|clearly) ")
+# Handoff section 7: never invent a facility, opening hours, wait time or location.
+# Matched on the original case so "the nearest hospital" passes and "Unity Hospital" does not.
+_FACILITY = re.compile(r"\b(?:[A-Z][A-Za-z'.]+ ){1,4}(?:Teaching |General |Specialist |Federal |State )?"
+                       r"(?:Hospital|Clinic|Medical Cent(?:er|re)|Health Cent(?:er|re)|Pharmacy|Maternity)\b"
+                       r"|\b(?:LUTH|LASUTH|UCH|UNTH|ABUTH|UBTH|OAUTHC|JUTH|UITH|FMC)\b")
+_HOURS = re.compile(r"\b(open|opens|opened|closes|closing)\s+(24|all day|until|till|from|at|now|daily|every)"
+                    r"|\b\d{1,2}(:\d{2})?\s?(am|pm)\b|\b24/7\b|\bopening hours?\b")
+_WAIT = re.compile(r"\bwait(ing)?\s+(time|times)\b|\bwait (of |about |around |for )?\d+\s?(min|minute|hour)"
+                   r"|\b\d+\s?(min|minute|hour)s? wait\b")
+_ADDRESS = re.compile(r"\b\d+\s+[A-Za-z]+\s+(street|st|road|rd|avenue|ave|close|crescent|way)\b", re.I)
 _SAFE_CLAIM = re.compile(r"\byou are (definitely|completely) (safe|fine)\b|\bnothing to worry about\b")
 
 
@@ -121,6 +131,10 @@ def unsafe_text(text: str) -> Optional[str]:
         return "states a diagnosis"
     if _SAFE_CLAIM.search(t):
         return "tells the user they are definitely safe"
+    if _FACILITY.search(text or ""):
+        return "names a facility"
+    if _HOURS.search(t) or _WAIT.search(t) or _ADDRESS.search(text or ""):
+        return "states opening hours, a wait time or an address"
     return None
 
 

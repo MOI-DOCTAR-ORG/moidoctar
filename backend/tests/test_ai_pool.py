@@ -21,6 +21,8 @@ from app.services import triage_service  # noqa: E402
 
 KEY_A = "AIzaSyA" + "a" * 30
 KEY_B = "AIzaSyB" + "b" * 30
+# The model-led path (an adult, concern outside the approved tables).
+FREE = {"patient": {"for": "self", "age_years": 30}, "flow": {"band": "adult", "stage": "free"}}
 
 
 @pytest.fixture(autouse=True)
@@ -99,13 +101,13 @@ def _ai_payload(level, **extra):
 def test_ai_cannot_lower_urgency(monkeypatch):
     ai_keys.add_key(KEY_A, "A")
     monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("SELF_CARE")))
-    res = triage_service.analyze_conversation("u1", "I have crushing chest pain", [{"role": "user", "content": "I have crushing chest pain"}])
+    res = triage_service.analyze_conversation("u1", "I have crushing chest pain", [{"role": "user", "content": "I have crushing chest pain"}], dict(FREE))
     assert res["urgency"] == "URGENT" and res["urgency_level"] == "Urgent"
     assert res["ai_source"] == "gemini"
 
 
 def test_fallback_when_ai_down(monkeypatch):
-    res = triage_service.analyze_conversation("u1", "mild cough", [{"role": "user", "content": "mild cough"}])
+    res = triage_service.analyze_conversation("u1", "mild cough", [{"role": "user", "content": "mild cough"}], dict(FREE))
     assert res["ai_source"] == "rules" and res["ai_notice"]
 
 
@@ -123,7 +125,7 @@ def test_prompt_sends_reply_preferences_not_the_health_record(monkeypatch):
         return _reply(_ai_payload("SELF_CARE"))
 
     monkeypatch.setattr(gemini_client, "_post", spy)
-    res = triage_service.analyze_conversation("u2", "cough", [{"role": "user", "content": "cough"}])
+    res = triage_service.analyze_conversation("u2", "cough", [{"role": "user", "content": "cough"}], dict(FREE))
     sys_text = seen["body"]["systemInstruction"]["parts"][0]["text"]
     assert "'tone': 'direct'" in sys_text
     assert "penicillin" not in sys_text and "asthma" not in sys_text
@@ -148,11 +150,12 @@ def test_endpoints(monkeypatch):
         assert c.put("/api/v1/ai/preferences", json={"response_style": "detailed"}).json()["preferences"]["response_style"] == "detailed"
         monkeypatch.setattr(gemini_client, "_post", lambda *a, **k: _reply(_ai_payload("SOON")))
         ai_keys.add_key(KEY_B, "B")
-        r = c.post("/api/v1/triage/chat", json={"symptoms": "fever", "messages": [{"role": "ai", "text": "Hi"}, {"role": "user", "content": "fever 2 days"}]})
+        r = c.post("/api/v1/triage/chat", json={"symptoms": "fever", "messages": [{"role": "ai", "text": "Hi"}, {"role": "user", "content": "fever 2 days"}],
+                         "context": FREE})
         assert r.status_code == 200, r.text
         assert r.json()["reply"] and r.json()["ai_source"] == "gemini"
         assert r.json()["urgency"] == "SOON" and r.json()["indicator"]["color"] == "yellow"
-        r = c.post("/api/v1/triage/chat", data={"symptoms": "fever", "messages": "[]", "context": json.dumps({"profile": {"allergies": ["dust"]}})},
+        r = c.post("/api/v1/triage/chat", data={"symptoms": "fever", "messages": "[]", "context": json.dumps({"profile": {"allergies": ["dust"]}, **FREE})},
                    files={"image": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")})
         assert r.status_code == 200
         assert "dust" in ai_memory.load("u3")["health_context"]["allergies"]
