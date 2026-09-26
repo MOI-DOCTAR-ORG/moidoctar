@@ -23,7 +23,8 @@ DEFAULT_PREFERENCES: Dict[str, Any] = {
     "response_style": "balanced",
     "tone": "gentle",
     "units": "metric",
-    "language": "English",
+    # "auto" mirrors how the user writes (English, Nigerian English or Pidgin).
+    "language": "auto",
     "emergency_number": "112",
     "remember_conversations": True,
 }
@@ -64,6 +65,11 @@ def load(user_id: str) -> Dict[str, Any]:
         if isinstance(snap, dict):
             mem["profile_items"].update({k: v for k, v in snap.items() if k in LIST_FIELDS and isinstance(v, list)})
         mem["updated_at"] = data.get("updated_at")
+        # "English" was the stored default before "auto" existed. Unless the user picked
+        # it themselves, it means they never chose, so keep mirroring them.
+        if mem["preferences"].get("language") == "English" and not any(
+                h.get("field") == "preferences.language" and h.get("source") == "user" for h in mem["history"]):
+            mem["preferences"]["language"] = "auto"
     return mem
 
 
