@@ -4,7 +4,8 @@ import { buildAiContext } from '../lib/aiContext'
 import { useBodyMap } from './BodyMapContext'
 import { useAuth } from './AuthContext'
 import { scopeKey } from '../utils/storage'
-import type { TriageChatResponse } from '../types/triage'
+import type { FollowUpQuestion, TriageChatResponse } from '../types/triage'
+import { usesContract } from '../lib/triageDisplay'
 
 export type ChatMsg = {
   id: string
@@ -13,6 +14,10 @@ export type ChatMsg = {
   time: string
   result?: TriageChatResponse
   imageName?: string
+  /** One question at a time (handoff): shown under the message with its answer options. */
+  question?: FollowUpQuestion
+  /** Fixed app copy shown under the message, e.g. the medication-under-review notice. */
+  notice?: string
 }
 
 export type Severity = 'Mild' | 'Moderate' | 'Severe'
@@ -165,11 +170,34 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
       try {
         const res = await chat.mutateAsync({
           symptoms: userText,
-          messages: JSON.stringify(history.map((m) => ({ role: m.role === 'ai' ? 'model' : 'user', content: m.text }))),
+          // The question is part of what Liana said, so the model (and the question limit) can see it.
+          messages: JSON.stringify(history.map((m) => ({
+            role: m.role === 'ai' ? 'model' : 'user',
+            content: m.question ? `${m.text} ${m.question.text}` : m.text,
+          }))),
           context: buildAiContext({ bodyAreas: selectedAreas, severity, sessionId: sessionIdRef.current }),
           image: img ?? undefined,
         })
         const data = res.data
+        if (usesContract(data)) {
+          // Driven by the server's fixed fields, not the model's prose: a result card once the
+          // assessment is complete (or stopped for an emergency), otherwise the one next question.
+          const complete = data.status !== 'question' && data.has_symptoms !== false
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: nextId(),
+              role: 'ai',
+              time: nowLabel(),
+              text: data.summary || data.reply || 'What are you feeling right now?',
+              result: complete ? data : undefined,
+              question: data.status === 'question' && data.follow_up_question ? data.follow_up_question : undefined,
+              // A completed result shows ai_notice itself; a question needs it here.
+              notice: data.medication_notice || (complete ? undefined : data.ai_notice) || undefined,
+            },
+          ])
+          return
+        }
         const hasSymptoms = Boolean(data.has_symptoms && data.possible_conditions && data.possible_conditions.length > 0)
         setMessages((prev) => [
           ...prev,

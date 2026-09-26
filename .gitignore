@@ -20,3 +20,4 @@ __pycache__/
 backend/.env
 backend/.data/
 *.tsbuildinfo
+backend/.data_test/
