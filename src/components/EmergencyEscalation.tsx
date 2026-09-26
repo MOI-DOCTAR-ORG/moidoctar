@@ -20,9 +20,11 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags, title, sub
   const isEmergency = ['emergency', 'high', 'urgent'].includes(urgencyLevel.toLowerCase())
   if (!isEmergency) return null
 
-  // Nigeria's numbers, with the one the user set in Assistant Settings first.
-  const emergencyNumbers = own && !EMERGENCY_NUMBERS.some((n) => n.number === own)
-    ? [{ label: 'Your emergency number', number: own, icon: 'call' }, ...EMERGENCY_NUMBERS]
+  // Nigeria's numbers, with the one the user set in Assistant Settings first
+  // (moved up if it is already one of them, e.g. 199).
+  const emergencyNumbers = own && own !== EMERGENCY_NUMBERS[0].number
+    ? [{ label: 'Your emergency number', number: own, icon: 'call' },
+       ...EMERGENCY_NUMBERS.filter((n) => n.number !== own)]
     : EMERGENCY_NUMBERS
 
   return (
