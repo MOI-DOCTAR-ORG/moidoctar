@@ -68,6 +68,10 @@ export type TriageChatResponse = {
   ai_notice?: string
   /** Things the assistant just remembered about the user */
   memory_notes?: string[]
+  /** The number escalation copy tells the user to call (their setting; 112 by default). */
+  emergency_number?: string
+  /** The language Liana was told to reply in, or "auto" to mirror the user. */
+  reply_language?: string
 
   // The handoff result contract. Present on every new answer; older saved sessions don't have it.
   status?: 'question' | 'complete' | 'emergency_stop'

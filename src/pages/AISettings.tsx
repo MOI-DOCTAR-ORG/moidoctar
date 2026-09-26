@@ -41,11 +41,20 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
   )
 }
 
+// "auto" mirrors how the user writes: English, Nigerian English or Pidgin.
+const LANGUAGES = [
+  { value: 'auto', label: 'Match how I write', hint: 'English or Pidgin' },
+  { value: 'English', label: 'English' },
+  { value: 'Pidgin', label: 'Pidgin' },
+  { value: 'Yoruba', label: 'Yorùbá' },
+  { value: 'Hausa', label: 'Hausa' },
+  { value: 'Igbo', label: 'Igbo' },
+]
+
 function PreferencesTab() {
   const { data: mem, isLoading, isError } = useAiMemory()
   const update = useUpdateAiPreferences()
   const { addToast } = useToastCtx()
-  const [lang, setLang] = useState<string | null>(null)
   const [num, setNum] = useState<string | null>(null)
   if (isLoading) return <p className="text-sm text-on-surface-variant">Loading…</p>
   if (isError || !mem) return <p className="text-sm text-on-surface-variant">Could not load your preferences. Check your connection and refresh.</p>
@@ -59,6 +68,9 @@ function PreferencesTab() {
 
   return (
     <div className="space-y-6">
+      <p className="rounded-xl bg-surface-container px-4 py-3 text-sm text-on-surface-variant">
+        These settings change how Liana writes to you. They never change how urgent a result is: Moi Doctar's safety rules decide that, and every answer is checked before you see it.
+      </p>
       <Segmented
         label="How long should answers be?" value={p.response_style} onChange={(v) => save({ response_style: v })}
         options={[{ value: 'concise', label: 'Short', hint: '1–2 sentences' }, { value: 'balanced', label: 'Balanced', hint: '2–4 sentences' }, { value: 'detailed', label: 'Detailed', hint: 'A short paragraph' }]}
@@ -71,15 +83,12 @@ function PreferencesTab() {
         label="Units" value={p.units} onChange={(v) => save({ units: v })}
         options={[{ value: 'metric', label: 'Metric', hint: '°C, kg' }, { value: 'imperial', label: 'Imperial', hint: '°F, lb' }]}
       />
+      <Segmented
+        label="Reply language" value={LANGUAGES.some((l) => l.value === p.language) ? p.language : 'auto'}
+        onChange={(v) => save({ language: v })}
+        options={LANGUAGES}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-sm font-semibold text-on-surface">Reply language</span>
-          <input
-            value={lang ?? p.language} onChange={(e) => setLang(e.target.value)}
-            onBlur={() => { if (lang !== null && lang.trim() && lang !== p.language) save({ language: lang.trim() }); setLang(null) }}
-            className="mt-2 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3 text-base text-on-surface outline-none focus:border-primary"
-          />
-        </label>
         <label className="block">
           <span className="text-sm font-semibold text-on-surface">Local emergency number</span>
           <input
@@ -87,6 +96,7 @@ function PreferencesTab() {
             onBlur={() => { if (num !== null && num.trim() && num !== p.emergency_number) save({ emergency_number: num.trim() }); setNum(null) }}
             className="mt-2 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3 text-base text-on-surface outline-none focus:border-primary"
           />
+          <span className="mt-1 block text-xs text-on-surface-variant">Liana tells you to call this number, with 112 as the backup, and it is shown first on emergency results.</span>
         </label>
       </div>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-outline-variant p-4">

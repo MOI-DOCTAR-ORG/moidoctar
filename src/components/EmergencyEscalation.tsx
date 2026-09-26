@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Icon from './Icon'
 import { useNavigate } from 'react-router-dom'
 import { EMERGENCY_NUMBERS } from '../lib/triageDisplay'
+import { useAiMemory } from '../hooks/useMoiDoctor'
 
 type EmergencyEscalationProps = {
   urgencyLevel: string
@@ -14,12 +15,15 @@ type EmergencyEscalationProps = {
 export default function EmergencyEscalation({ urgencyLevel, redFlags, title, subtitle }: EmergencyEscalationProps) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(true)
+  const own = useAiMemory().data?.preferences.emergency_number?.replace(/[^\d+]/g, '')
 
   const isEmergency = ['emergency', 'high', 'urgent'].includes(urgencyLevel.toLowerCase())
   if (!isEmergency) return null
 
-  // Nigeria's numbers only: the US ones were shown first to a Nigerian audience.
-  const emergencyNumbers = EMERGENCY_NUMBERS
+  // Nigeria's numbers, with the one the user set in Assistant Settings first.
+  const emergencyNumbers = own && !EMERGENCY_NUMBERS.some((n) => n.number === own)
+    ? [{ label: 'Your emergency number', number: own, icon: 'call' }, ...EMERGENCY_NUMBERS]
+    : EMERGENCY_NUMBERS
 
   return (
     <div className="rounded-2xl border-2 border-red-500/40 bg-red-500/10 overflow-hidden">
