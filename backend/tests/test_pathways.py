@@ -207,3 +207,38 @@ def test_an_older_client_without_flow_keeps_the_model_led_path():
     """The previous frontend never sends `flow`; it must not loop on the age question."""
     r = triage_service.analyze_conversation("u1", "I have a cough", [{"role": "user", "content": "I have a cough"}], {})
     assert not (r.get("follow_up_question") or {}).get("id", "").startswith("profile.")
+
+
+# ── typed answers (handoff: "answerable with a short response or predefined option") ──
+
+@pytest.mark.parametrize("reply,expected", [
+    ("1 day", "About a week or less"), ("2 weeks", "About two weeks"), ("since yesterday", "About a week or less"),
+    ("one month", "About three weeks or more"), ("3 days", "About a week or less"),
+])
+def test_typed_durations_map_to_the_approved_option(reply, expected):
+    opts = ["About a week or less", "About two weeks", "About three weeks or more"]
+    assert opts[pathways.match_answer(reply, opts)] == expected
+
+
+@pytest.mark.parametrize("reply,expected", [("yeah", "Yes"), ("nope", "No"), ("e no dey", "No"), ("i no know", "Not sure")])
+def test_typed_yes_no_in_english_and_pidgin(reply, expected):
+    opts = ["Yes", "No", "Not sure"]
+    assert opts[pathways.match_answer(reply, opts)] == expected
+
+
+def test_typed_answer_advances_instead_of_repeating():
+    """Seen live: '1 day' to 'How long has this illness been going on?' repeated the question."""
+    c = Chat(ADULT)
+    c.say("I have had fever for days")
+    c.answer("No")                                     # bleed (typhoid critical question 1)
+    before = c.last["follow_up_question"]["id"]
+    assert before.endswith("illness_week")
+    r = c.say("1 day")
+    assert r["follow_up_question"]["id"] != before
+
+
+def test_unplaceable_answer_says_so_instead_of_silently_repeating():
+    c = Chat(ADULT)
+    c.say("I have had fever for days")
+    r = c.say("purple elephant")
+    assert r["summary"] == pathways.NOT_MATCHED
