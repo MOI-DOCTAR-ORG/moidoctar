@@ -104,159 +104,48 @@ export function saveLocalMedications(meds: typeof initialMedications) {
 }
 
 // ---------- Simulated AI Triage Engine ----------
-export function generateTriageAssessment(symptoms: string): TriageChatResponse {
-  const lower = symptoms.toLowerCase()
-
-  const emergencyKeywords = [
-    'chest pain', 'heart attack', 'shortness of breath', "can't breathe", 'cannot breathe',
-    'stroke', 'unconscious', 'seizure', 'severe bleeding', 'paralysis', 'anaphylaxis', 'blue lips'
+/**
+ * What the app shows when the server can't be reached at all.
+ *
+ * The handoff requires a fixed, safe fallback here. The browser used to run its own
+ * keyword triage with diagnosis labels and US numbers — a second, unreviewed rule set
+ * that could disagree with the server's approved rules — so it now returns fixed copy
+ * and the emergency numbers instead of guessing an urgency.
+ */
+export function generateTriageAssessment(_symptoms: string): TriageChatResponse {
+  const fallback = 'We cannot complete the AI guidance right now. If your symptoms are severe, sudden, or getting worse, call 112 or go to the nearest emergency department now.'
+  const steps = [
+    'If your symptoms are severe, sudden or getting worse, call 112 now.',
+    'Go to the nearest clinic or hospital if you are worried.',
+    'Try again when you are back online.',
   ]
-
-  const moderateKeywords = [
-    'fever', 'headache', 'migraine', 'vomiting', 'nausea', 'diarrhea', 'infection',
-    'abdominal', 'stomach', 'rash', 'pain', 'swelling', 'dizzy', 'dizziness', 'cough'
-  ]
-
-  const isEmergency = emergencyKeywords.some(kw => lower.includes(kw))
-  const isModerate = !isEmergency && moderateKeywords.some(kw => lower.includes(kw))
-
-  if (isEmergency) {
-    return {
-      assessment_id: 'tri_' + Date.now().toString(36),
-      needs_more_info: false,
-      urgency_level: 'Urgent',
-      confidence_score: 0.95,
-      rationale: 'Your reported symptoms present potential signs of acute cardiorespiratory or neurological urgency requiring immediate clinical assessment.',
-      possible_conditions: [
-        'Acute Coronary / Cardiopulmonary Syndrome',
-        'Severe Respiratory Distress',
-        'Acute Neurological Event',
-        'Acute Systemic Reaction'
-      ],
-      care_plan: {
-        immediate_relief: [
-          'Sit or lie down somewhere comfortable and stay calm',
-          'Loosen tight clothing while you wait for help',
-        ],
-        food_and_water: [
-          "Don't eat or drink anything until you've been seen",
-        ],
-        when_to_hospital: [
-          'Go now — call emergency services or get to the nearest emergency department',
-          "Don't drive yourself; have someone else take you or call an ambulance",
-        ],
-      },
-      recommended_actions: [
-        'Call emergency medical services (911 / 112) or go to the nearest emergency department immediately',
-        'Do not drive yourself to the emergency facility',
-        'Rest in an upright or comfortable position while waiting for help',
-        'Keep someone informed of your situation'
-      ],
-      follow_up_questions: [
-        'Does the pain radiate to your left arm, neck, jaw, or upper back?',
-        'Are you experiencing sweating, severe nausea, or lightheadedness?',
-        'Do you have a personal or family history of cardiovascular disease?'
-      ],
-      red_flags_to_watch: [
-        'Sudden worsening of chest discomfort or inability to catch your breath',
-        'Loss of consciousness, syncope, or sudden extreme confusion',
-        'Cyanosis (bluish tint around lips or fingernails)'
-      ],
-      disclaimer: 'MoiDoctar provides triage guidance, not a medical diagnosis. In a life-threatening emergency, call 911 or emergency services immediately.'
-    }
-  }
-
-  if (isModerate) {
-    return {
-      assessment_id: 'tri_' + Date.now().toString(36),
-      needs_more_info: true,
-      urgency_level: 'Moderate',
-      confidence_score: 0.87,
-      rationale: 'Your reported symptoms indicate an active symptomatic condition that would benefit from clinical evaluation within 24 to 48 hours.',
-      possible_conditions: [
-        'Acute Viral / Bacterial Infection',
-        'Tension Headache or Migraine Syndrome',
-        'Gastroenteritis / Acute GI Irritation',
-        'Musculoskeletal Strain / Inflammation'
-      ],
-      care_plan: {
-        immediate_relief: [
-          'Rest and avoid strenuous activity',
-          'Paracetamol at the pack dose can help with pain or fever',
-        ],
-        food_and_water: [
-          'Sip water or an oral rehydration drink often, small amounts if nauseous',
-          'Eat light, easy food if you have an appetite',
-        ],
-        when_to_hospital: [
-          "Go if a high fever doesn't ease after 2 days on medication",
-          "Go if you can't keep fluids down for several hours",
-        ],
-      },
-      recommended_actions: [
-        'Schedule a consultation with a primary healthcare provider or visit an urgent care center',
-        'Maintain oral hydration with water and electrolyte-balanced fluids',
-        'Rest and record your temperature and symptom progression twice daily',
-        'Avoid strenuous physical exertion until evaluated'
-      ],
-      follow_up_questions: [
-        'How many days have you been experiencing these symptoms?',
-        'Have you taken any over-the-counter antipyretics or analgesics?',
-        'Are the symptoms getting progressively worse or staying relatively stable?'
-      ],
-      red_flags_to_watch: [
-        'Temperature exceeding 103°F (39.4°C) unresponsive to medication',
-        'Inability to tolerate liquids for more than 24 hours',
-        'Severe stiff neck accompanied by light sensitivity'
-      ],
-      disclaimer: 'MoiDoctar provides triage guidance, not a medical diagnosis. If symptoms rapidly deteriorate, seek urgent medical care.'
-    }
-  }
-
+  const escalation = 'Do not wait for the app if this feels serious.'
   return {
     assessment_id: 'tri_' + Date.now().toString(36),
     needs_more_info: false,
-    urgency_level: 'Stable',
-    confidence_score: 0.91,
-    rationale: 'Your reported symptoms currently reflect mild, non-emergent discomfort. Supportive home care and continued observation are recommended.',
-    possible_conditions: [
-      'Mild Upper Respiratory Symptoms',
-      'Localized Muscular Fatigue',
-      'Mild Allergic Rhinitis',
-      'Benign Stress / Fatigue Reaction'
-    ],
-    care_plan: {
-      immediate_relief: [
-        'Rest and give your body time to recover',
-        'A warm compress or a simple pain reliever can help if needed',
-      ],
-      food_and_water: [
-        'Keep drinking water through the day',
-        "Eat normally as you're able to",
-      ],
-      when_to_hospital: [
-        'Go if symptoms get worse or last more than a week',
-        'Go if you develop a high fever, severe pain, or trouble breathing',
-      ],
-    },
-    recommended_actions: [
-      'Practice supportive self-care: adequate rest, warm fluids, and balanced nutrition',
-      'Log any changes in symptoms over the next 48 to 72 hours',
-      'Consult your primary care physician if symptoms persist beyond one week'
-    ],
-    follow_up_questions: [
-      'Are you experiencing any other mild symptoms such as fatigue or nasal congestion?',
-      'Have you recently been exposed to seasonal allergens or someone who was unwell?'
-    ],
-    red_flags_to_watch: [
-      'Onset of high fever, chills, or difficulty breathing',
-      'Sudden development of sharp, localized pain'
-    ],
-    disclaimer: 'MoiDoctar provides triage guidance, not a medical diagnosis. Consult a licensed physician for clinical decisions.'
+    urgency_level: 'Moderate',
+    confidence_score: null,
+    rationale: fallback,
+    possible_conditions: [],
+    care_plan: { immediate_relief: steps, food_and_water: [], when_to_hospital: [escalation] },
+    recommended_actions: steps,
+    follow_up_questions: [],
+    red_flags_to_watch: [escalation],
+    disclaimer: 'Moi Doctar provides guidance only and does not diagnose conditions. In an emergency, call 112.',
+    has_symptoms: true,
+    status: 'complete',
+    urgency: 'INSUFFICIENT_INFORMATION',
+    indicator: { label: 'More information needed', color: 'gray', icon: 'help', priority: 5 },
+    summary: fallback,
+    reason: null,
+    next_steps: steps,
+    escalation: { required: true, message: escalation },
+    facility_action: 'nearest_emergency_department',
+    follow_up_question: null,
+    safety_note: 'Moi Doctar provides guidance only and does not diagnose conditions. In an emergency, call 112.',
   }
 }
 
-// ---------- Request Dispatcher ----------
 export async function handleLocalRequest(config: InternalAxiosRequestConfig): Promise<AxiosResponse> {
   const url = (config.url || '').replace(/^\/api\/v1/, '').split('?')[0]
   const method = (config.method || 'get').toLowerCase()
@@ -559,9 +448,7 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
       ai_source: 'offline',
       ai_notice: 'The server is not reachable, so this is an offline safety check, not the AI.',
     }
-    assessment.reply = assessment.urgency_level === 'Urgent'
-      ? 'What you describe could be serious. Please call your local emergency number or get to the nearest emergency department now.'
-      : assessment.rationale
+    assessment.reply = assessment.summary
     return {
       data: assessment,
       status: 200,

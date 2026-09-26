@@ -1,25 +1,25 @@
 import { useState } from 'react'
 import Icon from './Icon'
 import { useNavigate } from 'react-router-dom'
+import { EMERGENCY_NUMBERS } from '../lib/triageDisplay'
 
 type EmergencyEscalationProps = {
   urgencyLevel: string
   redFlags: string[]
+  /** Heading override, so the panel never contradicts the result's own urgency badge. */
+  title?: string
+  subtitle?: string
 }
 
-export default function EmergencyEscalation({ urgencyLevel, redFlags }: EmergencyEscalationProps) {
+export default function EmergencyEscalation({ urgencyLevel, redFlags, title, subtitle }: EmergencyEscalationProps) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(true)
 
   const isEmergency = ['emergency', 'high', 'urgent'].includes(urgencyLevel.toLowerCase())
   if (!isEmergency) return null
 
-  const emergencyNumbers = [
-    { label: 'Emergency Services (US)', number: '911', icon: 'local_hospital' },
-    { label: 'Emergency Services (EU)', number: '112', icon: 'local_hospital' },
-    { label: 'Nigeria Emergency', number: '199', icon: 'local_hospital' },
-    { label: 'Poison Control (US)', number: '1-800-222-1222', icon: 'science' },
-  ]
+  // Nigeria's numbers only: the US ones were shown first to a Nigerian audience.
+  const emergencyNumbers = EMERGENCY_NUMBERS
 
   return (
     <div className="rounded-2xl border-2 border-red-500/40 bg-red-500/10 overflow-hidden">
@@ -33,9 +33,9 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags }: Emergenc
           </div>
           <div>
             <h3 className="font-label-md text-label-md text-red-600 dark:text-red-400 font-bold uppercase tracking-wide">
-              Urgent Care Recommended
+              {title ?? 'Urgent Care Recommended'}
             </h3>
-            <p className="text-caption text-secondary">Immediate medical attention may be needed</p>
+            <p className="text-caption text-secondary">{subtitle ?? 'Immediate medical attention may be needed'}</p>
           </div>
         </div>
         <Icon icon={expanded ? 'expand_less' : 'expand_more'} size="lg" className="text-red-500" />

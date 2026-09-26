@@ -27,11 +27,30 @@ export type CarePlan = {
   when_to_hospital: string[]
 }
 
+/** The five levels from the AI Engineer Handoff. The app, not the model, decides these. */
+export type Urgency = 'EMERGENCY' | 'URGENT' | 'SOON' | 'SELF_CARE' | 'INSUFFICIENT_INFORMATION'
+
+export type TriageIndicator = {
+  label: string
+  color: 'red' | 'orange' | 'yellow' | 'green' | 'gray'
+  icon: string
+  priority: number
+}
+
+export type FollowUpQuestion = {
+  id: string
+  text: string
+  type: 'single_choice' | 'short_text'
+  options: string[]
+  required: boolean
+}
+
 export type TriageChatResponse = {
   assessment_id: string
   needs_more_info: boolean
   urgency_level: string
-  confidence_score: number
+  /** No longer produced by the server (the old values were fixed numbers). */
+  confidence_score: number | null
   rationale: string
   possible_conditions: string[]
   /** Locked 3-part care plan: immediate relief, food & water, when to go to hospital. */
@@ -50,6 +69,21 @@ export type TriageChatResponse = {
   /** Things the assistant just remembered about the user */
   memory_notes?: string[]
 
+  // The handoff result contract. Present on every new answer; older saved sessions don't have it.
+  status?: 'question' | 'complete' | 'emergency_stop'
+  urgency?: Urgency
+  indicator?: TriageIndicator
+  summary?: string
+  reason?: string | null
+  next_steps?: string[]
+  escalation?: { required: boolean; message: string | null }
+  facility_action?: string | null
+  follow_up_question?: FollowUpQuestion | null
+  safety_note?: string
+  red_flags?: string[]
+  warning_signs?: string[]
+  rule_version?: string
+  medication_notice?: string
 }
 
 export type CacheStats = {
