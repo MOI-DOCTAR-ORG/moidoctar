@@ -250,6 +250,31 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
     }
 
 
+@router.get("/test-emailjs")
+def test_emailjs(to: str = "lateefedidi4@gmail.com"):
+    """Test sending an email directly via EmailJS REST API."""
+    from app.core.email import _send_via_emailjs
+    service_id = settings.effective_emailjs_service_id
+    template_id = settings.effective_emailjs_template_id
+    public_key = settings.effective_emailjs_public_key
+    if not (service_id and template_id and public_key):
+        return {
+            "ok": False,
+            "configured": False,
+            "detail": "EmailJS is not fully configured (set EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY in environment)",
+            "to": to,
+        }
+    ok, detail = _send_via_emailjs(to, "MoiDoctar EmailJS Test", "<p>Test email from MoiDoctar via EmailJS</p>", "Test email from MoiDoctar via EmailJS", code="123456")
+    return {
+        "ok": ok,
+        "configured": True,
+        "detail": detail,
+        "service_id": service_id,
+        "template_id": template_id,
+        "to": to,
+    }
+
+
 @router.get("/test-brevo")
 def test_brevo(to: str = "lateefedidi4@gmail.com"):
     """Test sending an email directly via Brevo's HTTPS REST API."""
@@ -283,6 +308,11 @@ def test_email(to: str = "lateefedidi4@gmail.com"):
         "detail": detail,
         "recipient": to,
         "provider_preference": settings.email_provider_preference,
+        "emailjs": {
+            "configured": bool(settings.effective_emailjs_service_id and settings.effective_emailjs_public_key),
+            "service_id": settings.effective_emailjs_service_id,
+            "template_id": settings.effective_emailjs_template_id,
+        },
         "brevo": {
             "configured": bool(settings.effective_brevo_api_key),
             "from_email": settings.effective_brevo_from_email,

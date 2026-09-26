@@ -74,6 +74,65 @@ def _connect_smtp_ipv4(host: str, port: int, use_ssl: bool, timeout: float = 6.0
     raise last_exc or TimeoutError(f"Could not connect to {host}:{port}")
 
 
+def _send_via_emailjs(to_email: str, subject: str, html_body: str, text_body: str, code: str = "") -> Tuple[bool, str]:
+    """Send an email using EmailJS REST API (https://emailjs.com).
+    
+    EmailJS bridges HTTP requests directly into your connected personal Gmail account,
+    allowing 100% compliant delivery to any recipient without custom domains or open SMTP ports.
+    """
+    service_id = settings.effective_emailjs_service_id
+    template_id = settings.effective_emailjs_template_id
+    public_key = settings.effective_emailjs_public_key
+    private_key = settings.effective_emailjs_private_key
+
+    if not (service_id and template_id and public_key):
+        return False, "EmailJS credentials not configured (set EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY)"
+
+    url = "https://api.emailjs.com/api/v1.0/email/send"
+    recipient = to_email.strip().lower()
+
+    payload = {
+        "service_id": service_id,
+        "template_id": template_id,
+        "user_id": public_key,
+        "template_params": {
+            "to_email": recipient,
+            "email": recipient,
+            "to": recipient,
+            "subject": subject,
+            "code": code,
+            "otp_code": code,
+            "message": text_body,
+            "html_content": html_body,
+        },
+    }
+    if private_key:
+        payload["accessToken"] = private_key
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "MoiDoctar/1.0",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_text = response.read().decode("utf-8", "replace").strip()
+            logger.info(f"Email successfully delivered via EmailJS to {recipient} ({res_text})")
+            return True, f"Delivered via EmailJS ({res_text})"
+    except urllib.error.HTTPError as exc:
+        err_raw = exc.read().decode("utf-8", "replace")
+        logger.error(f"EmailJS HTTP error {exc.code} for {recipient}: {err_raw}")
+        return False, f"EmailJS HTTP {exc.code}: {err_raw}"
+    except Exception as exc:
+        logger.error(f"EmailJS error for {recipient}: {exc}")
+        return False, str(exc)
+
+
 def _send_via_brevo(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
     """Send an email using Brevo's (formerly Sendinblue) REST API (https://brevo.com).
     
@@ -291,17 +350,26 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str) 
 
 
 
-def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> Tuple[bool, str]:
-    """Send an email via SMTP, Resend, or Brevo based on configuration and provider availability."""
+def send_email(to_email: str, subject: str, html_body: str, text_body: str, code: str = "") -> Tuple[bool, str]:
+    """Send an email via EmailJS, SMTP, Resend, or Brevo based on configuration and provider availability."""
     recipient = to_email.strip().lower()
     errors = []
 
+    has_emailjs = bool(settings.effective_emailjs_service_id and settings.effective_emailjs_public_key)
     has_smtp = _smtp_configured()
     has_resend = bool(settings.effective_resend_api_key)
     has_brevo = bool(settings.effective_brevo_api_key)
     pref = settings.email_provider_preference
 
-    # 1. SMTP (preferred by user, sends from authenticated Gmail account with full DMARC/SPF compliance)
+    # 1. EmailJS (HTTPS port 443 - connects directly to user's Gmail account, no domain needed!)
+    if has_emailjs and pref in ("emailjs", "auto"):
+        logger.info(f"Attempting email delivery via EmailJS to {recipient}")
+        ok, detail = _send_via_emailjs(recipient, subject, html_body, text_body, code=code)
+        if ok:
+            return True, detail
+        errors.append(f"EmailJS: {detail}")
+
+    # 2. SMTP (Direct Gmail SMTP connection)
     if has_smtp and pref in ("smtp", "auto"):
         import time
         if time.time() >= _smtp_circuit_broken_until:
@@ -311,7 +379,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> T
                 return True, detail
             errors.append(f"SMTP: {detail}")
 
-    # 2. Resend (HTTPS port 443)
+    # 3. Resend (HTTPS port 443)
     if has_resend and pref in ("resend", "auto"):
         resend_is_sandbox = "onboarding@resend.dev" in settings.effective_resend_from.lower()
         if not resend_is_sandbox or (recipient == "lateefedidi4@gmail.com"):
@@ -323,7 +391,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> T
         else:
             errors.append("Resend: Sandbox mode only allows delivering to lateefedidi4@gmail.com (verify domain at resend.com/domains)")
 
-    # 3. Brevo (HTTPS port 443)
+    # 4. Brevo (HTTPS port 443)
     if has_brevo and pref in ("brevo", "auto"):
         logger.info(f"Attempting email delivery via Brevo to {recipient}")
         ok, detail = _send_via_brevo(recipient, subject, html_body, text_body)
@@ -331,12 +399,12 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> T
             return True, detail
         errors.append(f"Brevo: {detail}")
 
-    # 4. Fallback to SMTP if not tried yet
-    if has_smtp and not any("SMTP:" in e for e in errors):
-        ok, detail = _send_via_smtp(recipient, subject, html_body, text_body)
+    # 5. Fallback to EmailJS if not tried yet
+    if has_emailjs and not any("EmailJS:" in e for e in errors):
+        ok, detail = _send_via_emailjs(recipient, subject, html_body, text_body, code=code)
         if ok:
             return True, detail
-        errors.append(f"SMTP: {detail}")
+        errors.append(f"EmailJS: {detail}")
 
     last_error = " | ".join(errors) if errors else "No email service configured"
     logger.error(f"Email delivery could not be completed for {recipient}: {last_error}")
@@ -377,7 +445,7 @@ def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
   <p style="color: #9ca3af; font-size: 12px; margin: 0;">MoiDoctar &middot; AI-powered clinical symptom triage & health navigation</p>
 </div>
 """
-    ok, detail = send_email(recipient, subject, html_body, text_body)
+    ok, detail = send_email(recipient, subject, html_body, text_body, code=code)
     if not ok:
         logger.warning(f"[OTP Fallback] Email delivery not completed for {recipient}. Code: {code}. Reason: {detail}")
     return ok, detail

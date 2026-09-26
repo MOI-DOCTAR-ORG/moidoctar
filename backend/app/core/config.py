@@ -249,14 +249,50 @@ class Settings(BaseSettings):
         ).strip()
 
     @property
+    def effective_emailjs_service_id(self) -> str:
+        return (
+            os.getenv("EMAILJS_SERVICE_ID")
+            or os.getenv("EMAIL_JS_SERVICE_ID")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_emailjs_template_id(self) -> str:
+        return (
+            os.getenv("EMAILJS_TEMPLATE_ID")
+            or os.getenv("EMAIL_JS_TEMPLATE_ID")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_emailjs_public_key(self) -> str:
+        return (
+            os.getenv("EMAILJS_PUBLIC_KEY")
+            or os.getenv("EMAILJS_USER_ID")
+            or os.getenv("EMAIL_JS_PUBLIC_KEY")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_emailjs_private_key(self) -> str:
+        return (
+            os.getenv("EMAILJS_PRIVATE_KEY")
+            or os.getenv("EMAILJS_ACCESS_TOKEN")
+            or os.getenv("EMAIL_JS_PRIVATE_KEY")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
     def email_provider_preference(self) -> str:
-        """Returns 'brevo', 'smtp', 'resend', or 'auto'."""
+        """Returns 'emailjs', 'brevo', 'smtp', 'resend', or 'auto'."""
         provider = (
             os.getenv("EMAIL_PROVIDER")
             or os.getenv("MAIL_PROVIDER")
             or os.getenv("EMAIL_BACKEND")
             or ""
         ).strip().lower()
+        if provider in ("emailjs", "email_js"):
+            return "emailjs"
         if provider in ("brevo", "sendinblue", "sib"):
             return "brevo"
         if provider in ("smtp", "mail"):
