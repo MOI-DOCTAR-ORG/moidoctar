@@ -209,6 +209,23 @@ def _to_contents(messages: List[Dict[str, str]], symptoms: str,
 
 
 
+def _classify_answer(answer: str, question_text: str, options: List[str]) -> Optional[int]:
+    """Place a typed reply on one approved option. The model only picks from the list; it
+    never writes an answer, and anything it is unsure about comes back None (re-ask)."""
+    from app.services.gemini_client import generate, parse_json_object
+    numbered = "\n".join(f"{i}: {o}" for i, o in enumerate(options))
+    prompt = (f"Question: {question_text}\nOptions:\n{numbered}\nUser reply: {answer}\n\n"
+              "Which option means the same as the reply? The reply may be Nigerian Pidgin or English. "
+              'Return {"index": n} for one clear match, or {"index": null} if none fits or it is unclear.')
+    text, _ = generate([{"role": "user", "parts": [{"text": prompt}]}], json_mode=True, temperature=0,
+                       max_output_tokens=256)
+    idx = parse_json_object(text).get("index")
+    return int(idx) if isinstance(idx, int) else None
+
+
+pathways.classifier = _classify_answer
+
+
 def _free_assessment(contents, system: str, floor: Optional[str], asked: int, is_greeting: bool):
     """Model-led assessment, for greetings and concerns outside the approved tables."""
     from app.services.gemini_client import GeminiUnavailable
