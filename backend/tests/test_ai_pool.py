@@ -112,7 +112,9 @@ def test_fallback_when_ai_down(monkeypatch):
 
 
 def test_prompt_sends_reply_preferences_not_the_health_record(monkeypatch):
-    """Handoff section 8: don't send unnecessary personal or health information to the model."""
+    """Handoff section 8: don't send unnecessary personal or health information to the model.
+    Allergies, medicines and notes are never needed (the model may not name a medicine); a
+    long-term condition is, because it is a reason to choose the safer level."""
     ai_keys.add_key(KEY_A, "A")
     ai_memory.sync_health_context("u2", {"allergies": ["penicillin"], "conditions": ["asthma"]}, "profile")
     ai_memory.set_preferences("u2", {"tone": "direct", "units": "bogus"})
@@ -127,8 +129,9 @@ def test_prompt_sends_reply_preferences_not_the_health_record(monkeypatch):
     monkeypatch.setattr(gemini_client, "_post", spy)
     res = triage_service.analyze_conversation("u2", "cough", [{"role": "user", "content": "cough"}], dict(FREE))
     sys_text = seen["body"]["systemInstruction"]["parts"][0]["text"]
-    assert "'tone': 'direct'" in sys_text
-    assert "penicillin" not in sys_text and "asthma" not in sys_text
+    assert "Tone: direct" in sys_text
+    assert "penicillin" not in sys_text
+    assert "Long-term conditions the user has recorded: asthma" in sys_text
     assert res["memory_notes"] == []
 
 
