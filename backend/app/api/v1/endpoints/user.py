@@ -39,8 +39,8 @@ async def upload_photo(
 
     import os, base64, httpx
     photo_url = None
-    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "moidoctar")
-    upload_preset = os.getenv("CLOUDINARY_UPLOAD_PRESET", "moidoctar_uploads")
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "ditu39hqh")
+    upload_preset = os.getenv("CLOUDINARY_UPLOAD_PRESET", "moidoctar")
 
     if cloud_name:
         try:

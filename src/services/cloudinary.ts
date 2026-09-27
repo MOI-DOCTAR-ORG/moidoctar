@@ -12,8 +12,8 @@ interface CloudinaryUploadResponse {
  * Otherwise, falls back to the backend `/user/uploadPhoto` endpoint.
  */
 export async function uploadImageToCloudinary(file: File): Promise<string> {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'moidoctar'
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'moidoctar_uploads'
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'ditu39hqh'
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'moidoctar'
 
   // Attempt direct Cloudinary unsigned upload
   if (cloudName && uploadPreset) {
