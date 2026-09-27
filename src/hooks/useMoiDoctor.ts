@@ -213,6 +213,35 @@ export function useUpdateAiHealthContext() {
   })
 }
 
+export function useAddAiFact() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (text: string) => (await modelClient.post<AiMemory>('/ai/memory/facts', { text })).data,
+    onSuccess: (data) => qc.setQueryData(['ai-memory'], data),
+  })
+}
+
+export function useRemoveAiHealthItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ field, value }: { field: string; value: string }) =>
+      (await modelClient.delete<AiMemory>(`/ai/memory/health-item?field=${encodeURIComponent(field)}&value=${encodeURIComponent(value)}`)).data,
+    onSuccess: (data) => qc.setQueryData(['ai-memory'], data),
+  })
+}
+
+export function useUploadPhoto() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return (await apiClient.post<{ data: { photoUrl: string } }>('/user/uploadPhoto', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })).data
+    },
+  })
+}
+
 export function useDeleteAiFact() {
   const qc = useQueryClient()
   return useMutation({

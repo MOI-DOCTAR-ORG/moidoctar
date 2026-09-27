@@ -210,6 +210,21 @@ def delete_fact(user_id: str, fact_id: str) -> bool:
         return True
 
 
+def add_user_fact(user_id: str, text: str) -> Dict[str, Any]:
+    cleaned = _clean_str(text, 120)
+    if not cleaned:
+        raise ValueError("Memory note cannot be empty")
+    with _lock:
+        mem = load(user_id)
+        existing = {f["text"].lower() for f in mem["facts"]}
+        if cleaned.lower() not in existing:
+            fact_item = {"id": "f_" + uuid.uuid4().hex[:6], "text": cleaned, "source": "user", "created_at": _iso()}
+            mem["facts"].append(fact_item)
+            _log(mem, "fact", None, cleaned, "user")
+            _save(user_id, mem)
+        return mem
+
+
 def remove_health_item(user_id: str, field: str, value: str) -> bool:
     if field not in LIST_FIELDS:
         return False

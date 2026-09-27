@@ -68,6 +68,8 @@ def _admin_emails() -> List[str]:
 def _format_user_out(u: Any) -> Dict[str, Any]:
     if not isinstance(u, dict):
         return {}
+    demo = u.get("demographics") or {}
+    photo_url = u.get("photo") or demo.get("photo") or demo.get("photoUrl")
     return {
         "_id": str(u.get("id", "")),
         "userName": u.get("user_name", "User"),
@@ -75,7 +77,8 @@ def _format_user_out(u: Any) -> Dict[str, Any]:
         "isVerified": bool(u.get("is_verified", True)),
         "role": "admin" if (u.get("role") == "admin" or str(u.get("email", "")).strip().lower() in _admin_emails()) else u.get("role", "user"),
         "phone": u.get("phone"),
-        "demographics": u.get("demographics") or {},
+        "photo": photo_url,
+        "demographics": demo,
         "preference": u.get("preference") or {"emailNotification": True, "smsAlert": False, "twoFactorAuth": False},
         "notifications": u.get("notifications") or [],
         "createdAt": u.get("created_at"),
@@ -428,6 +431,10 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]
                 update_data["demographics"] = cleaned["demographics"]
             if "preference" in cleaned:
                 update_data["preference"] = cleaned["preference"]
+            if "photo" in cleaned:
+                demo = cleaned.get("demographics") or {}
+                demo["photoUrl"] = cleaned["photo"]
+                update_data["demographics"] = demo
 
             res = supabase.table("users").update(update_data).eq("id", user_id).execute()
             rows = safe_supabase_rows(res)
@@ -446,6 +453,11 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]
                 u["demographics"] = {**(u.get("demographics") or {}), **cleaned["demographics"]}
             if "preference" in cleaned:
                 u["preference"] = {**(u.get("preference") or {}), **cleaned["preference"]}
+            if "photo" in cleaned:
+                u["photo"] = cleaned["photo"]
+                demo = u.get("demographics") or {}
+                demo["photoUrl"] = cleaned["photo"]
+                u["demographics"] = demo
             return _format_user_out(u)
 
     raise ValueError("user_not_found")

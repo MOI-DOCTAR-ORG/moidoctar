@@ -4,8 +4,11 @@ import { useToastContext as useToastCtx } from '../context/ToastContext'
 import {
   useAiKeys, useAddAiKey, useAiMemory, useAiStatus, useDeleteAiFact, useDeleteAiKey,
   useResetAiMemory, useTestAiKey, useToggleAiKey, useUpdateAiPreferences,
+  useAddAiFact, useRemoveAiHealthItem, useUpdateAiHealthContext,
 } from '../hooks/useMoiDoctor'
 import type { AiKeyInfo, AiPreferences } from '../types/triage'
+import { loadProfile } from '../types/profile'
+import { scopeKey } from '../utils/storage'
 
 type Tab = 'preferences' | 'memory' | 'keys'
 
@@ -119,80 +122,253 @@ const show = (v: unknown) => (v === null || v === undefined ? '—' : Array.isAr
 function MemoryTab() {
   const { data: mem, isLoading, isError } = useAiMemory()
   const delFact = useDeleteAiFact()
+  const addFact = useAddAiFact()
+  const removeHealthItem = useRemoveAiHealthItem()
+  const updateHealthContext = useUpdateAiHealthContext()
   const reset = useResetAiMemory()
   const { addToast } = useToastCtx()
   const [confirm, setConfirm] = useState(false)
+  const [newFactText, setNewFactText] = useState('')
+
   if (isLoading) return <p className="text-sm text-on-surface-variant">Loading…</p>
   if (isError || !mem) return <p className="text-sm text-on-surface-variant">Could not load memory. Check your connection and refresh.</p>
+
   const h = mem.health_context
-  const rows: [string, string][] = [
-    ['Age', h.age ? String(h.age) : '—'], ['Gender', h.gender || '—'], ['Location', h.location || '—'],
-    ['Conditions', h.conditions.join(', ') || '—'], ['Allergies', h.allergies.join(', ') || '—'], ['Medications', h.medications.join(', ') || '—'],
-  ]
+
+  const handleAddFact = (e: React.FormEvent) => {
+    e.preventDefault()
+    const text = newFactText.trim()
+    if (!text) return
+    addFact.mutate(text, {
+      onSuccess: () => {
+        addToast('Memory note added for Liana', 'success')
+        setNewFactText('')
+      },
+      onError: (e) => addToast(errMsg(e, 'Could not add note'), 'error'),
+    })
+  }
+
+  const handleSyncProfile = () => {
+    try {
+      const stored = loadProfile(scopeKey('doctarr_patient_profile'))
+      if (!stored) {
+        addToast('No profile found to sync. Update your Profile page first.', 'error')
+        return
+      }
+      updateHealthContext.mutate(
+        {
+          gender: stored.gender || undefined,
+          location: stored.state || undefined,
+          allergies: stored.knownAllergies,
+          conditions: stored.chronicConditions,
+          medications: stored.currentMedications.map((m) => `${m.name} (${m.dosage})`),
+        },
+        {
+          onSuccess: () => addToast('Synced health details from your Profile', 'success'),
+          onError: (e) => addToast(errMsg(e, 'Sync failed'), 'error'),
+        }
+      )
+    } catch {
+      addToast('Sync failed. Please try saving your Profile page first.', 'error')
+    }
+  }
+
+  const handleRemoveHealthTag = (field: 'conditions' | 'allergies' | 'medications', value: string) => {
+    removeHealthItem.mutate(
+      { field, value },
+      {
+        onSuccess: () => addToast(`Removed "${value}" from memory`, 'success'),
+        onError: (e) => addToast(errMsg(e, 'Could not remove item'), 'error'),
+      }
+    )
+  }
+
   return (
     <div className="space-y-8">
+      {/* Section 1: Health details in use */}
       <section>
-        <h3 className="text-sm font-semibold text-on-surface">Health details in use</h3>
-        <p className="mt-1 text-sm text-on-surface-variant">Synced from your profile each time you use triage. Edit them on your Profile page.</p>
-        <dl className="mt-3 divide-y divide-outline-variant rounded-xl border border-outline-variant">
-          {rows.map(([k, v]) => (
-            <div key={k} className="flex flex-col gap-0.5 px-4 py-2.5 sm:flex-row sm:gap-4">
-              <dt className="w-28 shrink-0 text-sm text-on-surface-variant">{k}</dt>
-              <dd className="min-w-0 break-words text-sm text-on-surface">{v}</dd>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-on-surface">Health details in use</h3>
+            <p className="mt-0.5 text-sm text-on-surface-variant">Synced from your profile. Tap any item to remove it from memory.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSyncProfile}
+            disabled={updateHealthContext.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+          >
+            <Icon icon="sync" size="sm" className={updateHealthContext.isPending ? 'animate-spin' : ''} />
+            {updateHealthContext.isPending ? 'Syncing…' : 'Sync from Profile'}
+          </button>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-outline-variant p-3">
+              <span className="block text-xs text-on-surface-variant">Age</span>
+              <span className="text-sm font-medium text-on-surface">{h.age ? `${h.age} years` : '—'}</span>
             </div>
-          ))}
-        </dl>
+            <div className="rounded-xl border border-outline-variant p-3">
+              <span className="block text-xs text-on-surface-variant">Gender</span>
+              <span className="text-sm font-medium text-on-surface">{h.gender || '—'}</span>
+            </div>
+            <div className="rounded-xl border border-outline-variant p-3">
+              <span className="block text-xs text-on-surface-variant">Location</span>
+              <span className="text-sm font-medium text-on-surface">{h.location || '—'}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {[
+              { label: 'Conditions', field: 'conditions' as const, items: h.conditions },
+              { label: 'Allergies', field: 'allergies' as const, items: h.allergies },
+              { label: 'Medications', field: 'medications' as const, items: h.medications },
+            ].map(({ label, field, items }) => (
+              <div key={label} className="rounded-xl border border-outline-variant p-3">
+                <span className="block text-xs font-semibold text-on-surface-variant mb-1.5">{label}</span>
+                {items.length === 0 ? (
+                  <span className="text-xs text-on-surface-variant">None recorded</span>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {items.map((item) => (
+                      <span
+                        key={item}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface px-2.5 py-1 text-xs text-on-surface"
+                      >
+                        {item}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item}`}
+                          onClick={() => handleRemoveHealthTag(field, item)}
+                          className="hover:text-error text-on-surface-variant"
+                        >
+                          <Icon icon="close" size="sm" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
+      {/* Section 2: Add Custom Memory Note */}
+      <section className="rounded-xl border border-outline-variant bg-surface-container/20 p-4">
+        <h3 className="text-sm font-semibold text-on-surface">Add a note for Liana to remember</h3>
+        <p className="mt-0.5 text-sm text-on-surface-variant">
+          Add any personal preferences or health notes (e.g., “I have a needle phobia” or “I prefer evening appointments”).
+        </p>
+        <form onSubmit={handleAddFact} className="mt-3 flex gap-2">
+          <input
+            type="text"
+            value={newFactText}
+            onChange={(e) => setNewFactText(e.target.value)}
+            placeholder="e.g. Sensitive to aspirin, prefer generic meds..."
+            className="min-h-11 flex-1 rounded-xl border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            disabled={addFact.isPending || !newFactText.trim()}
+            className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary disabled:opacity-40 shrink-0 flex items-center gap-1.5"
+          >
+            <Icon icon={addFact.isPending ? 'hourglass_top' : 'add'} size="sm" />
+            {addFact.isPending ? 'Saving…' : 'Remember'}
+          </button>
+        </form>
+      </section>
+
+      {/* Section 3: Things Liana learned from your chats */}
       <section>
         <h3 className="text-sm font-semibold text-on-surface">Things Liana learned from your chats</h3>
         {mem.facts.length === 0 ? (
-          <p className="mt-2 text-sm text-on-surface-variant">Nothing yet. If you tell Liana something lasting, like “I’m allergic to penicillin”, it will show up here.</p>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Nothing yet. When you chat with Liana or add a note above, important details will appear here.
+          </p>
         ) : (
           <ul className="mt-3 space-y-2">
             {mem.facts.map((f) => (
               <li key={f.id} className="flex items-center gap-3 rounded-xl border border-outline-variant px-4 py-2.5">
+                <Icon icon="psychology" size="md" className="text-primary shrink-0" />
                 <span className="min-w-0 flex-1 break-words text-sm text-on-surface">{f.text}</span>
                 <button
-                  type="button" aria-label={`Forget: ${f.text}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-on-surface-variant hover:bg-error-container hover:text-on-error-container"
+                  type="button"
+                  aria-label={`Forget: ${f.text}`}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-on-surface-variant hover:bg-error-container hover:text-on-error-container transition-colors"
                   onClick={() => delFact.mutate(f.id, { onError: (e) => addToast(errMsg(e), 'error') })}
-                ><Icon icon="delete" size="md" /></button>
+                >
+                  <Icon icon="delete" size="md" />
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
 
+      {/* Section 4: Recent changes log */}
       <section>
         <h3 className="text-sm font-semibold text-on-surface">Recent changes</h3>
         {mem.history.length === 0 ? (
           <p className="mt-2 text-sm text-on-surface-variant">No changes recorded yet.</p>
         ) : (
           <ol className="mt-3 space-y-2">
-            {[...mem.history].reverse().slice(0, 25).map((c, i) => (
-              <li key={i} className="rounded-xl border border-outline-variant px-4 py-2.5 text-sm">
-                <div className="flex flex-wrap items-center gap-x-2 text-xs text-on-surface-variant">
-                  <time dateTime={c.at}>{new Date(c.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time>
-                  <span className="rounded bg-surface-container px-1.5 py-0.5">{c.source === 'ai' ? 'Learned by Liana' : c.source === 'profile' ? 'From your profile' : 'You changed'}</span>
-                </div>
-                <p className="mt-1 break-words text-on-surface"><span className="font-medium capitalize">{fieldLabel(c.field)}</span>: {show(c.from)} → {show(c.to)}</p>
-              </li>
-            ))}
+            {[...mem.history]
+              .reverse()
+              .slice(0, 25)
+              .map((c, i) => (
+                <li key={i} className="rounded-xl border border-outline-variant px-4 py-2.5 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-on-surface-variant">
+                    <time dateTime={c.at}>
+                      {new Date(c.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </time>
+                    <span className="rounded bg-surface-container px-1.5 py-0.5 font-medium">
+                      {c.source === 'ai' ? 'Learned by Liana' : c.source === 'profile' ? 'From your profile' : 'You changed'}
+                    </span>
+                  </div>
+                  <p className="mt-1 break-words text-on-surface">
+                    <span className="font-medium capitalize">{fieldLabel(c.field)}</span>: {show(c.from)} → {show(c.to)}
+                  </p>
+                </li>
+              ))}
           </ol>
         )}
       </section>
 
+      {/* Section 5: Erase Memory */}
       <section className="rounded-xl border border-error/30 p-4">
         <h3 className="text-sm font-semibold text-on-surface">Start fresh</h3>
         <p className="mt-1 text-sm text-on-surface-variant">Erase everything Liana remembers, including preferences and the change history.</p>
         {confirm ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="min-h-10 rounded-lg bg-error px-4 text-sm font-semibold text-on-error"
-              onClick={() => reset.mutate(undefined, { onSuccess: () => { setConfirm(false); addToast('Memory cleared', 'success') }, onError: (e) => addToast(errMsg(e), 'error') })}>Yes, erase it</button>
-            <button type="button" className="min-h-10 rounded-lg border border-outline-variant px-4 text-sm" onClick={() => setConfirm(false)}>Cancel</button>
+            <button
+              type="button"
+              className="min-h-10 rounded-lg bg-error px-4 text-sm font-semibold text-on-error"
+              onClick={() =>
+                reset.mutate(undefined, {
+                  onSuccess: () => {
+                    setConfirm(false)
+                    addToast('Memory cleared', 'success')
+                  },
+                  onError: (e) => addToast(errMsg(e), 'error'),
+                })
+              }
+            >
+              Yes, erase it
+            </button>
+            <button type="button" className="min-h-10 rounded-lg border border-outline-variant px-4 text-sm" onClick={() => setConfirm(false)}>
+              Cancel
+            </button>
           </div>
         ) : (
-          <button type="button" className="mt-3 min-h-10 rounded-lg border border-error/40 px-4 text-sm font-medium text-error hover:bg-error-container/40" onClick={() => setConfirm(true)}>Erase memory</button>
+          <button
+            type="button"
+            className="mt-3 min-h-10 rounded-lg border border-error/40 px-4 text-sm font-medium text-error hover:bg-error-container/40 transition-colors"
+            onClick={() => setConfirm(true)}
+          >
+            Erase memory
+          </button>
         )}
       </section>
     </div>

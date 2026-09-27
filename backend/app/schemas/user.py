@@ -8,6 +8,8 @@ class Demographics(BaseModel):
     currentCondition: Optional[str] = None
     bloodType: Optional[str] = None
     country: Optional[str] = None
+    photo: Optional[str] = None
+    photoUrl: Optional[str] = None
 
 
 class UserPreferences(BaseModel):
@@ -27,6 +29,7 @@ class UserOut(BaseModel):
     email: str
     isVerified: bool = True
     role: str = "user"
+    photo: Optional[str] = None
     demographics: Optional[Demographics] = None
     phone: Optional[str] = None
     preference: Optional[UserPreferences] = None
@@ -38,6 +41,7 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     userName: Optional[str] = None
     phone: Optional[str] = None
+    photo: Optional[str] = None
     demographics: Optional[Dict[str, Any]] = None
     preference: Optional[Dict[str, Any]] = None
 

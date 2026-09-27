@@ -6,6 +6,8 @@ import Icon from '../components/Icon'
 import { PremiumDateInput, PremiumSelect, premiumControlClass } from '../components/ui/PremiumFormControls'
 import { scopeKey } from '../utils/storage'
 import { api } from '../services/api'
+import modelClient from '../lib/modelAxios'
+import { uploadImageToCloudinary } from '../services/cloudinary'
 import { getPermissionState, requestLocationPermission, requestNotificationPermission, type PermissionResult } from '../utils/permissions'
 import { resetTourCompleted, REPLAY_TOUR_EVENT } from '../components/OnboardingTour'
 import {
@@ -52,6 +54,7 @@ export default function Profile() {
   const [originalForm, setOriginalForm] = useState<PatientProfile>(getDefaultForm)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
 
   const [sectionsOpen, setSectionsOpen] = useState({
     basic: true,
@@ -178,7 +181,7 @@ export default function Profile() {
     updateField('currentMedications', form.currentMedications.filter((_, idx) => idx !== i))
   }
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -193,11 +196,16 @@ export default function Profile() {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      updateField('photo', reader.result as string)
+    setIsUploadingPhoto(true)
+    try {
+      const cdnUrl = await uploadImageToCloudinary(file)
+      updateField('photo', cdnUrl)
+      addToast('Profile picture uploaded successfully.', 'success')
+    } catch {
+      addToast('Cloudinary image upload failed. Please try again.', 'error')
+    } finally {
+      setIsUploadingPhoto(false)
     }
-    reader.readAsDataURL(file)
   }
 
   const removePhoto = () => {
@@ -215,19 +223,32 @@ export default function Profile() {
       try { localStorage.setItem('doctarr_current_user_email', form.email) } catch {}
     }
 
-    // Sync core fields to backend
+    // Sync core fields & photo to backend
     try {
       await api.put('/user/updateProfile', {
         userName: form.fullName,
         phone: form.phoneNumber || undefined,
+        photo: form.photo || undefined,
         demographics: {
           gender: form.gender?.toLowerCase() || undefined,
           age: form.dateOfBirth || undefined,
           bloodType: form.bloodGroup || undefined,
           country: form.state || undefined,
+          photoUrl: form.photo || undefined,
         },
       })
     } catch { /* localStorage save still succeeded */ }
+
+    // Sync health context to AI Memory (What Liana Remembers)
+    try {
+      await modelClient.put('/ai/health-context', {
+        gender: form.gender || undefined,
+        location: form.state || undefined,
+        allergies: form.knownAllergies,
+        conditions: form.chronicConditions,
+        medications: form.currentMedications.map(m => `${m.name} (${m.dosage})`),
+      })
+    } catch { /* ignore if AI memory endpoint unreachable */ }
 
     setOriginalForm(JSON.parse(JSON.stringify(form)))
     setDirty(false)
@@ -292,8 +313,13 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
             {/* Photo */}
             <div className="relative group">
-              <div className="w-28 h-28 md:w-36 md:h-36 rounded-full bg-primary/15 text-primary flex items-center justify-center text-4xl font-extrabold border-4 border-outline-variant overflow-hidden">
-                {form.photo ? (
+              <div className="w-28 h-28 md:w-36 md:h-36 rounded-full bg-primary/15 text-primary flex items-center justify-center text-4xl font-extrabold border-4 border-outline-variant overflow-hidden relative">
+                {isUploadingPhoto ? (
+                  <div className="flex flex-col items-center gap-1 text-primary">
+                    <Icon icon="hourglass_top" size="lg" className="animate-spin" />
+                    <span className="text-[10px] font-bold">Cloudinary…</span>
+                  </div>
+                ) : form.photo ? (
                   <img src={form.photo} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <span>{getInitialsForProfile(form)}</span>
