@@ -4,6 +4,44 @@ export interface Medication {
   frequency: string
 }
 
+export function calculateAge(dobString?: string | null): number | undefined {
+  if (!dobString || typeof dobString !== 'string' || !dobString.trim()) return undefined
+
+  let d = new Date(dobString)
+
+  if (isNaN(d.getTime())) {
+    const parts = dobString.split(/[-/.]/)
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+      } else if (parts[2].length === 4) {
+        // MM/DD/YYYY or DD/MM/YYYY
+        const p0 = parseInt(parts[0], 10)
+        const p1 = parseInt(parts[1], 10)
+        const year = parseInt(parts[2], 10)
+        if (p0 > 12) {
+          // DD/MM/YYYY
+          d = new Date(year, p1 - 1, p0)
+        } else {
+          // MM/DD/YYYY
+          d = new Date(year, p0 - 1, p1)
+        }
+      }
+    }
+  }
+
+  if (isNaN(d.getTime())) return undefined
+
+  const today = new Date()
+  let age = today.getFullYear() - d.getFullYear()
+  const monthDiff = today.getMonth() - d.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) {
+    age--
+  }
+  return age >= 0 && age < 125 ? age : undefined
+}
+
 export interface AppointmentRecord {
   date: string
   doctor: string

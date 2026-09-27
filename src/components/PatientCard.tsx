@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Icon from './Icon'
 import { useAiMemory } from '../hooks/useMoiDoctor'
-import { loadProfile } from '../types/profile'
+import { loadProfile, calculateAge } from '../types/profile'
 import { scopeKey } from '../utils/storage'
 import type { AgeBand, PatientInfo } from '../types/triage'
 
@@ -21,10 +21,8 @@ export const BAND_LABEL: Record<AgeBand, string> = {
 function ownAge(): number | null {
   const p = loadProfile(scopeKey('doctarr_patient_profile'))
   if (!p?.dateOfBirth) return null
-  const d = new Date(p.dateOfBirth)
-  if (Number.isNaN(d.getTime())) return null
-  const y = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000))
-  return y >= 0 && y < 125 ? y : null
+  const age = calculateAge(p.dateOfBirth)
+  return age ?? null
 }
 
 /** Same cut-offs as the server (pathways.band_for_age). */

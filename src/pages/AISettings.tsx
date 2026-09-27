@@ -7,7 +7,7 @@ import {
   useAddAiFact, useRemoveAiHealthItem, useUpdateAiHealthContext,
 } from '../hooks/useMoiDoctor'
 import type { AiKeyInfo, AiPreferences } from '../types/triage'
-import { loadProfile } from '../types/profile'
+import { loadProfile, calculateAge } from '../types/profile'
 import { scopeKey } from '../utils/storage'
 
 type Tab = 'preferences' | 'memory' | 'keys'
@@ -155,10 +155,12 @@ function MemoryTab() {
         addToast('No profile found to sync. Update your Profile page first.', 'error')
         return
       }
+      const computedAge = calculateAge(stored.dateOfBirth)
       updateHealthContext.mutate(
         {
+          age: computedAge,
           gender: stored.gender || undefined,
-          location: stored.state || undefined,
+          location: [stored.city, stored.state].filter(Boolean).join(', ') || stored.state || undefined,
           allergies: stored.knownAllergies,
           conditions: stored.chronicConditions,
           medications: stored.currentMedications.map((m) => `${m.name} (${m.dosage})`),
@@ -182,6 +184,9 @@ function MemoryTab() {
       }
     )
   }
+
+  const storedProfile = loadProfile(scopeKey('doctarr_patient_profile'))
+  const displayAge = h.age ?? (storedProfile ? calculateAge(storedProfile.dateOfBirth) : undefined)
 
   return (
     <div className="space-y-8">
@@ -207,7 +212,7 @@ function MemoryTab() {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div className="rounded-xl border border-outline-variant p-3">
               <span className="block text-xs text-on-surface-variant">Age</span>
-              <span className="text-sm font-medium text-on-surface">{h.age ? `${h.age} years` : '—'}</span>
+              <span className="text-sm font-medium text-on-surface">{displayAge ? `${displayAge} years` : '—'}</span>
             </div>
             <div className="rounded-xl border border-outline-variant p-3">
               <span className="block text-xs text-on-surface-variant">Gender</span>

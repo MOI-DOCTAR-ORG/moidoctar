@@ -15,6 +15,7 @@ import {
   type Medication,
   createDefaultProfile,
   calculateCompletion,
+  calculateAge,
   loadProfile,
   saveProfile as persistProfile,
 } from '../types/profile'
@@ -225,6 +226,8 @@ export default function Profile() {
 
     setSaveStatus('saving')
 
+    const calculatedAge = calculateAge(currentForm.dateOfBirth)
+
     // Sync core fields & photo to backend
     try {
       await api.put('/user/updateProfile', {
@@ -233,7 +236,7 @@ export default function Profile() {
         photo: currentForm.photo || undefined,
         demographics: {
           gender: currentForm.gender?.toLowerCase() || undefined,
-          age: currentForm.dateOfBirth || undefined,
+          age: calculatedAge,
           bloodType: currentForm.bloodGroup || undefined,
           country: currentForm.state || undefined,
           photoUrl: currentForm.photo || undefined,
@@ -244,8 +247,9 @@ export default function Profile() {
     // Sync health context to AI Memory (What Liana Remembers)
     try {
       await modelClient.put('/ai/health-context', {
+        age: calculatedAge,
         gender: currentForm.gender || undefined,
-        location: currentForm.state || undefined,
+        location: [currentForm.city, currentForm.state].filter(Boolean).join(', ') || currentForm.state || undefined,
         allergies: currentForm.knownAllergies,
         conditions: currentForm.chronicConditions,
         medications: currentForm.currentMedications.map(m => `${m.name} (${m.dosage})`),

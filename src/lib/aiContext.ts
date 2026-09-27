@@ -1,15 +1,8 @@
-import { loadProfile } from '../types/profile'
+import { loadProfile, calculateAge } from '../types/profile'
 import { scopeKey } from '../utils/storage'
 import type { PatientInfo } from '../types/triage'
 
 export type BodyAreaLike = { label: string; severity: string; notes?: string }
-
-function ageFromDob(dob: string): number | undefined {
-  const d = new Date(dob)
-  if (Number.isNaN(d.getTime())) return undefined
-  const years = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000))
-  return years > 0 && years < 125 ? years : undefined
-}
 
 /**
  * Everything the app already knows about the person, sent along with each
@@ -28,7 +21,7 @@ export function buildAiContext(opts: {
   const ctx: Record<string, unknown> = {}
   if (profile) {
     ctx.profile = {
-      age: profile.dateOfBirth ? ageFromDob(profile.dateOfBirth) : undefined,
+      age: profile.dateOfBirth ? calculateAge(profile.dateOfBirth) : undefined,
       gender: profile.gender || undefined,
       location: [profile.city, profile.state].filter(Boolean).join(', ') || undefined,
       allergies: profile.knownAllergies,
