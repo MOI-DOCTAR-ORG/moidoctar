@@ -55,6 +55,8 @@ export default function Profile() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [sectionsOpen, setSectionsOpen] = useState({
     basic: true,
@@ -212,29 +214,29 @@ export default function Profile() {
     updateField('photo', null)
   }
 
-  const doSave = useCallback(async () => {
+  const performAutoSave = useCallback(async (currentForm: PatientProfile) => {
+    if (!currentForm.fullName.trim()) return
+
     const scopedKey = getScopedKey()
-    persistProfile(scopedKey, form)
+    persistProfile(scopedKey, currentForm)
 
-    try { localStorage.setItem(scopeKey('doctarr_name'), form.fullName) } catch {}
-    try { localStorage.setItem(scopeKey('doctarr_email'), form.email) } catch {}
+    try { localStorage.setItem(scopeKey('doctarr_name'), currentForm.fullName) } catch {}
+    try { localStorage.setItem(scopeKey('doctarr_email'), currentForm.email) } catch {}
 
-    if (form.email !== originalForm.email) {
-      try { localStorage.setItem('doctarr_current_user_email', form.email) } catch {}
-    }
+    setSaveStatus('saving')
 
     // Sync core fields & photo to backend
     try {
       await api.put('/user/updateProfile', {
-        userName: form.fullName,
-        phone: form.phoneNumber || undefined,
-        photo: form.photo || undefined,
+        userName: currentForm.fullName,
+        phone: currentForm.phoneNumber || undefined,
+        photo: currentForm.photo || undefined,
         demographics: {
-          gender: form.gender?.toLowerCase() || undefined,
-          age: form.dateOfBirth || undefined,
-          bloodType: form.bloodGroup || undefined,
-          country: form.state || undefined,
-          photoUrl: form.photo || undefined,
+          gender: currentForm.gender?.toLowerCase() || undefined,
+          age: currentForm.dateOfBirth || undefined,
+          bloodType: currentForm.bloodGroup || undefined,
+          country: currentForm.state || undefined,
+          photoUrl: currentForm.photo || undefined,
         },
       })
     } catch { /* localStorage save still succeeded */ }
@@ -242,33 +244,50 @@ export default function Profile() {
     // Sync health context to AI Memory (What Liana Remembers)
     try {
       await modelClient.put('/ai/health-context', {
-        gender: form.gender || undefined,
-        location: form.state || undefined,
-        allergies: form.knownAllergies,
-        conditions: form.chronicConditions,
-        medications: form.currentMedications.map(m => `${m.name} (${m.dosage})`),
+        gender: currentForm.gender || undefined,
+        location: currentForm.state || undefined,
+        allergies: currentForm.knownAllergies,
+        conditions: currentForm.chronicConditions,
+        medications: currentForm.currentMedications.map(m => `${m.name} (${m.dosage})`),
       })
     } catch { /* ignore if AI memory endpoint unreachable */ }
 
-    setOriginalForm(JSON.parse(JSON.stringify(form)))
+    setSaveStatus('saved')
     setDirty(false)
+  }, [getScopedKey])
+
+  // Debounced auto-save effect whenever form changes and is dirty
+  useEffect(() => {
+    if (!dirty) return
+
+    // Immediately persist to localStorage for zero data loss on browser refresh
+    const scopedKey = getScopedKey()
+    persistProfile(scopedKey, form)
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      performAutoSave(form)
+    }, 800)
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    }
+  }, [form, dirty, getScopedKey, performAutoSave])
+
+  const doSave = useCallback(async () => {
+    setSaving(true)
+    await performAutoSave(form)
+    setOriginalForm(JSON.parse(JSON.stringify(form)))
     setSaving(false)
     addToast('Profile saved successfully.', 'success')
-  }, [form, originalForm, getScopedKey, addToast])
+  }, [form, performAutoSave, addToast])
 
   const handleSave = () => {
     if (!form.fullName.trim()) {
       addToast('Full name is required.', 'error')
-      return
-    }
-    if (!form.email.trim()) {
-      addToast('Email is required.', 'error')
-      return
-    }
-
-    if (form.email !== originalForm.email) {
-      pendingSaveRef.current = true
-      setShowPasswordModal(true)
       return
     }
 
@@ -301,12 +320,26 @@ export default function Profile() {
   return (
     <main className="min-h-[100dvh] flex flex-col items-center">
       <div className="max-w-[900px] w-full px-4 md:px-gutter py-stack-lg flex flex-col gap-gutter">
-        {dirty && (
-          <div className="self-end inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-3 py-1 text-caption text-amber-400 border border-amber-500/20">
-            <Icon icon="edit_note" size="sm" />
-            Unsaved
-          </div>
-        )}
+        <div className="self-end flex items-center gap-2">
+          {saveStatus === 'saving' && (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-caption text-primary border border-primary/20 font-bold shadow-sm">
+              <Icon icon="hourglass_top" size="sm" className="animate-spin" />
+              Auto-saving…
+            </div>
+          )}
+          {saveStatus === 'saved' && !dirty && (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-caption text-green-600 dark:text-green-400 border border-green-500/20 font-bold shadow-sm">
+              <Icon icon="check_circle" size="sm" />
+              Auto-saved
+            </div>
+          )}
+          {dirty && saveStatus !== 'saving' && (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-caption text-amber-400 border border-amber-500/20 font-medium shadow-sm">
+              <Icon icon="edit_note" size="sm" />
+              Saving changes…
+            </div>
+          )}
+        </div>
 
         {/* Profile Header Card */}
         <div className="bg-surface border border-outline-variant rounded-xl p-4 md:p-8">
@@ -352,13 +385,11 @@ export default function Profile() {
                 onChange={e => updateField('fullName', e.target.value)}
                 placeholder="Your full name"
               />
-              <input
-                className="text-center md:text-left font-body-md text-secondary bg-transparent border-b-2 border-transparent focus:border-primary outline-none w-full mb-4 transition-colors"
-                type="email"
-                value={form.email}
-                onChange={e => updateField('email', e.target.value)}
-                placeholder="your.email@example.com"
-              />
+              <div className="flex items-center justify-center md:justify-start gap-1.5 font-body-md text-secondary mb-4">
+                <Icon icon="lock" size="xs" className="text-outline shrink-0" />
+                <span>{form.email || 'No email provided'}</span>
+                <span className="text-[10px] font-semibold bg-surface-variant text-secondary px-2 py-0.5 rounded-full border border-outline-variant">Locked</span>
+              </div>
 
               {/* Completion bar */}
               <div className="flex items-center gap-3">
@@ -433,13 +464,23 @@ export default function Profile() {
               />
             </Field>
             <Field label="Email Address">
-              <input
-                className={inputClass()}
-                type="email"
-                placeholder="your.email@example.com"
-                value={form.email}
-                onChange={e => updateField('email', e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  className={inputClass() + ' opacity-75 cursor-not-allowed bg-surface-variant/50 pr-10'}
+                  type="email"
+                  readOnly
+                  disabled
+                  value={form.email}
+                  placeholder="your.email@example.com"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary flex items-center gap-1" title="Account login email cannot be edited directly">
+                  <Icon icon="lock" size="sm" />
+                </div>
+              </div>
+              <p className="text-[11px] text-secondary mt-1 flex items-center gap-1">
+                <Icon icon="info" size="xs" className="shrink-0" />
+                Account login email cannot be changed directly.
+              </p>
             </Field>
             <Field label="Home Address" className="sm:col-span-2">
               <textarea
