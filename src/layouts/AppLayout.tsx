@@ -27,6 +27,7 @@ const pageTitles = [
   { path: '/profile', label: 'Profile' },
   { path: '/ai-settings', label: 'Assistant Settings' },
   { path: '/theme', label: 'Theme' },
+  { path: '/support', label: 'Support' },
 ]
 
 function getPageTitle(pathname: string) {

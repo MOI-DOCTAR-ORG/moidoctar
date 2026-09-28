@@ -14,8 +14,8 @@ const primaryNav = [
 ]
 
 const bottomNav = [
-  { label: 'Support', icon: 'help' },
-  { label: 'Terms & Conditions', icon: 'contract' },
+  { label: 'Support', icon: 'help', to: '/support' },
+  { label: 'Terms & Conditions', icon: 'contract', to: undefined },
 ]
 
 type SidebarProps = {
@@ -92,17 +92,39 @@ export default function Sidebar({ open, onClose, onSignOut }: SidebarProps) {
 
       <div className="mt-auto space-y-1 border-t border-outline-variant px-2.5 pt-3">
         {bottomNav.map((item) => {
-          return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={handleNav}
-              className="flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-primary/10 hover:text-on-surface"
-            >
+          const isActive = item.to ? isActiveRoute(item.to) : false
+          const className = `flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm transition-colors ${
+            isActive
+              ? 'bg-primary/10 text-primary'
+              : 'text-secondary hover:bg-primary/10 hover:text-on-surface'
+          }`
+          const content = (
+            <>
               <span className="grid h-7 w-7 shrink-0 place-items-center">
                 <Icon icon={item.icon} size="md" />
               </span>
               <span className="truncate font-label-md text-label-md">{item.label}</span>
+            </>
+          )
+
+          // Support is a real route; Terms has no page yet, so it stays a button.
+          if (item.to) {
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                onClick={handleNav}
+                aria-current={isActive ? 'page' : undefined}
+                className={className}
+              >
+                {content}
+              </Link>
+            )
+          }
+
+          return (
+            <button key={item.label} type="button" onClick={handleNav} className={className}>
+              {content}
             </button>
           )
         })}
