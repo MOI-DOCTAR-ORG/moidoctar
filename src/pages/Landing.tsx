@@ -41,21 +41,22 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-on-background">
-      <header className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-6 md:px-8">
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src="/moidoctar-logo.svg" alt={APP_NAME} className="h-9 w-9 object-contain" />
-          <span className="font-headline-md text-lg font-extrabold text-primary">{APP_NAME}</span>
+      <header className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-4 py-5 sm:px-5 sm:py-6 md:px-8">
+        <Link to="/" aria-label={APP_NAME} className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+          <img src="/moidoctar-logo.svg" alt="" className="h-9 w-9 shrink-0 object-contain" />
+          <span className="hidden min-[360px]:inline truncate font-headline-md text-lg font-extrabold text-primary">{APP_NAME}</span>
         </Link>
-        <nav className="flex items-center gap-2.5">
+        <nav className="flex shrink-0 items-center gap-2 sm:gap-2.5" aria-label="Account">
+          {/* Secondary action: outlined so it reads as a button without competing with "Get started". */}
           <Link
             to="/sign-in"
-            className="rounded-xl px-4 py-2.5 font-label-md text-label-md text-on-surface-variant transition hover:bg-primary-container/40 hover:text-primary"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-outline-variant bg-surface px-3.5 sm:px-4 py-2.5 font-label-md text-label-md font-semibold text-on-surface transition hover:border-primary hover:bg-primary-container/30 hover:text-primary active:scale-[0.98] active:bg-primary-container/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Sign in
           </Link>
           <Link
             to="/sign-up"
-            className="rounded-xl bg-primary px-4 py-2.5 font-label-md text-label-md font-bold text-on-primary shadow-sm transition shadow-sm"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary bg-primary px-3.5 sm:px-4 py-2.5 font-label-md text-label-md font-bold text-on-primary shadow-sm transition hover:opacity-90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Get started
           </Link>
