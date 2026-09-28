@@ -8,6 +8,8 @@ class Demographics(BaseModel):
     currentCondition: Optional[str] = None
     bloodType: Optional[str] = None
     country: Optional[str] = None
+    genotype: Optional[str] = None
+    dateOfBirth: Optional[str] = None
     photo: Optional[str] = None
     photoUrl: Optional[str] = None
 

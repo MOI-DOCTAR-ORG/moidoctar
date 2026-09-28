@@ -113,32 +113,37 @@ export function createDefaultProfile(): PatientProfile {
   }
 }
 
+/**
+ * Share of the profile the person has filled in, as a whole percentage (0–100).
+ * The sign-in email isn't counted: it comes with the account and can't be edited here.
+ * Any chosen answer counts as filled — including "Don't know" and "Prefer not to say".
+ */
 export function calculateCompletion(profile: PatientProfile): number {
+  const filled = (v: unknown) => typeof v === 'string' ? v.trim().length > 0 : !!v
+  const listed = (v: unknown) => Array.isArray(v) && v.length > 0
   const fields: boolean[] = [
-    !!profile.photo,
-    !!profile.fullName,
-    !!profile.dateOfBirth,
-    !!profile.gender,
-    !!profile.bloodGroup,
-    !!profile.genotype,
-    !!profile.phoneNumber,
-    !!profile.email,
-    !!profile.homeAddress,
-    !!profile.state,
-    !!profile.city,
-    profile.knownAllergies.length > 0,
-    profile.chronicConditions.length > 0,
-    profile.currentMedications.length > 0,
-    !!profile.pastSurgeries,
-    !!profile.disabilities,
-    !!profile.emergencyName,
-    !!profile.emergencyRelationship,
-    !!profile.emergencyPhone,
-    !!profile.preferredDoctor,
-    !!profile.preferredHospital,
+    filled(profile.photo),
+    filled(profile.fullName),
+    filled(profile.dateOfBirth),
+    filled(profile.gender),
+    filled(profile.bloodGroup),
+    filled(profile.genotype),
+    filled(profile.phoneNumber),
+    filled(profile.homeAddress),
+    filled(profile.state),
+    filled(profile.city),
+    listed(profile.knownAllergies),
+    listed(profile.chronicConditions),
+    listed(profile.currentMedications),
+    filled(profile.pastSurgeries),
+    filled(profile.disabilities),
+    filled(profile.emergencyName),
+    filled(profile.emergencyRelationship),
+    filled(profile.emergencyPhone),
+    filled(profile.preferredDoctor),
+    filled(profile.preferredHospital),
   ]
-  const filled = fields.filter(Boolean).length
-  return Math.round((filled / fields.length) * 100)
+  return Math.round((fields.filter(Boolean).length / fields.length) * 100)
 }
 
 export function loadProfile(key: string): PatientProfile | null {
