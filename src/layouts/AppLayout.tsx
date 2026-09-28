@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import Icon from '../components/Icon'
+import { getDisplayName, getInitials, getProfileImage } from '../lib/userIdentity'
 
 const pageTitles = [
   { path: '/new-triage-interface', label: 'New Triage' },
@@ -31,13 +32,6 @@ const pageTitles = [
 function getPageTitle(pathname: string) {
   if (pathname === '/dashboard') return 'Dashboard'
   return pageTitles.find(page => pathname.startsWith(page.path))?.label || 'MoiDoctar'
-}
-
-function getInitials(name?: string) {
-  const parts = name?.trim().split(/\s+/).filter(Boolean) || []
-  if (parts.length === 0) return 'U'
-  if (parts.length === 1) return parts[0][0].toUpperCase()
-  return `${parts[0][0].toUpperCase()}${parts[parts.length - 1][0].toUpperCase()}`
 }
 
 export default function AppLayout() {
@@ -63,9 +57,9 @@ export default function AppLayout() {
     return () => window.removeEventListener(REPLAY_TOUR_EVENT, handler)
   }, [])
   const isDark = theme === 'dark'
-  // The chat owns the full screen height on phones (its own input bar replaces the bottom nav).
-  const isChat = pathname.startsWith('/new-triage')
   const pageTitle = getPageTitle(pathname)
+  const displayName = getDisplayName(user)
+  const avatarUrl = getProfileImage(user)
 
   const handleSignOut = async () => {
     await signOut()
@@ -83,24 +77,24 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-background text-on-background font-body-md">
       {showTour && <OnboardingTour onFinish={() => setShowTour(false)} />}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onSignOut={handleSignOut} />
 
       <div className="fixed top-0 left-0 right-0 md:left-[var(--spacing-sidebar-width,232px)] z-30">
 
         {/* Glass header */}
         <div className="bg-surface border-b border-outline-variant h-14 md:h-16">
-          <div className="mx-auto flex h-full w-full max-w-[1400px] items-center justify-between px-3 sm:px-4 md:px-6">
-            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="mx-auto flex h-full w-full max-w-[1400px] items-center justify-between px-2 min-[360px]:px-3 sm:px-4 md:px-6">
+            <div className="flex min-w-0 items-center gap-1.5 min-[360px]:gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
                 className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 shrink-0 place-items-center rounded-xl bg-primary-container text-primary md:hidden transition-colors hover:bg-primary-container/80"
-                aria-label="Open sidebar"
+                aria-label="Open menu"
               >
                 <Icon icon="menu" size="lg" />
               </button>
               <div className="min-w-0">
-                <h1 className="truncate font-headline-md text-lg headline-lg-mobile md:text-xl font-bold text-on-surface">
+                <h1 className="truncate font-headline-md text-base min-[360px]:text-lg headline-lg-mobile md:text-xl font-bold text-on-surface" title={pageTitle}>
                   {pageTitle}
                 </h1>
                 <p className="hidden truncate text-xs font-semibold text-secondary md:block">
@@ -109,7 +103,9 @@ export default function AppLayout() {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {/* Phones keep only theme + notifications here so the page title has room;
+                Profile lives in the bottom nav and Sign out in the menu. */}
+            <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
               <button
                 type="button"
                 onClick={toggleTheme}
@@ -135,16 +131,18 @@ export default function AppLayout() {
               </Link>
               <Link
                 to="/profile"
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl bg-primary-container text-sm font-bold text-primary transition hover:ring-2 hover:ring-primary/30"
+                className="hidden md:grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 overflow-hidden place-items-center rounded-xl bg-primary-container text-sm font-bold text-primary transition hover:ring-2 hover:ring-primary/30"
                 aria-label="Profile"
-                title={user?.userName || 'Profile'}
+                title={displayName || 'Profile'}
               >
-                {getInitials(user?.userName)}
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="" className="h-full w-full rounded-xl object-cover" />
+                  : getInitials(displayName)}
               </Link>
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-error-container hover:text-error"
+                className="hidden md:grid min-h-[44px] min-w-[44px] md:h-9 md:w-9 place-items-center rounded-xl text-secondary transition-colors hover:bg-error-container hover:text-error"
                 aria-label="Sign out"
               >
                 <Icon icon="logout" size="lg" />
@@ -157,11 +155,12 @@ export default function AppLayout() {
       <OfflineBanner />
 
       {/* Content */}
-      <div className={`md:ml-[var(--spacing-sidebar-width,232px)] pt-14 md:pt-16 ${isChat ? 'pb-0' : 'pb-[calc(4rem+env(safe-area-inset-bottom))]'} md:pb-0 min-h-[100dvh]`}>
+      {/* Bottom padding on phones keeps the last content (and Triage's composer) above the bottom nav. */}
+      <div className="app-content md:ml-[var(--spacing-sidebar-width,232px)] pt-14 md:pt-16 min-h-[100dvh]">
         <Outlet key={userChangeKey} />
       </div>
 
-      {!isChat && <MobileBottomNav />}
+      <MobileBottomNav />
     </div>
   )
 }

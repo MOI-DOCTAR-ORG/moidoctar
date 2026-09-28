@@ -21,9 +21,10 @@ const bottomNav = [
 type SidebarProps = {
   open: boolean
   onClose: () => void
+  onSignOut: () => void
 }
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+export default function Sidebar({ open, onClose, onSignOut }: SidebarProps) {
   const { pathname } = useLocation()
 
   const handleNav = () => {
@@ -105,6 +106,17 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </button>
           )
         })}
+        {/* On phones the header has no room for Sign out, so it lives here. */}
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-error-container hover:text-error md:hidden"
+        >
+          <span className="grid h-7 w-7 shrink-0 place-items-center">
+            <Icon icon="logout" size="md" />
+          </span>
+          <span className="truncate font-label-md text-label-md">Sign out</span>
+        </button>
       </div>
     </div>
   )

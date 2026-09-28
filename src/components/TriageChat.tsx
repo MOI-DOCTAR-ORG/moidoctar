@@ -9,7 +9,7 @@ import PatientCard, { BAND_LABEL, bandOf } from './PatientCard'
 import { useAuth, type TriageSession } from '../context/AuthContext'
 import { useBodyMap } from '../context/BodyMapContext'
 import { useTriageChat, type ChatMsg, type Severity } from '../context/TriageChatContext'
-import { getUserInitials } from '../utils/getUserInitials'
+import { getDisplayName, getInitials } from '../lib/userIdentity'
 import type { FollowUpQuestion, TriageChatResponse, Urgency } from '../types/triage'
 import { URGENCY_DISPLAY, legacySeverity, usesContract } from '../lib/triageDisplay'
 
@@ -362,10 +362,11 @@ function QuestionPrompt({ question, onAnswer, active }: { question: FollowUpQues
 }
 
 function Bubble({ msg, severity, onAsk, isLatest, isLast }: { msg: ChatMsg; severity: Severity | null; onAsk: (q: string) => void; isLatest: boolean; isLast?: boolean }) {
+  const { user } = useAuth()
   if (msg.role === 'user') {
     return (
       <div className="flex flex-row-reverse items-end gap-2">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary-container text-xs font-bold text-on-secondary-container">{getUserInitials()}</div>
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary-container text-xs font-bold text-on-secondary-container">{getInitials(getDisplayName(user))}</div>
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-on-primary sm:max-w-[75%]">
           <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.text}</p>
           {msg.imageName && <p className="mt-1 flex items-center gap-1 text-xs opacity-80"><Icon icon="attach_file" size="sm" /> {msg.imageName}</p>}
@@ -421,7 +422,7 @@ function PastTriageModal({
 }) {
   const navigate = useNavigate()
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-lg rounded-2xl border border-outline-variant bg-surface p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-outline-variant pb-3">
           <div className="flex items-center gap-2">
@@ -588,6 +589,25 @@ export default function TriageChat() {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [chat.messages.length, chat.pending, chat.error])
 
+  // Stay pinned to the latest message when the conversation area resizes (the bottom nav
+  // coming back after the keyboard closes, the severity row appearing) or a reply grows —
+  // unless the person has scrolled up to read something.
+  const logRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const log = logRef.current
+    if (!log || typeof ResizeObserver === 'undefined') return
+    let atBottom = true
+    const onScroll = () => { atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 32 }
+    const ro = new ResizeObserver(() => { if (atBottom) log.scrollTop = log.scrollHeight })
+    log.addEventListener('scroll', onScroll, { passive: true })
+    ro.observe(log)
+    if (log.firstElementChild) ro.observe(log.firstElementChild)
+    return () => {
+      ro.disconnect()
+      log.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+
   const submit = () => {
     if (chat.send(input)) setInput('')
   }
@@ -636,7 +656,7 @@ export default function TriageChat() {
   )
 
   return (
-    <main className="flex h-[calc(100dvh-3.5rem)] md:h-[calc(100dvh-4rem)]">
+    <main className="triage-shell flex">
       {/* Desktop Sidebar: Session details + Previous Triages list */}
       <aside className="hidden w-80 shrink-0 flex-col justify-between border-r border-outline-variant bg-surface-container-low p-4 lg:flex">
         <div className="flex flex-col min-h-0 flex-1">
@@ -742,7 +762,7 @@ export default function TriageChat() {
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-background">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
         {/* Mobile top bar */}
         <div className="border-b border-outline-variant lg:hidden bg-surface-container-low px-3 py-2">
           <div className="flex items-center justify-between gap-2">
@@ -750,7 +770,7 @@ export default function TriageChat() {
               <button
                 type="button"
                 onClick={() => setShowPastTriagesMobile(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface hover:border-primary transition-colors shadow-xs"
+                className="flex min-h-10 items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface hover:border-primary transition-colors shadow-xs"
               >
                 <Icon icon="history" size="xs" className="text-primary" />
                 <span>Previous Triages</span>
@@ -762,8 +782,9 @@ export default function TriageChat() {
               <button
                 type="button"
                 onClick={() => setShowDetails(v => !v)}
-                className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2 py-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+                className="flex min-h-10 items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2 py-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
                 title="Session Details"
+                aria-expanded={showDetails}
               >
                 <Icon icon="info" size="xs" />
                 <span>{hasAreas ? `${selectedAreas.length} marked` : 'Details'}</span>
@@ -774,7 +795,8 @@ export default function TriageChat() {
             <button
               type="button"
               onClick={handleStartNewTriage}
-              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90 transition-opacity"
+              className="flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90 transition-opacity"
+              aria-label="Start a new triage"
             >
               <Icon icon="add" size="xs" />
               <span>New</span>
@@ -788,7 +810,7 @@ export default function TriageChat() {
           )}
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-6" role="log" aria-live="polite">
+        <div ref={logRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6" role="log" aria-live="polite">
           <div className="mx-auto w-full max-w-3xl space-y-5">
             {!chat.hasStarted ? (
               <PatientCard value={chat.patient} onChange={chat.setPatient} />
@@ -823,7 +845,7 @@ export default function TriageChat() {
           </div>
         </div>
 
-        <div className="border-t border-outline-variant bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
+        <div className="chat-composer border-t border-outline-variant bg-surface px-3 pb-3 pt-2 sm:px-6 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto w-full max-w-3xl">
             {userTurns > 0 && chat.latest?.has_symptoms && (
               <div className="mb-2 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs text-on-surface-variant">
@@ -880,8 +902,8 @@ export default function TriageChat() {
 
       {/* Mobile Past Triages Drawer */}
       {showPastTriagesMobile && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs lg:hidden">
-          <div className="w-full max-h-[85vh] rounded-t-2xl border-t border-outline-variant bg-surface p-4 flex flex-col space-y-3 shadow-2xl animate-in slide-in-from-bottom duration-200">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-xs lg:hidden">
+          <div className="w-full max-h-[85vh] rounded-t-2xl border-t border-outline-variant bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col space-y-3 shadow-2xl animate-in slide-in-from-bottom duration-200">
             <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
               <div className="flex items-center gap-2">
                 <Icon icon="history" size="sm" className="text-primary" />
