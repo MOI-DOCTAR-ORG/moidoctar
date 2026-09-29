@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth, type BackendUser } from '../context/AuthContext'
 import { useToastContext } from '../context/ToastContext'
 import Icon from '../components/Icon'
@@ -904,7 +904,7 @@ export default function Profile() {
           </div>
           <div className="flex gap-stack-lg">
             <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Privacy Policy</a>
-            <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Terms of Service</a>
+            <Link className="text-caption text-secondary hover:text-primary transition-colors" to="/terms">Terms of Service</Link>
           </div>
         </footer>
       </div>

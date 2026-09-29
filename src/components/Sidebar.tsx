@@ -13,9 +13,10 @@ const primaryNav = [
   { label: 'Theme', icon: 'palette', to: '/theme' },
 ]
 
-const bottomNav = [
+// `to` is optional here: Support has no destination yet and stays a plain button.
+const bottomNav: { label: string; icon: string; to?: string }[] = [
   { label: 'Support', icon: 'help' },
-  { label: 'Terms & Conditions', icon: 'contract' },
+  { label: 'Terms & Conditions', icon: 'contract', to: '/terms' },
 ]
 
 type SidebarProps = {
@@ -92,17 +93,24 @@ export default function Sidebar({ open, onClose, onSignOut }: SidebarProps) {
 
       <div className="mt-auto space-y-1 border-t border-outline-variant px-2.5 pt-3">
         {bottomNav.map((item) => {
-          return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={handleNav}
-              className="flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-primary/10 hover:text-on-surface"
-            >
+          const className =
+            'flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-primary/10 hover:text-on-surface'
+          const inner = (
+            <>
               <span className="grid h-7 w-7 shrink-0 place-items-center">
                 <Icon icon={item.icon} size="md" />
               </span>
               <span className="truncate font-label-md text-label-md">{item.label}</span>
+            </>
+          )
+
+          return item.to ? (
+            <Link key={item.label} to={item.to} onClick={handleNav} className={className}>
+              {inner}
+            </Link>
+          ) : (
+            <button key={item.label} type="button" onClick={handleNav} className={className}>
+              {inner}
             </button>
           )
         })}
