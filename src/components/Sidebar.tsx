@@ -13,9 +13,9 @@ const primaryNav = [
   { label: 'Theme', icon: 'palette', to: '/theme' },
 ]
 
-// `to` is optional here: Support has no destination yet and stays a plain button.
+// `to` stays optional so a future entry without a page still renders as a button.
 const bottomNav: { label: string; icon: string; to?: string }[] = [
-  { label: 'Support', icon: 'help' },
+  { label: 'Support', icon: 'help', to: '/support' },
   { label: 'Terms & Conditions', icon: 'contract', to: '/terms' },
 ]
 
@@ -93,9 +93,13 @@ export default function Sidebar({ open, onClose, onSignOut }: SidebarProps) {
 
       <div className="mt-auto space-y-1 border-t border-outline-variant px-2.5 pt-3">
         {bottomNav.map((item) => {
-          const className =
-            'flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm text-secondary transition-colors hover:bg-primary/10 hover:text-on-surface'
-          const inner = (
+          const isActive = item.to ? isActiveRoute(item.to) : false
+          const className = `flex h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm transition-colors ${
+            isActive
+              ? 'bg-primary/10 text-primary'
+              : 'text-secondary hover:bg-primary/10 hover:text-on-surface'
+          }`
+          const content = (
             <>
               <span className="grid h-7 w-7 shrink-0 place-items-center">
                 <Icon icon={item.icon} size="md" />
@@ -104,13 +108,24 @@ export default function Sidebar({ open, onClose, onSignOut }: SidebarProps) {
             </>
           )
 
-          return item.to ? (
-            <Link key={item.label} to={item.to} onClick={handleNav} className={className}>
-              {inner}
-            </Link>
-          ) : (
+          // Entries with a route navigate; any without one fall back to a plain button.
+          if (item.to) {
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                onClick={handleNav}
+                aria-current={isActive ? 'page' : undefined}
+                className={className}
+              >
+                {content}
+              </Link>
+            )
+          }
+
+          return (
             <button key={item.label} type="button" onClick={handleNav} className={className}>
-              {inner}
+              {content}
             </button>
           )
         })}

@@ -26,6 +26,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import LocalCareDiscovery from './pages/LocalCareDiscovery'
 import Landing from './pages/Landing'
 import Terms from './pages/Terms'
+import Support from './pages/Support'
 
 export default function App() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/symptom-tracker-body-map" element={<SymptomTrackerBodyMap />} />
         <Route path="/ai-settings" element={<AISettings />} />
         <Route path="/theme" element={<Theme />} />
+        <Route path="/support" element={<Support />} />
         <Route path="/admin/cache" element={<AdminCache />} />
       </Route>
 
