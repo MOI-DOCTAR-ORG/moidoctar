@@ -10,9 +10,11 @@ type EmergencyEscalationProps = {
   /** Heading override, so the panel never contradicts the result's own urgency badge. */
   title?: string
   subtitle?: string
+  /** The session ID to link to on the Care Details button. */
+  sessionId?: string
 }
 
-export default function EmergencyEscalation({ urgencyLevel, redFlags, title, subtitle }: EmergencyEscalationProps) {
+export default function EmergencyEscalation({ urgencyLevel, redFlags, title, subtitle, sessionId }: EmergencyEscalationProps) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(true)
   const own = useAiMemory().data?.preferences.emergency_number?.replace(/[^\d+]/g, '')
@@ -26,6 +28,8 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags, title, sub
     ? [{ label: 'Your emergency number', number: own, icon: 'call' },
        ...EMERGENCY_NUMBERS.filter((n) => n.number !== own)]
     : EMERGENCY_NUMBERS
+
+  const careDetailsPath = sessionId ? `/care-details?id=${sessionId}` : '/care-details'
 
   return (
     <div className="rounded-2xl border-2 border-red-500/40 bg-red-500/10 overflow-hidden">
@@ -93,11 +97,11 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags, title, sub
           </div>
 
           <button
-            onClick={() => navigate('/care-details')}
+            onClick={() => navigate(careDetailsPath)}
             className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-2 min-h-[44px]"
           >
             <Icon icon="local_hospital" size="md" />
-            View Care Details & Find Nearby Help
+            View Care Details &amp; Find Nearby Help
           </button>
         </div>
       )}

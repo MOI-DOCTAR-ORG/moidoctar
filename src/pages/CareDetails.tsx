@@ -1,270 +1,362 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import type { TriageSession } from '../context/AuthContext'
 import Icon from '../components/Icon'
-import { PremiumInput, PremiumSelect } from '../components/ui/PremiumFormControls'
-import { usePersistState } from '../hooks/usePersistState'
 
-interface SymptomReport {
-  id: number
-  symptom: string
-  severity: string
-  duration: string
-  notes: string
-  timestamp: string
+/* ─── Helpers ─────────────────────────────────────────────────────────────── */
+
+const severityConfig: Record<string, { badge: string; border: string; icon: string; label: string }> = {
+  Urgent: {
+    badge: 'bg-error/15 text-error border border-error/30',
+    border: 'border-l-error',
+    icon: 'warning',
+    label: 'Urgent',
+  },
+  Moderate: {
+    badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+    border: 'border-l-amber-400',
+    icon: 'info',
+    label: 'Moderate',
+  },
+  Stable: {
+    badge: 'bg-green-500/15 text-success border border-green-500/30',
+    border: 'border-l-green-400',
+    icon: 'check_circle',
+    label: 'Stable',
+  },
 }
 
-export default function CareDetails() {
+/* ─── Empty State ──────────────────────────────────────────────────────────── */
+
+function EmptyState() {
   const navigate = useNavigate()
-  const { addSession } = useAuth()
-  const [followUp, setFollowUp] = useState(true)
+  return (
+    <div className="min-h-[70dvh] flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-20 h-20 mx-auto mb-5 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+        <Icon icon="local_hospital" size="2xl" />
+      </div>
+      <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No triage sessions yet</h3>
+      <p className="font-body-md text-body-md text-secondary max-w-md mx-auto mb-6">
+        Complete a triage session with Liana to see your personalised care details here.
+      </p>
+      <button
+        onClick={() => navigate('/new-triage')}
+        className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-label-md hover:opacity-90 transition-all min-h-[44px]"
+      >
+        <Icon icon="add" size="md" />
+        Start New Triage
+      </button>
+    </div>
+  )
+}
 
-  const [symptom, setSymptom] = useState('')
-  const [severity, setSeverity] = useState('')
-  const [duration, setDuration] = useState('')
-  const [notes, setNotes] = useState('')
-  const [reports, setReports] = usePersistState<SymptomReport[]>('doctarr_care_reports', [])
+/* ─── Session Not Found ────────────────────────────────────────────────────── */
 
-  const submitReport = () => {
-    if (!symptom.trim()) return
-    const report: SymptomReport = {
-      id: Date.now(),
-      symptom,
-      severity: severity || 'Mild',
-      duration: duration || 'Not specified',
-      notes,
-      timestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    }
-    setReports(prev => [report, ...prev])
-    addSession({
-      id: 'sess-' + Date.now(),
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      condition: symptom,
-      description: `${severity || 'Mild'} ${symptom} for ${duration || 'unknown duration'}. ${notes}`,
-      severity: severity === 'Severe' ? 'Urgent' : severity === 'Moderate' ? 'Moderate' : 'Stable',
-      statusLabel: 'Reviewed',
-      statusIcon: 'clinical_notes',
-    })
-    setSymptom('')
-    setSeverity('')
-    setDuration('')
-    setNotes('')
-  }
+function SessionNotFound({ sessionId }: { sessionId: string }) {
+  const navigate = useNavigate()
+  return (
+    <div className="min-h-[70dvh] flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-20 h-20 mx-auto mb-5 bg-error/10 rounded-full flex items-center justify-center text-error">
+        <Icon icon="search_off" size="2xl" />
+      </div>
+      <h3 className="font-headline-md text-headline-md text-on-surface mb-2">Session not found</h3>
+      <p className="font-body-md text-body-md text-secondary max-w-md mx-auto mb-6">
+        The session ID <code className="bg-surface px-1 rounded text-xs">{sessionId}</code> could not be found in your history.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={() => navigate('/history')}
+          className="inline-flex items-center gap-2 border border-primary text-primary px-6 py-3 rounded-full font-label-md hover:bg-primary/10 transition-all min-h-[44px]"
+        >
+          <Icon icon="history" size="md" />
+          View History
+        </button>
+        <button
+          onClick={() => navigate('/new-triage')}
+          className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-label-md hover:opacity-90 transition-all min-h-[44px]"
+        >
+          <Icon icon="add" size="md" />
+          Start New Triage
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Session Detail View ──────────────────────────────────────────────────── */
+
+function SessionDetail({ session }: { session: TriageSession }) {
+  const navigate = useNavigate()
+  const config = severityConfig[session.severity] ?? severityConfig.Stable
 
   return (
-    <main className="min-h-[100dvh] p-4 md:p-6 max-w-container-max-width mx-auto bg-background text-on-surface font-body-md">
-      <header className="mb-stack-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <main className="min-h-[100dvh] p-4 md:p-6 max-w-[1100px] mx-auto bg-background text-on-surface font-body-md">
+      {/* Breadcrumb */}
+      <header className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <nav className="flex items-center gap-2 text-secondary mb-2">
-            <button onClick={() => navigate('/history')} className="text-caption font-caption hover:text-primary transition-colors">History</button>
+            <button
+              onClick={() => navigate('/history')}
+              className="text-caption font-caption hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <Icon icon="arrow_back" size="sm" />
+              History
+            </button>
             <Icon icon="chevron_right" size="sm" />
             <span className="text-caption font-caption text-primary font-bold">Care Details</span>
           </nav>
           <h2 className="font-headline-lg text-headline-lg text-on-surface">Care Details</h2>
         </div>
+        <div className="flex items-center gap-3">
+          <span className="text-caption text-secondary">
+            {session.date}{session.time ? ` · ${session.time}` : ''}
+          </span>
+          <span className={`px-3 py-1.5 rounded-full font-label-md text-xs flex items-center gap-1.5 ${config.badge}`}>
+            <Icon icon={config.icon} size="xs" />
+            {config.label}
+          </span>
+        </div>
       </header>
 
-      {/* Severity Status Overview */}
-      <div className="grid grid-cols-3 gap-2 md:gap-4 mb-stack-lg">
-        {(['Mild', 'Moderate', 'Severe'] as const).map(sev => {
-          const count = reports.filter(r => r.severity === sev).length
-          const colors = {
-            Mild: 'bg-green-500/15 border-green-500/30 text-success',
-            Moderate: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
-            Severe: 'bg-error/15 border-error/30 text-error',
-          }
-          const statuses = {
-            Mild: { label: 'Active Monitoring', icon: 'check_circle' },
-            Moderate: { label: 'Needs Attention', icon: 'info' },
-            Severe: { label: 'Urgent', icon: 'warning' },
-          }
-          return (
-            <div key={sev} className={`rounded-xl border p-3 md:p-4 ${colors[sev]}`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] uppercase font-bold tracking-widest">{sev}</span>
-                <div className={`w-2 h-2 rounded-full ${sev === 'Mild' ? 'bg-green-500' : sev === 'Moderate' ? 'bg-amber-500' : 'bg-error'} ${count > 0 ? 'animate-pulse' : ''}`} />
-              </div>
-              <span className="font-headline-lg text-headline-lg font-bold">{count}</span>
-              <span className="text-caption ml-1 opacity-70">{count === 1 ? 'report' : 'reports'}</span>
-              {count > 0 && (
-                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-current/20">
-                  <Icon icon={statuses[sev].icon} size="xs" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider">{statuses[sev].label}</span>
-                </div>
-              )}
-            </div>
-          )
-        })}
+      {/* Condition headline */}
+      <div className={`bg-surface rounded-xl border border-l-4 border-outline-variant ${config.border} p-5 md:p-6 mb-6`}>
+        <p className="text-caption text-secondary uppercase tracking-widest font-bold mb-1">Chief Complaint</p>
+        <h3 className="font-headline-md text-headline-md text-on-surface">{session.condition}</h3>
+        {session.description && (
+          <p className="mt-2 text-body-md text-on-surface-variant leading-relaxed">{session.description}</p>
+        )}
       </div>
 
-      {/* Symptom Report Form */}
-      <section className="bg-surface rounded-xl p-4 sm:p-6 md:p-8 border border-outline-variant mb-gutter">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
-            <Icon icon="edit_note" size="lg" />
-          </div>
-          <h3 className="font-headline-md text-headline-md">Report Your Symptoms</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
-          <div className="flex flex-col gap-1">
-            <label className="font-label-md text-caption text-secondary">SYMPTOM</label>
-            <PremiumInput placeholder="e.g. Fever, Cough, Headache" value={symptom} onChange={e => setSymptom(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="font-label-md text-caption text-secondary">SEVERITY</label>
-            <div className="flex gap-2">
-              {['Mild', 'Moderate', 'Severe'].map(s => (
-                <button key={s} onClick={() => setSeverity(s)} className={`flex-1 py-3 rounded-lg border font-label-md transition-all min-h-[44px] ${severity === s ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant hover:border-primary'}`}>{s}</button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="font-label-md text-caption text-secondary">DURATION</label>
-            <PremiumSelect value={duration} onChange={e => setDuration(e.target.value)}>
-              <option value="">Select duration</option>
-              <option value="Few hours">Few hours</option>
-              <option value="1 day">1 day</option>
-              <option value="2-3 days">2-3 days</option>
-              <option value="1 week">1 week</option>
-              <option value="2+ weeks">2+ weeks</option>
-            </PremiumSelect>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="font-label-md text-caption text-secondary">NOTES (optional)</label>
-            <PremiumInput placeholder="Additional details..." value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <button onClick={submitReport} className="w-full sm:w-auto bg-primary text-on-primary px-8 py-3 rounded-full font-label-md hover:opacity-90 transition-all flex items-center justify-center gap-2 min-h-[44px]">
-            <Icon icon="clinical_notes" size="lg" />
-            Submit Report
-          </button>
-        </div>
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column — rich detail */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
 
-      {/* Symptom Tags */}
-      {reports.length > 0 && (
-        <section className="flex flex-nowrap overflow-x-auto gap-2 mb-stack-lg pb-2">
-          {reports.slice(0, 5).map(r => (
-            <span key={r.id} className={`px-4 py-2 rounded-full text-label-md font-label-md flex items-center gap-2 ${r.severity === 'Severe' ? 'bg-error/15 text-error border border-error/20' : r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-primary/15 text-primary border border-primary/20'}`}>
-              <Icon icon={r.severity === 'Severe' ? 'warning' : r.severity === 'Moderate' ? 'info' : 'check_circle'} size="sm" />
-              {r.symptom}
-            </span>
-          ))}
-        </section>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-        <div className="lg:col-span-2 space-y-gutter">
-          <section className="bg-surface rounded-xl p-4 md:p-8 lifted-card transition-all duration-700 opacity-100 translate-y-0 border border-outline-variant">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-primary/15 flex items-center justify-center text-primary">
-                <Icon icon="psychology" size="xl" />
-              </div>
-              <h3 className="font-headline-md text-headline-md">Your Reports</h3>
-            </div>
-            {reports.length === 0 ? (
-              <div className="space-y-4 text-on-surface-variant leading-relaxed font-body-md">
-                <p>No symptoms have been reported yet. Use the form above to log your symptoms and get guidance from Liana.</p>
-                <div className="p-4 bg-primary/5 border-l-4 border-primary rounded-r-lg">
-                  <p className="text-label-md font-label-md text-primary mb-1">Key Insight</p>
-                  <p className="text-body-md">Complete a symptom assessment to unlock personalized health insights.</p>
+          {/* Possible Conditions */}
+          {session.conditions && session.conditions.length > 0 && (
+            <section className="bg-surface rounded-xl border border-outline-variant p-5 md:p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center text-primary">
+                  <Icon icon="biotech" size="lg" />
                 </div>
+                <h4 className="font-headline-sm text-headline-sm text-on-surface">Possible Conditions</h4>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {reports.map(r => (
-                  <div key={r.id} className="bg-surface rounded-lg p-4 border border-outline-variant group">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="font-label-md text-label-md text-on-surface font-bold">{r.symptom}</h4>
-                        <p className="text-caption text-secondary">{r.timestamp}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-3 py-0.5 rounded-full text-caption font-bold uppercase ${
-                          r.severity === 'Severe' ? 'bg-error/15 text-error border border-error/20' :
-r.severity === 'Moderate' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                          'bg-primary/15 text-primary border border-primary/20'
-                        }`}>{r.severity}</span>
-                        <button
-                          onClick={() => setReports(prev => prev.filter(x => x.id !== r.id))}
-                          className="opacity-0 group-hover:opacity-100 text-secondary hover:text-error transition-all p-1 rounded-full hover:bg-error/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                          <Icon icon="close" size="xs" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex gap-4 text-caption text-secondary">
-                      <span>Duration: {r.duration}</span>
-                      {r.notes && <span>Notes: {r.notes}</span>}
-                    </div>
-                  </div>
+              <div className="flex flex-wrap gap-2">
+                {session.conditions.map(c => (
+                  <span
+                    key={c}
+                    className="px-3 py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md border border-outline-variant"
+                  >
+                    {c}
+                  </span>
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
-          <div className="relative h-[240px] rounded-xl overflow-hidden group">
-            <img
-              alt="Medical professional reviewing digital health data"
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKXdX56RArmULZK_NoQ0L99HNEH3Smr4pCogZr1zloxe29vQZoB26L8Iu78idg7ZwHHUDKRyrKxSMcQWXPY2GAyGcUU_L5ikTUELOgPKOWXEE9Tb7l9pndYlQwpmnKXA5JJdpiAQwriLBBeAT0YoPgHW3irIWbiaGoOPswqOnYqvrc4_ts2NWwIzdymky9Sr03DYK7taoPrRNvjZihhWh501vmdR2fLafOADCKSzevfmE2SFGH3N4vyy5sxGrLAqa6CZyr0Qwj3n4"
-            />
-            <div className="absolute inset-0 bg-black/50 flex items-end p-6">
-              <p className="text-white font-label-md">Your care details and triage history will appear here.</p>
-            </div>
-          </div>
+          {/* Recommended Actions / Care Plan */}
+          {session.recommendedActions && session.recommendedActions.length > 0 && (
+            <section className="bg-surface rounded-xl border border-outline-variant p-5 md:p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center text-primary">
+                  <Icon icon="checklist" size="lg" />
+                </div>
+                <h4 className="font-headline-sm text-headline-sm text-on-surface">Recommended Actions</h4>
+              </div>
+              <ol className="space-y-3">
+                {session.recommendedActions.map((action, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-sm">
+                      {i + 1}
+                    </div>
+                    <p className="text-body-md text-on-surface leading-relaxed pt-0.5">{action}</p>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {/* Red Flags */}
+          {session.redFlags && session.redFlags.length > 0 && (
+            <section className="bg-error/8 rounded-xl border border-error/30 p-5 md:p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-error/15 flex items-center justify-center text-error">
+                  <Icon icon="warning" size="lg" />
+                </div>
+                <h4 className="font-headline-sm text-headline-sm text-error">Red Flags — Seek Help Immediately If You Notice:</h4>
+              </div>
+              <ul className="space-y-2">
+                {session.redFlags.map((flag, i) => (
+                  <li key={i} className="flex items-start gap-2 text-on-error-container">
+                    <span className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-error" />
+                    <span className="text-body-md leading-relaxed">{flag}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Fallback if no structured data at all */}
+          {!session.conditions?.length && !session.recommendedActions?.length && !session.redFlags?.length && (
+            <section className="bg-surface rounded-xl border border-outline-variant p-8 text-center">
+              <div className="w-14 h-14 mx-auto mb-3 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                <Icon icon="psychology" size="xl" />
+              </div>
+              <p className="text-body-md text-secondary">
+                This session was logged without structured condition data. Start a new triage with Liana for a detailed breakdown.
+              </p>
+            </section>
+          )}
         </div>
 
-        <div className="lg:col-span-1 flex flex-col gap-gutter">
-          <section className="bg-surface rounded-xl p-4 md:p-6 border border-outline-variant h-full">
-            <div className="flex items-center gap-3 mb-6">
-              <Icon icon="assignment_turned_in" size="lg" className="text-primary" />
-              <h3 className="font-headline-md text-headline-md">Next Steps</h3>
-            </div>
-            <ul className="space-y-6">
-              {[
-                'Log your symptoms in the <strong class="text-primary">report form</strong> above to get guidance from Liana.',
-                'Use the <strong>Symptom Tracker</strong> to monitor and record your health daily.',
-                'Set up medication reminders and track your prescriptions.',
-                'Review your <strong>Medical History</strong> and update your conditions.',
-              ].map((step, i) => (
-                <li key={i} className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-sm">{i + 1}</div>
-                  <p className="text-body-md" dangerouslySetInnerHTML={{ __html: step }} />
-                </li>
-              ))}
-            </ul>
+        {/* Right column — quick actions */}
+        <div className="flex flex-col gap-6">
 
-            <div className="mt-10 pt-6 border-t border-outline-variant flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="font-label-md text-label-md text-on-surface">Follow-up Reminder</span>
-                <span className="text-caption text-secondary">Notify me after my next session</span>
+          {/* Urgency summary card */}
+          <section className="bg-surface rounded-xl border border-outline-variant p-5">
+            <h4 className="font-label-md text-label-md text-secondary uppercase tracking-widest mb-3">Urgency Summary</h4>
+            <div className={`flex items-center gap-3 p-3 rounded-lg ${config.badge} mb-3`}>
+              <Icon icon={config.icon} size="lg" />
+              <div>
+                <p className="font-bold font-label-md">{config.label}</p>
+                <p className="text-caption opacity-70">
+                  {session.severity === 'Urgent'
+                    ? 'Immediate attention recommended'
+                    : session.severity === 'Moderate'
+                    ? 'See a doctor soon'
+                    : 'Monitor and rest'}
+                </p>
               </div>
-              <button onClick={() => setFollowUp(!followUp)} className={'relative inline-flex h-6 w-12 items-center rounded-full transition-colors ' + (followUp ? 'bg-primary' : 'bg-outline-variant')}>
-                <span className={'inline-block h-5 w-5 transform rounded-full bg-white border-2 border-outline-variant transition-transform ' + (followUp ? 'translate-x-6' : 'translate-x-0.5')} />
-              </button>
             </div>
+            <p className="text-caption text-secondary">Session logged on {session.date}</p>
           </section>
+
+          {/* Quick Action — Find Care */}
+          <section className="bg-surface rounded-xl border border-outline-variant p-5 flex flex-col gap-3">
+            <h4 className="font-label-md text-label-md text-secondary uppercase tracking-widest">Quick Actions</h4>
+
+            <button
+              onClick={() => navigate('/local-care')}
+              className="w-full flex items-center gap-3 p-3 rounded-lg border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all group min-h-[44px]"
+            >
+              <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <Icon icon="local_hospital" size="md" />
+              </div>
+              <div className="text-left">
+                <p className="font-label-md text-on-surface">Find Care Near Me</p>
+                <p className="text-caption text-secondary">Hospitals, clinics &amp; pharmacies</p>
+              </div>
+              <Icon icon="chevron_right" size="sm" className="ml-auto text-secondary group-hover:text-primary" />
+            </button>
+
+            <button
+              onClick={() => navigate('/new-triage')}
+              className="w-full flex items-center gap-3 p-3 rounded-lg border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all group min-h-[44px]"
+            >
+              <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <Icon icon="add_circle" size="md" />
+              </div>
+              <div className="text-left">
+                <p className="font-label-md text-on-surface">Start New Triage</p>
+                <p className="text-caption text-secondary">New symptoms? Ask Liana</p>
+              </div>
+              <Icon icon="chevron_right" size="sm" className="ml-auto text-secondary group-hover:text-primary" />
+            </button>
+
+            <button
+              onClick={() => navigate('/history')}
+              className="w-full flex items-center gap-3 p-3 rounded-lg border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all group min-h-[44px]"
+            >
+              <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <Icon icon="history" size="md" />
+              </div>
+              <div className="text-left">
+                <p className="font-label-md text-on-surface">All Sessions</p>
+                <p className="text-caption text-secondary">View your full triage history</p>
+              </div>
+              <Icon icon="chevron_right" size="sm" className="ml-auto text-secondary group-hover:text-primary" />
+            </button>
+          </section>
+
+          {/* Emergency call — only show for urgent */}
+          {session.severity === 'Urgent' && (
+            <section className="bg-error/10 rounded-xl border border-error/30 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Icon icon="emergency" size="md" className="text-error" />
+                <h4 className="font-label-md text-label-md text-error font-bold uppercase tracking-wide">
+                  Emergency?
+                </h4>
+              </div>
+              <p className="text-caption text-on-surface-variant mb-3">
+                If you have chest pain, difficulty breathing, or any life-threatening symptoms, call emergency services immediately.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { number: '112', label: 'Emergency' },
+                  { number: '199', label: 'Ambulance' },
+                ].map(item => (
+                  <a
+                    key={item.number}
+                    href={`tel:${item.number}`}
+                    className="flex flex-col items-center gap-1 p-3 bg-error/15 border border-error/20 rounded-xl hover:bg-error/25 transition-all text-error"
+                  >
+                    <Icon icon="call" size="md" />
+                    <span className="font-bold font-label-md">{item.number}</span>
+                    <span className="text-caption text-secondary">{item.label}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
-      <footer className="mt-stack-lg flex flex-col md:flex-row items-center justify-between p-4 md:p-6 bg-surface rounded-xl gap-4 border border-outline-variant">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-primary/10 rounded-lg">
-              <Icon icon="verified_user" size="lg" className="text-primary" />
+      {/* Footer */}
+      <footer className="mt-8 flex flex-col md:flex-row items-center justify-between p-4 md:p-5 bg-surface rounded-xl gap-4 border border-outline-variant">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Icon icon="verified_user" size="md" className="text-primary" />
           </div>
           <div>
             <h4 className="font-label-md text-label-md">Medical Disclaimer</h4>
             <p className="text-caption text-secondary">This is triage guidance, not a medical diagnosis. In case of emergency, call local medical services immediately.</p>
           </div>
         </div>
-        <button onClick={() => navigate('/new-triage')} className="w-full md:w-auto px-10 py-4 bg-primary text-on-primary rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-all transform active:scale-95 min-h-[44px]">
+        <button
+          onClick={() => navigate('/new-triage')}
+          className="w-full md:w-auto px-8 py-3 bg-primary text-on-primary rounded-full font-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-all min-h-[44px]"
+        >
           <Icon icon="add" size="md" />
           Start New Triage
         </button>
       </footer>
     </main>
   )
+}
+
+/* ─── Page Entry Point ─────────────────────────────────────────────────────── */
+
+export default function CareDetails() {
+  const { sessions, refreshSessions } = useAuth()
+  const [searchParams] = useSearchParams()
+
+  // Refresh sessions from backend on mount so data is always fresh
+  useEffect(() => {
+    void refreshSessions()
+  }, [refreshSessions])
+
+  const sessionId = searchParams.get('id')
+
+  if (sessions.length === 0) {
+    return <EmptyState />
+  }
+
+  if (sessionId) {
+    const session = sessions.find(s => s.id === sessionId)
+    if (!session) return <SessionNotFound sessionId={sessionId} />
+    return <SessionDetail session={session} />
+  }
+
+  // No ID provided — show the most recent session
+  return <SessionDetail session={sessions[0]} />
 }

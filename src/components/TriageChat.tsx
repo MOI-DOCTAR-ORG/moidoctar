@@ -46,8 +46,9 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
   ]
 
   const saveAndOpen = () => {
+    const sessionId = result.assessment_id || ('sess-' + Date.now())
     addSession({
-      id: result.assessment_id || ('sess-' + Date.now()),
+      id: sessionId,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       condition: result.possible_conditions?.length ? result.possible_conditions[0] : 'Self-reported symptoms',
@@ -61,7 +62,7 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
       rationale: result.rationale,
       tags: result.possible_conditions?.slice(0, 2),
     })
-    navigate('/care-details')
+    navigate(`/care-details?id=${sessionId}`)
   }
 
   const [showAnswerBox, setShowAnswerBox] = useState(false)
@@ -224,7 +225,7 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
       )}
 
       {result.urgency_level === 'Urgent' && (
-        <div className="mt-3"><EmergencyEscalation urgencyLevel={result.urgency_level} redFlags={result.red_flags_to_watch} /></div>
+        <div className="mt-3"><EmergencyEscalation urgencyLevel={result.urgency_level} redFlags={result.red_flags_to_watch} sessionId={result.assessment_id} /></div>
       )}
 
       <p className="mt-3 text-[11px] leading-snug text-on-surface-variant">{result.disclaimer}</p>
@@ -253,8 +254,9 @@ function ContractResultCard({ result, severity }: { result: TriageChatResponse &
 
   const saveAndOpen = () => {
     const level = legacySeverity(result.urgency)
+    const sessionId = result.assessment_id || ('sess-' + Date.now())
     addSession({
-      id: result.assessment_id || ('sess-' + Date.now()),
+      id: sessionId,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       condition: 'Self-reported symptoms',
@@ -268,7 +270,7 @@ function ContractResultCard({ result, severity }: { result: TriageChatResponse &
       rationale: result.reason || result.summary || '',
       tags: [display.label],
     })
-    navigate('/care-details')
+    navigate(`/care-details?id=${sessionId}`)
   }
 
   return (
@@ -318,7 +320,7 @@ function ContractResultCard({ result, severity }: { result: TriageChatResponse &
       )}
 
       {(result.urgency === 'EMERGENCY' || result.ai_source === 'offline') && (
-        <div className="mt-3"><EmergencyEscalation urgencyLevel="emergency" redFlags={[]} title="Emergency numbers" subtitle="Tap a number to call" /></div>
+        <div className="mt-3"><EmergencyEscalation urgencyLevel="emergency" redFlags={[]} title="Emergency numbers" subtitle="Tap a number to call" sessionId={result.assessment_id} /></div>
       )}
 
       <p className="mt-3 text-[11px] leading-snug text-on-surface-variant">{result.safety_note || result.disclaimer}</p>
@@ -508,7 +510,7 @@ function PastTriageModal({
             type="button"
             onClick={() => {
               onClose()
-              navigate('/care-details')
+              navigate(`/care-details?id=${session.id}`)
             }}
             className="w-full sm:w-auto flex-1 min-h-10 rounded-lg bg-primary text-on-primary px-4 text-xs font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
           >
