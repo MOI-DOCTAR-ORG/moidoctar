@@ -1,6 +1,12 @@
-from typing import Optional, Dict, Any
-from fastapi import Header, HTTPException, status
+from typing import Callable, Optional, Dict, Any
+from fastapi import Depends, Header, HTTPException, status
 from app.core.security import decode_access_token
+from app.core.permissions import (
+    P_ADMIN_ACCESS,
+    can,
+    effective_role,
+    is_operator,
+)
 from app.services.auth_service import get_user_by_id
 
 
@@ -50,13 +56,53 @@ async def get_optional_current_user(authorization: Optional[str] = Header(None))
     return get_user_by_id(user_id)
 
 
+def _forbidden(msg: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"err": "not_authorized", "msg": msg},
+    )
+
+
 async def get_current_admin(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Full-control operator. Staff do not pass this check."""
     user = await get_current_user(authorization)
-    from app.core.config import settings
-    is_admin = user.get("role") == "admin" or (user.get("email") or "").strip().lower() in settings.admin_emails_list
-    if not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"err": "not_authorized", "msg": "Admin privileges are required for this action"},
-        )
+    if effective_role(user) != "admin":
+        raise _forbidden("Admin privileges are required for this action")
     return user
+
+
+async def get_current_operator(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Anyone who may reach the admin console - staff or admin."""
+    user = await get_current_user(authorization)
+    if not is_operator(user):
+        raise _forbidden("Staff privileges are required for this action")
+    return user
+
+
+def require(permission: str) -> Callable:
+    """Dependency factory: the route declares what it needs, not who may do it.
+
+    Usage:
+        @router.post("/tickets/{id}/reply")
+        def reply(user: Dict[str, Any] = Depends(require(P_TICKETS_REPLY))):
+    """
+
+    async def _dependency(
+        user: Dict[str, Any] = Depends(get_current_user),
+    ) -> Dict[str, Any]:
+        if not can(user, permission):
+            raise _forbidden(f"This action requires the {permission} permission")
+        return user
+
+    return _dependency
+
+
+# Kept so the admin console can reach the same check the frontend mirrors.
+__all__ = [
+    "get_current_user",
+    "get_optional_current_user",
+    "get_current_admin",
+    "get_current_operator",
+    "require",
+    "P_ADMIN_ACCESS",
+]

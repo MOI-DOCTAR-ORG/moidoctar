@@ -30,7 +30,9 @@ class UserOut(BaseModel):
     userName: str
     email: str
     isVerified: bool = True
+    # One of: user, staff, admin. See app/core/permissions.py.
     role: str = "user"
+    isBlacklisted: bool = False
     photo: Optional[str] = None
     demographics: Optional[Demographics] = None
     phone: Optional[str] = None

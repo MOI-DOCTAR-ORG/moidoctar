@@ -114,3 +114,71 @@ create table if not exists app_settings (
   value jsonb not null,
   updated_at timestamptz default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Admin console: roles, audit trail, and support tickets.
+-- ---------------------------------------------------------------------------
+
+-- Roles are 'user', 'staff' or 'admin' (see backend/app/core/permissions.py).
+-- Existing rows already default to 'user'; this only widens what is allowed
+-- and adds the blacklist flag the console toggles.
+ALTER TABLE public.users
+    ADD COLUMN IF NOT EXISTS is_blacklisted BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE public.users
+    DROP CONSTRAINT IF EXISTS users_role_check;
+
+ALTER TABLE public.users
+    ADD CONSTRAINT users_role_check CHECK (role IN ('user', 'staff', 'admin'));
+
+-- Append-only record of privileged actions: role changes, blacklists, cache
+-- clears, AI key changes, and every read of a user's consented triage history.
+CREATE TABLE IF NOT EXISTS public.admin_audit (
+    id UUID PRIMARY KEY,
+    actor_id TEXT NOT NULL,
+    actor_email TEXT,
+    action TEXT NOT NULL,
+    target_id TEXT,
+    detail JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON public.admin_audit (created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_audit_target_idx ON public.admin_audit (target_id);
+
+-- Support tickets. ticket_id is generated client-side (SUP-XXXXXX) so a person
+-- always has a reference to quote, even when the request failed to send and
+-- waited in their browser queue.
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    ticket_id TEXT PRIMARY KEY,
+    user_id TEXT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    category TEXT,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    priority TEXT DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent')),
+    status TEXT DEFAULT 'open' CHECK (status IN ('open', 'pending', 'resolved')),
+    assigned_to TEXT,
+    -- The reporter's explicit permission for support to read their triage
+    -- history for THIS ticket. Default false: silence is not consent.
+    consent_share_history BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS support_tickets_status_idx ON public.support_tickets (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS support_tickets_user_idx ON public.support_tickets (user_id);
+CREATE INDEX IF NOT EXISTS support_tickets_email_idx ON public.support_tickets (email);
+
+CREATE TABLE IF NOT EXISTS public.support_ticket_messages (
+    id UUID PRIMARY KEY,
+    ticket_id TEXT NOT NULL REFERENCES public.support_tickets (ticket_id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    is_staff BOOLEAN DEFAULT FALSE,
+    author_id TEXT,
+    author_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS support_messages_ticket_idx ON public.support_ticket_messages (ticket_id, created_at);

@@ -30,7 +30,15 @@ class Settings(BaseSettings):
 
     # Emails that are treated as admins (can manage AI API keys), in addition
     # to users whose role is "admin". Comma separated.
+    #
+    # This is also the break-glass path for the admin console: it is how the
+    # first admin exists, and how one is restored if the last stored admin is
+    # ever removed. Keep at least one address here.
     ADMIN_EMAILS: str = ""
+
+    # Public URL of the deployed frontend, used to link support reply emails
+    # back to the in-app ticket thread. Falls back to the first CORS origin.
+    FRONTEND_URL: str = ""
 
     # Server Port
     PORT: int = 3000
@@ -318,6 +326,19 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def frontend_support_url(self) -> str:
+        """Where a support reply email points the user back to.
+
+        Falls back to the first configured CORS origin, which in practice is
+        the deployed frontend. Empty means the email simply omits the link.
+        """
+        base = (self.FRONTEND_URL or "").strip().rstrip("/")
+        if not base:
+            origins = self.cors_origins_list
+            base = origins[0].rstrip("/") if origins else ""
+        return f"{base}/support" if base else ""
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
