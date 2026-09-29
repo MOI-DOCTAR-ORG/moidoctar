@@ -13,9 +13,10 @@ const primaryNav = [
   { label: 'Theme', icon: 'palette', to: '/theme' },
 ]
 
-const bottomNav = [
+// `to` stays optional so a future entry without a page still renders as a button.
+const bottomNav: { label: string; icon: string; to?: string }[] = [
   { label: 'Support', icon: 'help', to: '/support' },
-  { label: 'Terms & Conditions', icon: 'contract', to: undefined },
+  { label: 'Terms & Conditions', icon: 'contract', to: '/terms' },
 ]
 
 type SidebarProps = {
@@ -107,7 +108,7 @@ export default function Sidebar({ open, onClose, onSignOut }: SidebarProps) {
             </>
           )
 
-          // Support is a real route; Terms has no page yet, so it stays a button.
+          // Entries with a route navigate; any without one fall back to a plain button.
           if (item.to) {
             return (
               <Link

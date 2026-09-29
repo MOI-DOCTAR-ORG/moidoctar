@@ -48,15 +48,11 @@ export default function Landing() {
         </Link>
         <nav className="flex shrink-0 items-center gap-2 sm:gap-2.5" aria-label="Account">
           {/* Secondary action: outlined so it reads as a button without competing with "Get started". */}
-          {/* Icon-only on phones so the header isn't crowded; the accessible name stays "Sign in". */}
           <Link
             to="/sign-in"
-            aria-label="Sign in"
-            title="Sign in"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-outline-variant bg-surface px-2.5 sm:px-4 py-2.5 font-label-md text-label-md font-semibold text-on-surface transition hover:border-primary hover:bg-primary-container/30 hover:text-primary active:scale-[0.98] active:bg-primary-container/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-outline-variant bg-surface px-3.5 sm:px-4 py-2.5 font-label-md text-label-md font-semibold text-on-surface transition hover:border-primary hover:bg-primary-container/30 hover:text-primary active:scale-[0.98] active:bg-primary-container/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            <Icon icon="login" size="md" aria-hidden="true" className="sm:hidden" />
-            <span className="hidden sm:inline">Sign in</span>
+            Sign in
           </Link>
           <Link
             to="/sign-up"
