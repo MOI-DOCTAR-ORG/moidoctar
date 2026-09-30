@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     CENCORI_CHAT_PATH: str = "/api/ai/chat"
     CENCORI_MODEL: str = "gemini-2.5-flash"
 
+    # Byteship (AIB Ship): file storage + CDN for profile photos. Server-side only, never expose
+    # this key to the browser. Leave blank to use Cloudinary / inline fallback.
+    BYTESHIP_API_KEY: str = ""
+    BYTESHIP_BASE_URL: str = "https://api.byteship.dev"
+
     # Emails that are treated as admins (can manage AI API keys), in addition
     # to users whose role is "admin". Comma separated.
     ADMIN_EMAILS: str = ""
