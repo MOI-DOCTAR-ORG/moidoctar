@@ -29,5 +29,6 @@ def archive_medication(
     req: MedicationStop,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    meds = stop_medication(current_user["_id"], req.id)
+    target_id = req.id or req.medicationId or ""
+    meds = stop_medication(current_user["_id"], target_id)
     return MedicationListResponse(msg="Medication status updated", data=meds)

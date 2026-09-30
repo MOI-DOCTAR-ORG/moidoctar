@@ -1,13 +1,20 @@
+import logging
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.concurrency import run_in_threadpool
 from app.schemas.user import UserUpdate, UserProfileResponse
 from app.schemas.auth import ForgotPasswordRequest
 from app.services.auth_service import update_user_profile, delete_user_account, reset_user_password
 from app.services.otp_service import verify_otp
 from app.services.notification_service import list_notifications, mark_all_read, dismiss_notification
+from app.services import byteship_storage
 from app.api.deps import get_current_user
 
+logger = logging.getLogger("moidoctar.user")
 router = APIRouter()
+
+MAX_PHOTO_BYTES = 5 * 1024 * 1024
+ALLOWED_PHOTO_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 
 @router.get("/listData", response_model=UserProfileResponse)
@@ -32,17 +39,36 @@ async def upload_photo(
     file: UploadFile = File(...),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Upload user avatar to Cloudinary (or return data URL fallback) and persist URL."""
+    """Store the user avatar and persist its URL.
+
+    Order: Byteship (AIB Ship storage/CDN) -> Cloudinary -> inline data URL, so a photo
+    upload never fails just because one provider is down or unconfigured.
+    """
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail={"err": "empty_file", "msg": "Uploaded file is empty"})
+    if len(content) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail={"err": "file_too_large", "msg": "Image must be under 5MB"})
+    if file.content_type not in ALLOWED_PHOTO_TYPES:
+        raise HTTPException(status_code=415, detail={"err": "unsupported_type", "msg": "Please upload a PNG, JPEG, or WebP image"})
 
     import os, base64, httpx
     photo_url = None
+    provider = "inline"
+
+    if byteship_storage.is_enabled():
+        try:
+            photo_url = await run_in_threadpool(
+                byteship_storage.upload_avatar, content, file.content_type, str(current_user["_id"])
+            )
+            provider = "byteship"
+        except byteship_storage.ByteshipUnavailable as exc:
+            logger.warning("Byteship upload failed (%s); falling back to Cloudinary.", exc)
+
     cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "ditu39hqh")
     upload_preset = os.getenv("CLOUDINARY_UPLOAD_PRESET", "moidoctar")
 
-    if cloud_name:
+    if not photo_url and cloud_name:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 res = await client.post(
@@ -53,6 +79,7 @@ async def upload_photo(
                 if res.status_code == 200:
                     data = res.json()
                     photo_url = data.get("secure_url") or data.get("url")
+                    provider = "cloudinary"
         except Exception:
             pass
 
@@ -60,13 +87,14 @@ async def upload_photo(
         mime = file.content_type or "image/jpeg"
         b64 = base64.b64encode(content).decode("utf-8")
         photo_url = f"data:{mime};base64,{b64}"
+        provider = "inline"
 
     try:
         updated = update_user_profile(current_user["_id"], {"photo": photo_url})
     except Exception:
         updated = current_user
 
-    return {"msg": "Photo uploaded successfully", "data": {"photoUrl": photo_url, "user": updated}}
+    return {"msg": "Photo uploaded successfully", "data": {"photoUrl": photo_url, "provider": provider, "user": updated}}
 
 
 @router.get("/notifications")

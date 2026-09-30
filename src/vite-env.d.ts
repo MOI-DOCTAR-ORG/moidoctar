@@ -4,6 +4,10 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME?: string
   readonly VITE_GOOGLE_CLIENT_ID?: string
   readonly VITE_API_BASE_URL?: string
+  readonly VITE_SABILYTICS_SITE_ID?: string
+  readonly VITE_SABILYTICS_SRC?: string
+  readonly VITE_SABILYTICS_DOMAIN?: string
+  readonly VITE_SABILYTICS_DISABLED?: string
   readonly VITE_MODEL_API_URL?: string
 }
 

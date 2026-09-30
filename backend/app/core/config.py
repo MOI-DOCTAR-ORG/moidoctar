@@ -28,6 +28,19 @@ class Settings(BaseSettings):
     GOOGLE_API_KEYS: str = ""
     GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
+    # Cencori AI gateway (AIB Ship product). When CENCORI_API_KEY is set, every AI call is
+    # routed through Cencori (logging, security filters, cost tracking) and falls back to
+    # calling Gemini directly if the gateway is down. Leave blank to call Gemini directly.
+    CENCORI_API_KEY: str = ""
+    CENCORI_BASE_URL: str = "https://api.cencori.com"
+    CENCORI_CHAT_PATH: str = "/api/ai/chat"
+    CENCORI_MODEL: str = "gemini-2.5-flash"
+
+    # Byteship (AIB Ship): file storage + CDN for profile photos. Server-side only, never expose
+    # this key to the browser. Leave blank to use Cloudinary / inline fallback.
+    BYTESHIP_API_KEY: str = ""
+    BYTESHIP_BASE_URL: str = "https://api.byteship.dev"
+
     # Emails that are treated as admins (can manage AI API keys), in addition
     # to users whose role is "admin". Comma separated.
     ADMIN_EMAILS: str = ""

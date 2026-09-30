@@ -88,7 +88,7 @@ export default function MedicationTracker() {
 
   const stopMedication = async (id: string) => {
     try {
-      const res = await api.put<{ msg: string; data: BackendMedication[] }>('/medication/stop', { medicationId: id })
+      const res = await api.put<{ msg: string; data: BackendMedication[] }>('/medication/stop', { id, medicationId: id })
       setMedications(res.data || [])
       addToast('Medication stopped.', 'success')
     } catch {

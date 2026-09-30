@@ -372,7 +372,7 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
 
   // 14. Medications: Stop
   if (url === '/medication/stop' && method === 'put') {
-    const targetId = body?.id
+    const targetId = body?.id || body?.medicationId
     const updated = currentMeds.map(m =>
       m.id === targetId ? { ...m, status: false, stoppedAt: new Date().toISOString() } : m
     )
@@ -538,6 +538,18 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
   // AI settings need the real server: never pretend they saved.
   if (url?.startsWith('/ai/')) {
     throw { response: { status: 503, data: { detail: { msg: 'The server is not reachable right now.' } } }, config }
+  }
+
+  // 22. Support Requests (offline demo mode)
+  if (url?.startsWith('/support/requests')) {
+    const tid = body?.ticket_id || 'SUP-LOCAL'
+    return {
+      data: { ticket_id: tid, msg: 'Support request received locally.', status: 'received', delivered: true },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    }
   }
 
   // Fallback 200 for any other API route

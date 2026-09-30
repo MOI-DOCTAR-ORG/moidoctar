@@ -487,3 +487,65 @@ def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
     if not ok:
         logger.warning(f"[OTP Fallback] Email delivery not completed for {recipient}. Code: {code}. Reason: {detail}")
     return ok, detail
+
+
+def send_support_ticket_email(
+    to_email: str,
+    name: str,
+    ticket_id: str,
+    category: str,
+    subject: str,
+    message: str,
+    priority: str = "normal",
+) -> Tuple[bool, str]:
+    """Send an automated email confirmation to the user when a support ticket is created."""
+    recipient = to_email.strip().lower()
+    heading = f"Support Request #{ticket_id}"
+    email_subject = f"[MoiDoctar Support #{ticket_id}] {subject}"
+
+    priority_badge = "Time-sensitive (High Priority)" if priority == "urgent" else "Normal Priority"
+
+    text_body = (
+        f"Hello {name},\n\n"
+        f"Thank you for reaching out to MoiDoctar Support. We have received your message and assigned it ticket ID #{ticket_id}.\n\n"
+        f"Ticket Details:\n"
+        f"• Ticket ID: {ticket_id}\n"
+        f"• Category: {category}\n"
+        f"• Priority: {priority_badge}\n"
+        f"• Subject: {subject}\n\n"
+        f"Message:\n{message}\n\n"
+        f"A member of our team will review your request and reply directly to this email address within 1 working day.\n\n"
+        f"Best regards,\n"
+        f"MoiDoctar Support Team"
+    )
+
+    html_body = f"""\
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb;">
+  <div style="margin-bottom: 24px;">
+    <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.5px;">Moi<span style="color: #2563eb;">Doctar</span> Support</span>
+  </div>
+  <h2 style="color: #111827; margin: 0 0 8px 0; font-size: 20px; font-weight: 700;">We received your support request</h2>
+  <p style="color: #4b5563; font-size: 15px; line-height: 1.5; margin: 0 0 20px 0;">Hi {name}, someone on our team will review your request and reply to this email address usually within 1 working day.</p>
+  
+  <div style="margin: 20px 0; padding: 16px 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+    <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">TICKET REFERENCE</p>
+    <p style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; color: #2563eb; font-family: monospace;">#{ticket_id}</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
+      <tr><td style="padding: 4px 0; font-weight: 600; width: 100px;">Category:</td><td style="padding: 4px 0;">{category}</td></tr>
+      <tr><td style="padding: 4px 0; font-weight: 600;">Priority:</td><td style="padding: 4px 0;">{priority_badge}</td></tr>
+      <tr><td style="padding: 4px 0; font-weight: 600;">Subject:</td><td style="padding: 4px 0; font-weight: 600; color: #0f172a;">{subject}</td></tr>
+    </table>
+  </div>
+
+  <div style="margin: 20px 0; padding: 16px 20px; border-radius: 12px; border-left: 4px solid #2563eb; background: #eff6ff;">
+    <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase;">YOUR MESSAGE</p>
+    <p style="margin: 0; font-size: 14px; color: #1e293b; white-space: pre-wrap; line-height: 1.5;">{message}</p>
+  </div>
+
+  <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 24px 0 0 0;">If you need to provide additional details, simply reply directly to this email.</p>
+  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+  <p style="color: #9ca3af; font-size: 12px; margin: 0;">MoiDoctar &middot; Support Module</p>
+</div>
+"""
+    return send_email(recipient, email_subject, html_body, text_body, code=ticket_id, heading=heading)
+
