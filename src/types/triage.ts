@@ -74,7 +74,7 @@ export type TriageChatResponse = {
   reply_language?: string
 
   // The handoff result contract. Present on every new answer; older saved sessions don't have it.
-  status?: 'question' | 'complete' | 'emergency_stop'
+  status?: 'question' | 'complete' | 'emergency_stop' | 'redirect_off_topic'
   urgency?: Urgency
   indicator?: TriageIndicator
   summary?: string
@@ -94,6 +94,12 @@ export type TriageChatResponse = {
   profile?: { band: AgeBand; label: string; age: string | null; weight_kg: number | null; for: PatientFor } | null
   /** Which approved table was used (typhoid, respiratory, hypertension, diarrhea, under_6), if any. */
   pathway?: string | null
+  /** Behavior spec: the message's intent (HEALTH_SYMPTOM, GENERAL_NON_HEALTH_QUESTION, …). */
+  intent?: string | null
+  /** What informal or misspelt words were read as ("bumbum pain" -> "pain around the buttocks or bottom"). */
+  normalized_terms?: string[]
+  off_topic?: boolean
+  confidence?: number | null
 }
 
 export type AgeBand = 'adult' | 'pediatric_6_plus' | 'under_6'
