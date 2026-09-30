@@ -903,7 +903,7 @@ export default function Profile() {
           <div className="flex items-center gap-6">
           </div>
           <div className="flex gap-stack-lg">
-            <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Privacy Policy</a>
+            <Link className="text-caption text-secondary hover:text-primary transition-colors" to="/privacy">Privacy Policy</Link>
             <Link className="text-caption text-secondary hover:text-primary transition-colors" to="/terms">Terms of Service</Link>
           </div>
         </footer>

@@ -26,6 +26,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import LocalCareDiscovery from './pages/LocalCareDiscovery'
 import Landing from './pages/Landing'
 import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import Support from './pages/Support'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
 
       {/* Legal pages - reachable signed out (sign-up consent) and signed in (sidebar, profile) */}
       <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       {/* Auth pages - no sidebar, redirect to app if authenticated */}
       <Route element={<AuthLayout />}>
