@@ -540,6 +540,18 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
     throw { response: { status: 503, data: { detail: { msg: 'The server is not reachable right now.' } } }, config }
   }
 
+  // 22. Support Requests (offline demo mode)
+  if (url?.startsWith('/support/requests')) {
+    const tid = body?.ticket_id || 'SUP-LOCAL'
+    return {
+      data: { ticket_id: tid, msg: 'Support request received locally.', status: 'received', delivered: true },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    }
+  }
+
   // Fallback 200 for any other API route
   return {
     data: { msg: 'Operation succeeded', data: null },
