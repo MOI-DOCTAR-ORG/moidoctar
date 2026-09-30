@@ -22,7 +22,7 @@ from app.services import triage_service  # noqa: E402
 KEY_A = "AIzaSyA" + "a" * 30
 KEY_B = "AIzaSyB" + "b" * 30
 # The model-led path (an adult, concern outside the approved tables).
-FREE = {"patient": {"for": "self", "age_years": 30}, "flow": {"band": "adult", "stage": "free"}}
+FREE = {"patient": {"for": "self", "age_years": 30}, "flow": {"band": "adult", "stage": "free", "other": True}}
 
 
 @pytest.fixture(autouse=True)

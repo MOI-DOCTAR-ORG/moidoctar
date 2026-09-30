@@ -60,7 +60,7 @@ def answer(level="SELF_CARE", **extra):
 
 
 # The model-led path: an adult whose concern is outside the approved tables ("Something else").
-FREE = {"patient": {"for": "self", "age_years": 30}, "flow": {"band": "adult", "stage": "free"}}
+FREE = {"patient": {"for": "self", "age_years": 30}, "flow": {"band": "adult", "stage": "free", "other": True}}
 
 
 def run(text, messages=None, context=None):
