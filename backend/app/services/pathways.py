@@ -132,6 +132,7 @@ _CONCERN_WORDS = {
                     r"phlegm", r"mucus", r"runny nose", r"pneumonia", r"sore throat"],
     "hypertension": [r"blood pressure", r"\bb\.?p\b", r"hypertension", r"high blood", r"\bhbp\b"],
     "diarrhea": [r"diarrh", r"loose stool", r"watery stool", r"running stomach", r"stooling", r"purging",
+                 r"\bpurge\b", r"dey purge",
                  r"dey stool", r"belle (dey )?run", r"cholera", r"rice[- ]?water", r"frequent stool"],
 }
 _CONCERN_RE = {k: [re.compile(p) for p in v] for k, v in _CONCERN_WORDS.items() if v}
@@ -259,6 +260,7 @@ def clean_flow(raw: Any) -> Dict[str, Any]:
     stage = f.get("stage") if f.get("stage") in ("free",) else None
     band = f.get("band") if f.get("band") in BANDS else None
     return {"band": band, "concern": concern, "answers": answers, "u6": u6, "stage": stage,
+            "other": f.get("other") is True,
             "pending": str(f.get("pending") or "") or None,
             "free_asked": int(f.get("free_asked") or 0) if str(f.get("free_asked") or "0").isdigit() else 0}
 
@@ -329,7 +331,7 @@ def step(flow: Dict[str, Any], patient: Dict[str, Any], answer: str, all_text: s
         if i is not None:
             chosen = CONCERN_OPTIONS[i][1]
             if chosen == "other":
-                flow["stage"], flow["pending"] = "free", None
+                flow["stage"], flow["pending"], flow["other"] = "free", None, True
                 return "free", {"flow": flow}
             flow["concern"] = chosen
     if not flow.get("concern"):

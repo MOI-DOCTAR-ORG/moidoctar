@@ -23,7 +23,8 @@ MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 _CONTRACT_KEYS = ("status", "urgency", "indicator", "summary", "reason", "next_steps", "escalation",
                   "facility_action", "follow_up_question", "safety_note", "red_flags", "warning_signs",
-                  "rule_version", "medication_notice", "flow", "profile", "pathway")
+                  "rule_version", "medication_notice", "flow", "profile", "pathway",
+                  "intent", "normalized_terms", "off_topic", "confidence")
 
 
 def _contract(a: Dict[str, Any]) -> Dict[str, Any]:
@@ -73,6 +74,16 @@ async def _extract(request: Request) -> Tuple[str, str, List[Dict[str, str]], Di
     return symptoms, clinical, messages, context if isinstance(context, dict) else {}, image_bytes, image_mime
 
 
+def _first_name(user: Dict[str, Any]) -> str:
+    """The account's own first name, set server-side so a client cannot supply it."""
+    from app.services.auth_service import _is_placeholder_name
+    name = str(user.get("user_name") or "").strip()
+    # A name made from the email address at signup is not one the user gave.
+    if not name or _is_placeholder_name(name, str(user.get("email") or "")):
+        return ""
+    return name.split()[0][:40]
+
+
 def _user_id(user: Dict[str, Any]) -> str:
     return str(user.get("_id") or user.get("id") or "user")
 
@@ -80,8 +91,9 @@ def _user_id(user: Dict[str, Any]) -> str:
 @router.post("", response_model=TriageResponse)
 async def perform_triage(request: Request, current_user: Dict[str, Any] = Depends(get_current_user)):
     symptoms, clinical, _, context, img, mime = await _extract(request)
-    text = f"{symptoms} {clinical}".strip() or "General symptom assessment"
+    text = f"{symptoms} {clinical}".strip()
     uid = _user_id(current_user)
+    context["_account_name"] = _first_name(current_user)
     a = await run_in_threadpool(analyze_conversation, uid, text, [{"role": "user", "content": text}], context, img, mime)
     save_triage_session(uid, [symptoms or text], a)
     return TriageResponse(
@@ -96,7 +108,8 @@ async def perform_triage(request: Request, current_user: Dict[str, Any] = Depend
 async def perform_triage_chat(request: Request, current_user: Dict[str, Any] = Depends(get_current_user)):
     symptoms, _, messages, context, img, mime = await _extract(request)
     uid = _user_id(current_user)
-    a = await run_in_threadpool(analyze_conversation, uid, symptoms or "General symptom assessment", messages, context, img, mime)
+    context["_account_name"] = _first_name(current_user)
+    a = await run_in_threadpool(analyze_conversation, uid, symptoms, messages, context, img, mime)
     user_lines = [str(m.get("content") or m.get("text") or "") for m in messages if str(m.get("role")) == "user"]
     if a.get("has_symptoms", True):
         save_triage_session(uid, [(user_lines[0] if user_lines else symptoms) or "Symptom check"], a,

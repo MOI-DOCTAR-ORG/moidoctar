@@ -35,9 +35,9 @@ STYLE: Dict[str, Dict[str, Any]] = {
                 "text": "Keep \"summary\" to one short sentence of 15 words or fewer. Give at most 2 next steps."},
     "balanced": {"words": 25, "steps": 3,
                  "text": "Keep \"summary\" to one or two short sentences, 25 words or fewer. Up to 3 next steps."},
-    "detailed": {"words": 35, "steps": 3,
-                 "text": "Use up to 35 words in \"summary\", and give a one-sentence \"reason\" that explains "
-                         "why this level was chosen. Up to 3 next steps."},
+    "detailed": {"words": 25, "steps": 3,
+                 "text": "Use up to 25 words in \"summary\", and give a one-sentence \"reason\" (30 words or fewer) "
+                         "that explains why this level was chosen. Up to 3 next steps."},
 }
 
 TONE = {

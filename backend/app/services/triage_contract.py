@@ -12,6 +12,7 @@ limits) is application logic and must not be taken from the model.
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -29,18 +30,59 @@ LEVELS: Dict[str, Dict[str, Any]] = {
     "INSUFFICIENT_INFORMATION": {"label": "More information needed", "color": "gray", "icon": "help",
                                  "priority": 5, "legacy": "Stable", "facility_action": None},
 }
-STATUSES = ("question", "complete", "emergency_stop")
+STATUSES = ("question", "complete", "emergency_stop", "redirect_off_topic")
+# The Behavior spec's status names (section 11), as the model returns them, mapped onto the
+# names the app and the current frontend use. "fallback" is never taken from the model: the
+# app sets it itself (ai_source "rules" plus ai_notice) when the model fails.
+STATUS_ALIASES = {"needs_clarification": "question", "emergency_escalation": "emergency_stop"}
+
+# Behavior spec, section 2. Every message is classified into exactly one of these.
+INTENTS = (
+    "HEALTH_SYMPTOM", "MEDICATION_OR_DOSAGE", "EMERGENCY_OR_RED_FLAG", "FOLLOW_UP_ANSWER",
+    "SPELLING_OR_LANGUAGE_CLARIFICATION", "APP_HELP", "GENERAL_NON_HEALTH_QUESTION",
+    "IDENTITY_OR_PERSONAL_DATA", "UNCLEAR_OR_INSUFFICIENT_INFORMATION", "ABUSIVE_OR_UNSAFE_REQUEST",
+)
+# Intents that are answered with fixed redirect copy, never with the model's own words.
+REDIRECT_INTENTS = ("GENERAL_NON_HEALTH_QUESTION", "IDENTITY_OR_PERSONAL_DATA", "ABUSIVE_OR_UNSAFE_REQUEST")
+
 MAX_QUESTIONS = 5
 MAX_STEPS = 3
-MAX_SUMMARY_WORDS = 35
+# Behavior spec, section 3 ("suggested limits").
+MAX_SUMMARY_WORDS = 25
+MAX_REASON_WORDS = 30
+MAX_STEP_WORDS = 15
+MAX_QUESTION_WORDS = 20
+MAX_TOTAL_WORDS = 80
+
+# The spec lists exactly these fields. With STRICT_FIELDS on, anything else is rejected.
+# `escalation`, `english` and `remember` are the app's own additions (the older escalation
+# shape, the checking copy for other languages, and Assistant Settings memory).
+ALLOWED_FIELDS = {"intent", "status", "urgency", "summary", "reason", "follow_up_question", "next_steps",
+                  "red_flags", "escalation_required", "normalized_terms", "off_topic", "confidence",
+                  "has_symptoms", "facility_action", "escalation", "english", "remember"}
+STRICT_FIELDS = os.environ.get("AI_STRICT_FIELDS", "").lower() in ("1", "true", "yes")
 
 SAFETY_NOTE = ("Moi Doctar provides guidance only and does not diagnose conditions. "
                f"In an emergency, call {EMERGENCY_NUMBER} or go to the nearest emergency department.")
 
-# Handoff section 8. The source text is cut off after "sudde"; the ending here
-# completes it in the same register and needs the health reviewer's sign-off.
-FALLBACK_MESSAGE = ("We cannot complete the AI guidance right now. If your symptoms are severe, sudden, "
-                    f"or getting worse, call {EMERGENCY_NUMBER} or go to the nearest emergency department now.")
+# Behavior spec, section 12, verbatim.
+FALLBACK_MESSAGE = ("We can't complete the AI guidance right now. If symptoms are severe or worsening, "
+                    "seek urgent medical care. Otherwise, try again or contact a qualified healthcare professional.")
+
+# Behavior spec, sections 6 and 7: short, polite, fixed redirects. Fixed so the same
+# input always gets the same reply, and so the model never answers an off-topic question.
+REDIRECT_COPY = {
+    "GENERAL_NON_HEALTH_QUESTION": ("I can help with health concerns and using Moi Doctar. I can't help with "
+                                    "general topics here. What health concern would you like help with?"),
+    "IDENTITY_OR_PERSONAL_DATA": "I don't know your name yet. You can add it in your profile if you want.",
+    "ABUSIVE_OR_UNSAFE_REQUEST": ("I can't help with that. If you have a health concern, tell me what you "
+                                  "are feeling."),
+}
+IDENTITY_OTHER_COPY = ("I only know what you add to your profile or tell me in this chat. You can check it "
+                       "in your profile.")
+APP_HELP_COPY = "For help using Moi Doctar, open Support from the menu. What would you like to do?"
+OPEN_QUESTION = {"id": "open_concern", "text": "What is your main symptom, and when did it start?",
+                 "type": "short_text", "options": [], "required": True}
 
 # Addendum section 9, verbatim.
 MEDICATION_REVIEW_MESSAGE = ("Medication guidance is currently under medical review. Do not use this app to "
@@ -108,6 +150,8 @@ _WAIT = re.compile(r"\bwait(ing)?\s+(time|times)\b|\bwait (of |about |around |fo
                    r"|\b\d+\s?(min|minute|hour)s? wait\b")
 _ADDRESS = re.compile(r"\b\d+\s+[A-Za-z]+\s+(street|st|road|rd|avenue|ave|close|crescent|way)\b", re.I)
 _SAFE_CLAIM = re.compile(r"\byou are (definitely|completely) (safe|fine)\b|\bnothing to worry about\b")
+# Behavior spec, section 6: never invent the user's name or other personal data.
+_PERSONAL = re.compile(r"\byour (name|age|address|phone number|email) is\b|\byou are called\b")
 
 
 class InvalidResult(ValueError):
@@ -131,6 +175,8 @@ def unsafe_text(text: str) -> Optional[str]:
         return "states a diagnosis"
     if _SAFE_CLAIM.search(t):
         return "tells the user they are definitely safe"
+    if _PERSONAL.search(t):
+        return "states personal data"
     if _FACILITY.search(text or ""):
         return "names a facility"
     if _HOURS.search(t) or _WAIT.search(t) or _ADDRESS.search(text or ""):
@@ -138,33 +184,55 @@ def unsafe_text(text: str) -> Optional[str]:
     return None
 
 
+def _first_sentence(text: str, limit: int) -> Optional[str]:
+    """The first sentence when it fits the limit, else None."""
+    first = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)[0]
+    return first if _words(first) <= limit else None
+
+
 def validate(result: Any) -> Dict[str, Any]:
-    """Handoff section 7. Returns the cleaned result or raises InvalidResult."""
+    """Handoff section 7 and Behavior spec section 11. Returns the cleaned result or raises InvalidResult."""
     if not isinstance(result, dict):
         raise InvalidResult("not a JSON object")
+    if STRICT_FIELDS:
+        unknown = set(result) - ALLOWED_FIELDS
+        if unknown:
+            raise InvalidResult(f"unknown fields {sorted(unknown)}")
     urgency = str(result.get("urgency") or "").strip().upper()
     if urgency not in LEVELS:
         raise InvalidResult(f"invalid urgency level {urgency!r}")
     status = str(result.get("status") or "").strip().lower()
+    status = STATUS_ALIASES.get(status, status)
     if status not in STATUSES:
         raise InvalidResult(f"invalid status {status!r}")
+    intent = str(result.get("intent") or "").strip().upper() or None
+    if intent and intent not in INTENTS:
+        raise InvalidResult(f"invalid intent {intent!r}")
     steps = result.get("next_steps")
     if steps is None:
         steps = []
     if not isinstance(steps, list) or len(steps) > MAX_STEPS:
         raise InvalidResult("too many next steps")
     steps = _clean_list(steps)
+    if any(_words(x) > MAX_STEP_WORDS for x in steps):
+        raise InvalidResult("a next step is too long")
     summary = str(result.get("summary") or "").strip()
     if _words(summary) > MAX_SUMMARY_WORDS:
-        raise InvalidResult("summary is too long")
+        summary = _first_sentence(summary, MAX_SUMMARY_WORDS) or ""
+        if not summary:
+            raise InvalidResult("summary is too long")
     reason = result.get("reason")
     reason = str(reason).strip() if reason else None
-    if reason and _words(reason) > MAX_SUMMARY_WORDS:
-        raise InvalidResult("reason is too long")
+    if reason and _words(reason) > MAX_REASON_WORDS:
+        reason = None  # supporting text only: dropped rather than shown long
+    # The spec's flat `escalation_required`, or the older {"escalation": {"required": ...}}.
     escalation = result.get("escalation") if isinstance(result.get("escalation"), dict) else {}
-    if urgency == "EMERGENCY" and escalation.get("required") is not True:
+    escalate = result.get("escalation_required", escalation.get("required"))
+    if urgency == "EMERGENCY" and escalate is not True:
         raise InvalidResult("emergency escalation is missing")
     question = result.get("follow_up_question")
+    if isinstance(question, str):
+        question = {"text": question} if question.strip() else None
     if status == "question":
         if not isinstance(question, dict) or not str(question.get("text") or "").strip():
             raise InvalidResult("question status without a question")
@@ -175,14 +243,25 @@ def validate(result: Any) -> Dict[str, Any]:
             "options": _clean_list(question.get("options"))[:6],
             "required": True,
         }
-        if _words(question["text"]) > 25:
+        if _words(question["text"]) > MAX_QUESTION_WORDS:
             raise InvalidResult("question is too long")
     else:
         question = None
+    total = lambda: sum(_words(x) for x in [summary, reason or "", *steps, question["text"] if question else ""])  # noqa: E731
+    if total() > MAX_TOTAL_WORDS:
+        reason = None
+        if total() > MAX_TOTAL_WORDS:
+            raise InvalidResult("response is too long")
     for text in [summary, reason or "", *steps, question["text"] if question else ""]:
         why = unsafe_text(text)
         if why:
             raise InvalidResult(f"text {why}")
+    terms = [t[:60] for t in _clean_list(result.get("normalized_terms"))[:6]]
+    try:
+        confidence = float(result.get("confidence"))
+        confidence = round(min(max(confidence, 0.0), 1.0), 2) if confidence == confidence else None
+    except (TypeError, ValueError):
+        confidence = None
     return {
         "status": status,
         "urgency": urgency,
@@ -191,6 +270,10 @@ def validate(result: Any) -> Dict[str, Any]:
         "next_steps": steps,
         "follow_up_question": question,
         "has_symptoms": bool(result.get("has_symptoms", True)),
+        "intent": intent,
+        "normalized_terms": terms,
+        "off_topic": result.get("off_topic") is True or intent in REDIRECT_INTENTS,
+        "confidence": confidence,
     }
 
 
@@ -212,6 +295,20 @@ def build(urgency: str, *, status: str, summary: Optional[str] = None, reason: O
         "follow_up_question": question,
         "safety_note": SAFETY_NOTE,
     }
+
+
+def redirect(intent: str, account_name: Optional[str] = None, asks_name: bool = True) -> Dict[str, Any]:
+    """Fixed reply for a message that is not a health concern (Behavior spec, sections 6 and 7)."""
+    if intent == "IDENTITY_OR_PERSONAL_DATA":
+        if not asks_name:
+            summary = IDENTITY_OTHER_COPY
+        elif account_name:
+            summary = f"Your profile name is {account_name}. You can change it in your profile."
+        else:
+            summary = REDIRECT_COPY[intent]
+    else:
+        summary = REDIRECT_COPY.get(intent, REDIRECT_COPY["GENERAL_NON_HEALTH_QUESTION"])
+    return build("INSUFFICIENT_INFORMATION", status="redirect_off_topic", summary=summary, next_steps=[])
 
 
 def legacy_fields(res: Dict[str, Any]) -> Dict[str, Any]:

@@ -6,7 +6,7 @@ from test_ai_pool import FREE, KEY_A, _ai_payload, _reply, clean  # noqa: F401  
 from app.services import ai_keys, ai_memory, gemini_client, reply_prefs, triage_service
 from app.services import triage_contract as contract
 
-CHILD = {"patient": {"for": "child", "age_years": 8}, "flow": {"band": "age_6_11", "stage": "free"}}
+CHILD = {"patient": {"for": "child", "age_years": 8}, "flow": {"band": "age_6_11", "stage": "free", "other": True}}
 
 
 def _run(monkeypatch, user, payload, context=None, text="I have a cough"):
