@@ -91,10 +91,11 @@ def _send_via_emailjs(to_email: str, subject: str, html_body: str, text_body: st
     url = "https://api.emailjs.com/api/v1.0/email/send"
     recipient = to_email.strip().lower()
 
-    # Calculate formatted 10-minute expiry time
+    # Calculate formatted 10-minute expiry time in WAT (West Africa Time, UTC+1)
     import datetime
-    now = datetime.datetime.now()
-    expiry_dt = now + datetime.timedelta(minutes=10)
+    wat_tz = datetime.timezone(datetime.timedelta(hours=1))
+    now_wat = datetime.datetime.now(datetime.timezone.utc).astimezone(wat_tz)
+    expiry_dt = now_wat + datetime.timedelta(minutes=10)
     expiry_str = expiry_dt.strftime("%I:%M %p")
 
     payload = {
