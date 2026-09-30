@@ -17,6 +17,7 @@ const primaryNav = [
 const bottomNav: { label: string; icon: string; to?: string }[] = [
   { label: 'Support', icon: 'help', to: '/support' },
   { label: 'Terms & Conditions', icon: 'contract', to: '/terms' },
+  { label: 'Admin Console', icon: 'admin_panel_settings', to: '/admin' },
 ]
 
 type SidebarProps = {
