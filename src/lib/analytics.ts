@@ -16,6 +16,6 @@ export function initAnalytics(): void {
   const s = document.createElement('script')
   s.defer = true
   s.src = src
-  s.setAttribute(import.meta.env.VITE_SABILYTICS_ATTR || 'data-site-id', siteId)
+  s.setAttribute(import.meta.env.VITE_SABILYTICS_ATTR || 'data-site', siteId)
   document.head.appendChild(s)
 }
