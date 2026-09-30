@@ -202,9 +202,22 @@ def test_resend(to: str = "lateefedidi4@gmail.com"):
 @router.get("/test-smtp")
 def test_smtp(to: str = "lateefedidi4@gmail.com"):
     import os
+    import socket
+    import app.core.email as email_mod
     from app.core.email import _send_via_smtp, _smtp_configured
+
+    # Reset circuit breaker so testing is never blocked
+    email_mod._smtp_circuit_broken_until = 0.0
+
     configured = _smtp_configured()
-    smtp_env_vars = [k for k in os.environ.keys() if any(term in k.upper() for term in ["SMTP", "MAIL", "GMAIL"])]
+    smtp_env_vars = [k for k in os.environ.keys() if any(term in k.upper() for term in ["SMTP", "MAIL", "GMAIL", "EMAIL"])]
+    resolved_ipv4 = []
+    try:
+        infos = socket.getaddrinfo(settings.effective_smtp_host, settings.effective_smtp_port, socket.AF_INET, socket.SOCK_STREAM)
+        resolved_ipv4 = list({ai[4][0] for ai in infos})
+    except Exception as e:
+        resolved_ipv4 = [f"DNS error: {e}"]
+
     if not configured:
         return {
             "ok": False,
@@ -212,9 +225,14 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
             "detail": "SMTP credentials not configured (set SMTP_HOST, SMTP_USER, SMTP_PASSWORD in environment)",
             "host": settings.effective_smtp_host,
             "user": settings.effective_smtp_user,
+            "port": settings.effective_smtp_port,
+            "use_ssl": settings.effective_smtp_use_ssl,
+            "use_tls": settings.effective_smtp_use_tls,
             "has_password": bool(settings.effective_smtp_password),
             "detected_smtp_env_vars": smtp_env_vars,
+            "resolved_ipv4": resolved_ipv4,
         }
+
     ok, detail = _send_via_smtp(to, "MoiDoctar SMTP Test", "<p>Test email from MoiDoctar via SMTP</p>", "Test email from MoiDoctar via SMTP")
     return {
         "ok": ok,
@@ -222,9 +240,99 @@ def test_smtp(to: str = "lateefedidi4@gmail.com"):
         "detail": detail,
         "host": settings.effective_smtp_host,
         "user": settings.effective_smtp_user,
+        "port": settings.effective_smtp_port,
+        "use_ssl": settings.effective_smtp_use_ssl,
+        "use_tls": settings.effective_smtp_use_tls,
         "from": settings.effective_smtp_from,
         "to": to,
+        "resolved_ipv4": resolved_ipv4,
         "detected_smtp_env_vars": smtp_env_vars,
+    }
+
+
+@router.get("/test-emailjs")
+def test_emailjs(to: str = "lateefedidi4@gmail.com"):
+    """Test sending an email directly via EmailJS REST API."""
+    from app.core.email import _send_via_emailjs
+    service_id = settings.effective_emailjs_service_id
+    template_id = settings.effective_emailjs_template_id
+    public_key = settings.effective_emailjs_public_key
+    if not (service_id and template_id and public_key):
+        return {
+            "ok": False,
+            "configured": False,
+            "detail": "EmailJS is not fully configured (set EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY in environment)",
+            "to": to,
+        }
+    ok, detail = _send_via_emailjs(to, "MoiDoctar EmailJS Test", "<p>Test email from MoiDoctar via EmailJS</p>", "Test email from MoiDoctar via EmailJS", code="123456")
+    return {
+        "ok": ok,
+        "configured": True,
+        "detail": detail,
+        "service_id": service_id,
+        "template_id": template_id,
+        "to": to,
+    }
+
+
+@router.get("/test-brevo")
+def test_brevo(to: str = "lateefedidi4@gmail.com"):
+    """Test sending an email directly via Brevo's HTTPS REST API."""
+    from app.core.email import _send_via_brevo
+    key = settings.effective_brevo_api_key
+    if not key:
+        return {
+            "ok": False,
+            "configured": False,
+            "detail": "BREVO_API_KEY is not set in environment variables.",
+            "to": to,
+        }
+    ok, detail = _send_via_brevo(to, "MoiDoctar Brevo Test", "<p>Test email from MoiDoctar via Brevo</p>", "Test email from MoiDoctar via Brevo")
+    return {
+        "ok": ok,
+        "configured": True,
+        "detail": detail,
+        "from_email": settings.effective_brevo_from_email,
+        "from_name": settings.effective_brevo_from_name,
+        "to": to,
+    }
+
+
+@router.get("/test-email")
+def test_email(to: str = "lateefedidi4@gmail.com"):
+    """Comprehensive test endpoint to diagnose which provider is selected and test real delivery."""
+    from app.core.email import send_otp_email, _smtp_configured
+    ok, detail = send_otp_email(to, "123456", "verify_email")
+    return {
+        "ok": ok,
+        "detail": detail,
+        "recipient": to,
+        "provider_preference": settings.email_provider_preference,
+        "emailjs": {
+            "configured": bool(settings.effective_emailjs_service_id and settings.effective_emailjs_public_key),
+            "service_id": settings.effective_emailjs_service_id,
+            "template_id": settings.effective_emailjs_template_id,
+        },
+        "brevo": {
+            "configured": bool(settings.effective_brevo_api_key),
+            "from_email": settings.effective_brevo_from_email,
+            "from_name": settings.effective_brevo_from_name,
+        },
+        "resend": {
+            "configured": bool(settings.effective_resend_api_key),
+            "from": settings.effective_resend_from,
+            "is_sandbox": "onboarding@resend.dev" in settings.effective_resend_from.lower(),
+        },
+        "smtp": {
+            "configured": _smtp_configured(),
+            "host": settings.effective_smtp_host,
+            "user": settings.effective_smtp_user,
+            "port": settings.effective_smtp_port,
+            "use_ssl": settings.effective_smtp_use_ssl,
+            "use_tls": settings.effective_smtp_use_tls,
+            "from": settings.effective_smtp_from,
+            "has_password": bool(settings.effective_smtp_password),
+        },
     }
 
 

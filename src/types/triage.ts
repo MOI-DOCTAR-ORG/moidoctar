@@ -27,11 +27,30 @@ export type CarePlan = {
   when_to_hospital: string[]
 }
 
+/** The five levels from the AI Engineer Handoff. The app, not the model, decides these. */
+export type Urgency = 'EMERGENCY' | 'URGENT' | 'SOON' | 'SELF_CARE' | 'INSUFFICIENT_INFORMATION'
+
+export type TriageIndicator = {
+  label: string
+  color: 'red' | 'orange' | 'yellow' | 'green' | 'gray'
+  icon: string
+  priority: number
+}
+
+export type FollowUpQuestion = {
+  id: string
+  text: string
+  type: 'single_choice' | 'short_text'
+  options: string[]
+  required: boolean
+}
+
 export type TriageChatResponse = {
   assessment_id: string
   needs_more_info: boolean
   urgency_level: string
-  confidence_score: number
+  /** No longer produced by the server (the old values were fixed numbers). */
+  confidence_score: number | null
   rationale: string
   possible_conditions: string[]
   /** Locked 3-part care plan: immediate relief, food & water, when to go to hospital. */
@@ -49,7 +68,50 @@ export type TriageChatResponse = {
   ai_notice?: string
   /** Things the assistant just remembered about the user */
   memory_notes?: string[]
+  /** The number escalation copy tells the user to call (their setting; 112 by default). */
+  emergency_number?: string
+  /** The language Liana was told to reply in, or "auto" to mirror the user. */
+  reply_language?: string
 
+  // The handoff result contract. Present on every new answer; older saved sessions don't have it.
+  status?: 'question' | 'complete' | 'emergency_stop' | 'redirect_off_topic'
+  urgency?: Urgency
+  indicator?: TriageIndicator
+  summary?: string
+  reason?: string | null
+  next_steps?: string[]
+  escalation?: { required: boolean; message: string | null }
+  facility_action?: string | null
+  follow_up_question?: FollowUpQuestion | null
+  safety_note?: string
+  red_flags?: string[]
+  warning_signs?: string[]
+  rule_version?: string
+  medication_notice?: string
+  /** Approved-flow state: sent back unchanged on the next message. */
+  flow?: Record<string, unknown> | null
+  /** The age profile the assessment used (addendum section 4). */
+  profile?: { band: AgeBand; label: string; age: string | null; weight_kg: number | null; for: PatientFor } | null
+  /** Which approved table was used (typhoid, respiratory, hypertension, diarrhea, under_6), if any. */
+  pathway?: string | null
+  /** Behavior spec: the message's intent (HEALTH_SYMPTOM, GENERAL_NON_HEALTH_QUESTION, …). */
+  intent?: string | null
+  /** What informal or misspelt words were read as ("bumbum pain" -> "pain around the buttocks or bottom"). */
+  normalized_terms?: string[]
+  off_topic?: boolean
+  confidence?: number | null
+}
+
+export type AgeBand = 'adult' | 'pediatric_6_plus' | 'under_6'
+export type PatientFor = 'self' | 'child' | 'other'
+
+/** Who the check is for. Weight is recorded for the future dosage module; triage does not use it. */
+export type PatientInfo = {
+  for: PatientFor
+  age_years?: number | null
+  age_months?: number | null
+  weight_kg?: number | null
+  pregnant?: 'yes' | 'no' | 'not_sure' | null
 }
 
 export type CacheStats = {

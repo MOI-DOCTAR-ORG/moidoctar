@@ -104,30 +104,37 @@ export default function MedicationTracker() {
 
   return (
     <main className="flex-1 flex flex-col h-full min-h-[100dvh] overflow-y-auto relative z-10 w-full bg-background font-body-md text-on-surface antialiased">
-      <div className="flex-1 p-margin-mobile md:p-stack-lg max-w-container-max-width mx-auto w-full pb-32 md:pb-stack-lg">
+      <div className="flex-1 p-margin-mobile md:p-stack-lg max-w-container-max-width mx-auto w-full pb-6 md:pb-stack-lg">
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-stack-lg">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-4 md:mb-stack-lg">
           <div>
             <h2 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface tracking-tight">Medication Tracker</h2>
             <p className="font-body-md text-body-md text-secondary mt-1">Manage your prescriptions and daily schedule.</p>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="bg-primary text-on-primary hover:opacity-90 font-label-md text-label-md py-3 px-6 rounded-full flex items-center justify-center gap-2 transition-colors self-start md:self-auto min-h-[44px]">
+          <button onClick={() => setShowForm(!showForm)} className="bg-primary text-on-primary hover:opacity-90 font-label-md text-label-md py-2.5 md:py-3 px-5 md:px-6 rounded-full flex items-center justify-center gap-2 transition-colors self-start md:self-auto min-h-[44px]">
             <Icon icon={showForm ? 'close' : 'add'} size="md" />
             {showForm ? 'Cancel' : 'Add Medication'}
           </button>
         </div>
 
         {showForm && (
-          <div className="bg-surface rounded-xl border border-outline-variant p-6 mb-6">
-            <h3 className="font-headline-md text-headline-md text-on-surface mb-4">New Medication</h3>
+          <div className="bg-surface rounded-xl border border-outline-variant p-4 md:p-6 mb-4 md:mb-6">
+            <h3 className="font-headline-md text-lg md:text-headline-md text-on-surface mb-2">New Medication</h3>
+            {/* OTC addendum, sections 9–10: this records instructions a health worker or the label gave;
+                it never suggests, calculates or changes a dose. */}
+            <p className="mb-4 flex items-start gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-caption text-on-surface-variant">
+              <Icon icon="info" size="sm" className="mt-px shrink-0" />
+              Record the dose exactly as your health worker, prescription or medicine label says. Moi Doctar does not
+              choose or change doses. Medication guidance is currently under medical review.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <div className="flex flex-col gap-1">
                 <label className="font-label-md text-caption text-secondary">Medication Name</label>
                 <PremiumInput placeholder="e.g. Lisinopril" value={medName} onChange={e => setMedName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="font-label-md text-caption text-secondary">Dosage</label>
-                <PremiumInput placeholder="e.g. 10mg" value={medDosage} onChange={e => setMedDosage(e.target.value)} />
+                <label className="font-label-md text-caption text-secondary">Dose (as prescribed or on the label)</label>
+                <PremiumInput placeholder="Copy it from your prescription or label" value={medDosage} onChange={e => setMedDosage(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="font-label-md text-caption text-secondary">Time</label>
@@ -160,33 +167,33 @@ export default function MedicationTracker() {
             <span className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-gutter">
             {/* Today's Schedule */}
-            <div className="lg:col-span-4 flex flex-col gap-gutter">
+            <div className="lg:col-span-4 flex flex-col gap-4 md:gap-gutter">
               <div className="bg-surface rounded-xl border border-outline-variant p-4 md:p-6 flex flex-col h-full">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-headline-md text-headline-md text-on-surface">Today's Schedule</h3>
-                  <span className="bg-surface text-on-surface font-label-md text-label-md px-3 py-1 rounded-full text-xs border border-outline-variant">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                <div className="flex items-center justify-between gap-2 mb-3 md:mb-6">
+                  <h3 className="font-headline-md text-lg md:text-headline-md text-on-surface">Today's Schedule</h3>
+                  <span className="bg-surface text-on-surface font-label-md text-label-md px-3 py-1 rounded-full text-xs border border-outline-variant whitespace-nowrap">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                 </div>
                 {active.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
                     <p className="text-secondary font-body-md text-center">No medications scheduled. Add your first medication to get started.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-4 flex-1">
+                  <div className="flex flex-col gap-3 md:gap-4 flex-1">
                     {scheduleGroups.map(({ freq, items }) => (
                       <div key={freq}>
-                        <h4 className="font-caption text-caption text-secondary uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <h4 className="font-caption text-caption text-secondary uppercase tracking-wider mb-2 md:mb-3 flex items-center gap-2">
                           <Icon icon={freqConfig[freq].icon} size="sm" /> {freqConfig[freq].label}
                         </h4>
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-2 md:gap-3">
                           {items.map(item => (
-                            <label key={item.id} onClick={() => toggleTaken(item.id)} className="flex items-start gap-3 p-3 rounded-lg border border-outline-variant bg-surface hover:bg-primary/10 transition-colors cursor-pointer group">
+                            <label key={item.id} onClick={() => toggleTaken(item.id)} className="flex items-start gap-3 p-2.5 md:p-3 rounded-lg border border-outline-variant bg-surface hover:bg-primary/10 transition-colors cursor-pointer group">
                               <div className="pt-0.5">
                                 <input type="checkbox" checked={!!taken[item.id]} onChange={() => {}} className="w-5 h-5 rounded border-outline text-green-500 focus:ring-primary transition-colors" />
                               </div>
-                              <div className="flex-1">
-                                <p className="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors">{item.name}</p>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors break-words">{item.name}</p>
                                 <p className="font-caption text-caption text-secondary">{item.time}</p>
                               </div>
                             </label>
@@ -200,38 +207,38 @@ export default function MedicationTracker() {
             </div>
 
             {/* Active Prescriptions */}
-            <div className="lg:col-span-8 flex flex-col gap-gutter">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-headline-md text-headline-md text-on-surface">Active Prescriptions</h3>
+            <div className="lg:col-span-8 flex flex-col gap-3 md:gap-gutter">
+              <div className="flex items-center justify-between md:mb-2">
+                <h3 className="font-headline-md text-lg md:text-headline-md text-on-surface">Active Prescriptions</h3>
               </div>
               {active.length === 0 ? (
-                <div className="bg-surface rounded-xl border border-outline-variant p-12 flex flex-col items-center justify-center text-center">
+                <div className="bg-surface rounded-xl border border-outline-variant p-8 md:p-12 flex flex-col items-center justify-center text-center">
                   <Icon icon="medication" size="2xl" className="text-outline-variant mb-4" />
                   <p className="font-body-md text-secondary">No active prescriptions yet.</p>
                   <p className="font-caption text-caption text-outline-variant mt-1">Add medications to track your prescriptions and refill schedule.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-gutter">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-gutter">
                   {active.map(med => {
                     const supplyNum = parseInt(med.supply) || 0
                     const cfg = freqConfig[med.frequent]
                     return (
                       <div key={med.id} className="bg-surface rounded-xl border border-outline-variant p-4 md:p-6 flex flex-col hover:border-primary/50 transition-colors group relative overflow-hidden">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors border border-outline-variant">
+                        <div className="flex items-start justify-between gap-2 mb-3 md:mb-4">
+                          <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                            <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-full bg-surface flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors border border-outline-variant">
                               <Icon icon="medication" size="lg" />
                             </div>
-                            <div>
-                              <h4 className="font-label-md text-label-md text-on-surface text-lg">{med.name}</h4>
-                              <p className="font-caption text-caption text-secondary">{med.dosage}</p>
+                            <div className="min-w-0">
+                              <h4 className="font-label-md text-label-md text-on-surface text-lg break-words">{med.name}</h4>
+                              <p className="font-caption text-caption text-secondary break-words">{med.dosage}</p>
                             </div>
                           </div>
-                          <button onClick={() => stopMedication(med.id)} className="opacity-0 group-hover:opacity-100 p-1 text-secondary hover:text-error transition-all min-h-[44px] min-w-[44px] flex items-center justify-center" title="Stop medication">
+                          <button onClick={() => stopMedication(med.id)} className="touch-visible opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 p-1 text-secondary hover:text-error transition-all min-h-[44px] min-w-[44px] flex items-center justify-center" title="Stop medication" aria-label={`Stop ${med.name}`}>
                             <Icon icon="stop_circle" size="md" />
                           </button>
                         </div>
-                        <div className="flex flex-wrap gap-2 mb-6">
+                        <div className="flex flex-wrap gap-2 mb-4 md:mb-6">
                           <span className="inline-flex items-center gap-1 bg-surface text-on-surface-variant font-caption text-caption px-3 py-1 rounded-full border border-outline-variant">
                             <Icon icon={cfg.icon} size="xs" /> {cfg.label}
                           </span>

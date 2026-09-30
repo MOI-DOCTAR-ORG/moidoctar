@@ -172,7 +172,7 @@ function SessionsView() {
                   <p className="text-on-surface-variant font-body-md line-clamp-1">{s.description}</p>
                 </div>
                 <div className="flex items-center gap-4 w-full lg:w-auto">
-                  <button onClick={() => navigate('/care-details')} className="flex-1 lg:flex-none px-6 py-3 border border-primary text-primary font-label-md text-label-md rounded-full hover:bg-primary/10 transition-colors min-h-[44px]">
+                  <button onClick={() => navigate(`/care-details?id=${s.id}`)} className="flex-1 lg:flex-none px-6 py-3 border border-primary text-primary font-label-md text-label-md rounded-full hover:bg-primary/10 transition-colors min-h-[44px]">
                     View Details
                   </button>
                 </div>

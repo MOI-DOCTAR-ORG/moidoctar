@@ -23,7 +23,8 @@ DEFAULT_PREFERENCES: Dict[str, Any] = {
     "response_style": "balanced",
     "tone": "gentle",
     "units": "metric",
-    "language": "English",
+    # "auto" mirrors how the user writes (English, Nigerian English or Pidgin).
+    "language": "auto",
     "emergency_number": "112",
     "remember_conversations": True,
 }
@@ -64,6 +65,11 @@ def load(user_id: str) -> Dict[str, Any]:
         if isinstance(snap, dict):
             mem["profile_items"].update({k: v for k, v in snap.items() if k in LIST_FIELDS and isinstance(v, list)})
         mem["updated_at"] = data.get("updated_at")
+        # "English" was the stored default before "auto" existed. Unless the user picked
+        # it themselves, it means they never chose, so keep mirroring them.
+        if mem["preferences"].get("language") == "English" and not any(
+                h.get("field") == "preferences.language" and h.get("source") == "user" for h in mem["history"]):
+            mem["preferences"]["language"] = "auto"
     return mem
 
 
@@ -202,6 +208,21 @@ def delete_fact(user_id: str, fact_id: str) -> bool:
         _log(mem, "fact", removed["text"], None, "user")
         _save(user_id, mem)
         return True
+
+
+def add_user_fact(user_id: str, text: str) -> Dict[str, Any]:
+    cleaned = _clean_str(text, 120)
+    if not cleaned:
+        raise ValueError("Memory note cannot be empty")
+    with _lock:
+        mem = load(user_id)
+        existing = {f["text"].lower() for f in mem["facts"]}
+        if cleaned.lower() not in existing:
+            fact_item = {"id": "f_" + uuid.uuid4().hex[:6], "text": cleaned, "source": "user", "created_at": _iso()}
+            mem["facts"].append(fact_item)
+            _log(mem, "fact", None, cleaned, "user")
+            _save(user_id, mem)
+        return mem
 
 
 def remove_health_item(user_id: str, field: str, value: str) -> bool:

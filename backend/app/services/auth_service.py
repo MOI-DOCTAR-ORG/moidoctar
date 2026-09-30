@@ -68,6 +68,8 @@ def _admin_emails() -> List[str]:
 def _format_user_out(u: Any) -> Dict[str, Any]:
     if not isinstance(u, dict):
         return {}
+    demo = u.get("demographics") or {}
+    photo_url = u.get("photo") or demo.get("photo") or demo.get("photoUrl")
     return {
         "_id": str(u.get("id", "")),
         "userName": u.get("user_name", "User"),
@@ -75,7 +77,8 @@ def _format_user_out(u: Any) -> Dict[str, Any]:
         "isVerified": bool(u.get("is_verified", True)),
         "role": "admin" if (u.get("role") == "admin" or str(u.get("email", "")).strip().lower() in _admin_emails()) else u.get("role", "user"),
         "phone": u.get("phone"),
-        "demographics": u.get("demographics") or {},
+        "photo": photo_url,
+        "demographics": demo,
         "preference": u.get("preference") or {"emailNotification": True, "smsAlert": False, "twoFactorAuth": False},
         "notifications": u.get("notifications") or [],
         "createdAt": u.get("created_at"),
@@ -265,17 +268,63 @@ def _verify_google_id_token(id_token: str, token_type: str = "id_token") -> Dict
     return claims
 
 
+def _google_display_name(access_token: str, token_type: str, claims: Dict[str, Any]) -> Optional[str]:
+    """The person's real name from Google, or None if Google didn't share one.
+
+    ID tokens carry `name` / `given_name` / `family_name`, but the tokeninfo
+    response for an *access* token (what the custom Google button sends) has
+    no profile fields at all, so for those we ask Google's userinfo endpoint.
+    Best effort: any failure just means no name.
+    """
+    info: Dict[str, Any] = claims
+    if token_type == "access_token" and not claims.get("name"):
+        import json
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                info = json.load(response)
+        except Exception as e:
+            logger.warning(f"Could not fetch Google profile name: {e}")
+            return None
+        # Only trust profile data for the account the token was verified for.
+        if str(info.get("email", "")).strip().lower() != str(claims.get("email", "")).strip().lower():
+            return None
+
+    name = str(info.get("name") or "").strip()
+    if not name:
+        name = " ".join(
+            part for part in (str(info.get("given_name") or "").strip(), str(info.get("family_name") or "").strip()) if part
+        )
+    return name or None
+
+
+def _is_placeholder_name(name: Any, email: str) -> bool:
+    """True for a name nobody chose: empty, the "User" default, or the email's
+    local part (what Google sign-in used to store when it had no real name)."""
+    n = str(name or "").strip().lower()
+    return not n or n == "user" or n == email.split("@")[0].lower()
+
+
 def authenticate_google(access_token: str, token_type: str = "id_token") -> Dict[str, Any]:
     """Sign in (or sign up) with a verified Google account.
 
-    `access_token` here is actually the Google ID token supplied by the
-    frontend's GoogleLogin `onSuccess` callback. We verify it with Google,
-    then find-or-create the corresponding real user by their verified email
-    - never a shared placeholder account.
+    `access_token` is either a Google ID token or an OAuth access token
+    (`token_type` says which). We verify it with Google, then find-or-create
+    the corresponding real user by their verified email - never a shared
+    placeholder account.
+
+    Google's name only initialises the account: it is used for new accounts
+    and to replace a placeholder name, never to overwrite a name the person
+    has saved themselves.
     """
     claims = _verify_google_id_token(access_token, token_type)
     email_clean = claims["email"].strip().lower()
-    full_name = claims.get("name") or email_clean.split("@")[0]
+    google_name = _google_display_name(access_token, token_type, claims)
+    full_name = google_name or email_clean.split("@")[0]
 
     supabase = get_supabase_client()
 
@@ -285,6 +334,10 @@ def authenticate_google(access_token: str, token_type: str = "id_token") -> Dict
             rows = safe_supabase_rows(res)
             if rows:
                 user = rows[0]
+                if google_name and _is_placeholder_name(user.get("user_name"), email_clean):
+                    upd = supabase.table("users").update({"user_name": google_name}).eq("id", user.get("id")).execute()
+                    upd_rows = safe_supabase_rows(upd)
+                    user = upd_rows[0] if upd_rows else {**user, "user_name": google_name}
             else:
                 new_user = {
                     "id": str(uuid.uuid4()),
@@ -318,6 +371,8 @@ def authenticate_google(access_token: str, token_type: str = "id_token") -> Dict
             "last_login": datetime.now(timezone.utc).isoformat(),
         }
     user = _local_users[email_clean]
+    if google_name and _is_placeholder_name(user.get("user_name"), email_clean):
+        user["user_name"] = google_name
     user["last_login"] = datetime.now(timezone.utc).isoformat()
     token = create_access_token({"sub": user["id"], "email": email_clean})
     return {"authorization": token, "refreshToken": token, "user": _format_user_out(user)}
@@ -428,6 +483,10 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]
                 update_data["demographics"] = cleaned["demographics"]
             if "preference" in cleaned:
                 update_data["preference"] = cleaned["preference"]
+            if "photo" in cleaned:
+                demo = cleaned.get("demographics") or {}
+                demo["photoUrl"] = cleaned["photo"]
+                update_data["demographics"] = demo
 
             res = supabase.table("users").update(update_data).eq("id", user_id).execute()
             rows = safe_supabase_rows(res)
@@ -446,6 +505,11 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]
                 u["demographics"] = {**(u.get("demographics") or {}), **cleaned["demographics"]}
             if "preference" in cleaned:
                 u["preference"] = {**(u.get("preference") or {}), **cleaned["preference"]}
+            if "photo" in cleaned:
+                u["photo"] = cleaned["photo"]
+                demo = u.get("demographics") or {}
+                demo["photoUrl"] = cleaned["photo"]
+                u["demographics"] = demo
             return _format_user_out(u)
 
     raise ValueError("user_not_found")

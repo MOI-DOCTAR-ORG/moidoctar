@@ -25,12 +25,17 @@ import NotFound from './pages/NotFound'
 import ForgotPassword from './pages/ForgotPassword'
 import LocalCareDiscovery from './pages/LocalCareDiscovery'
 import Landing from './pages/Landing'
+import Terms from './pages/Terms'
+import Support from './pages/Support'
 
 export default function App() {
   return (
     <Routes>
       {/* Public landing page - redirects to /dashboard automatically if already signed in */}
       <Route path="/" element={<Landing />} />
+
+      {/* Legal pages - reachable signed out (sign-up consent) and signed in (sidebar, profile) */}
+      <Route path="/terms" element={<Terms />} />
 
       {/* Auth pages - no sidebar, redirect to app if authenticated */}
       <Route element={<AuthLayout />}>
@@ -61,6 +66,7 @@ export default function App() {
         <Route path="/symptom-tracker-body-map" element={<SymptomTrackerBodyMap />} />
         <Route path="/ai-settings" element={<AISettings />} />
         <Route path="/theme" element={<Theme />} />
+        <Route path="/support" element={<Support />} />
         <Route path="/admin/cache" element={<AdminCache />} />
       </Route>
 

@@ -1,25 +1,35 @@
 import { useState } from 'react'
 import Icon from './Icon'
 import { useNavigate } from 'react-router-dom'
+import { EMERGENCY_NUMBERS } from '../lib/triageDisplay'
+import { useAiMemory } from '../hooks/useMoiDoctor'
 
 type EmergencyEscalationProps = {
   urgencyLevel: string
   redFlags: string[]
+  /** Heading override, so the panel never contradicts the result's own urgency badge. */
+  title?: string
+  subtitle?: string
+  /** The session ID to link to on the Care Details button. */
+  sessionId?: string
 }
 
-export default function EmergencyEscalation({ urgencyLevel, redFlags }: EmergencyEscalationProps) {
+export default function EmergencyEscalation({ urgencyLevel, redFlags, title, subtitle, sessionId }: EmergencyEscalationProps) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(true)
+  const own = useAiMemory().data?.preferences.emergency_number?.replace(/[^\d+]/g, '')
 
   const isEmergency = ['emergency', 'high', 'urgent'].includes(urgencyLevel.toLowerCase())
   if (!isEmergency) return null
 
-  const emergencyNumbers = [
-    { label: 'Emergency Services (US)', number: '911', icon: 'local_hospital' },
-    { label: 'Emergency Services (EU)', number: '112', icon: 'local_hospital' },
-    { label: 'Nigeria Emergency', number: '199', icon: 'local_hospital' },
-    { label: 'Poison Control (US)', number: '1-800-222-1222', icon: 'science' },
-  ]
+  // Nigeria's numbers, with the one the user set in Assistant Settings first
+  // (moved up if it is already one of them, e.g. 199).
+  const emergencyNumbers = own && own !== EMERGENCY_NUMBERS[0].number
+    ? [{ label: 'Your emergency number', number: own, icon: 'call' },
+       ...EMERGENCY_NUMBERS.filter((n) => n.number !== own)]
+    : EMERGENCY_NUMBERS
+
+  const careDetailsPath = sessionId ? `/care-details?id=${sessionId}` : '/care-details'
 
   return (
     <div className="rounded-2xl border-2 border-red-500/40 bg-red-500/10 overflow-hidden">
@@ -33,9 +43,9 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags }: Emergenc
           </div>
           <div>
             <h3 className="font-label-md text-label-md text-red-600 dark:text-red-400 font-bold uppercase tracking-wide">
-              Urgent Care Recommended
+              {title ?? 'Urgent Care Recommended'}
             </h3>
-            <p className="text-caption text-secondary">Immediate medical attention may be needed</p>
+            <p className="text-caption text-secondary">{subtitle ?? 'Immediate medical attention may be needed'}</p>
           </div>
         </div>
         <Icon icon={expanded ? 'expand_less' : 'expand_more'} size="lg" className="text-red-500" />
@@ -87,11 +97,11 @@ export default function EmergencyEscalation({ urgencyLevel, redFlags }: Emergenc
           </div>
 
           <button
-            onClick={() => navigate('/care-details')}
+            onClick={() => navigate(careDetailsPath)}
             className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-2 min-h-[44px]"
           >
             <Icon icon="local_hospital" size="md" />
-            View Care Details & Find Nearby Help
+            View Care Details &amp; Find Nearby Help
           </button>
         </div>
       )}

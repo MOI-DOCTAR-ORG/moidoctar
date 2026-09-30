@@ -1,4 +1,8 @@
-packageManager = "pnpm"
-installCommand = "CI=true pnpm install --frozen-lockfile"
-buildCommand = "pnpm run build"
-outputDirectory = "dist"
+version = 1
+
+[build]
+command = "pnpm run build"
+output = "dist"
+
+[routing]
+spa = true

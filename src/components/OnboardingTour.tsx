@@ -88,7 +88,8 @@ export default function OnboardingTour({ onFinish }: Props) {
   }
 
   const statusLabel = (status: PermissionResult | 'idle' | 'requesting') => {
-    if (status === 'granted') return { text: 'Enabled', className: 'text-green-600 dark:text-green-400' }
+    if (status === 'granted') return { text: 'Enabled (GPS)', className: 'text-green-600 dark:text-green-400 font-semibold' }
+    if (status === 'approximate') return { text: 'Enabled (Approximate location)', className: 'text-green-600 dark:text-green-400 font-semibold' }
     if (status === 'denied') return { text: 'Blocked — enable in browser settings', className: 'text-error' }
     if (status === 'unsupported') return { text: 'Not available on this device', className: 'text-secondary' }
     if (status === 'requesting') return { text: 'Requesting…', className: 'text-secondary' }

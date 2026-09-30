@@ -141,23 +141,21 @@ the frontend is rebuilt).
 ## 6. Pxxl deploy failure — root cause found and fixed
 Status: DONE
 
-`Static release packaging failed: invalid pxxl.toml: strict mode: fields in
-the document are missing in the target struct` — happened *after* a
-successful build, at the static-release packaging step.
+`Static release packaging failed: invalid pxxl.toml: strict mode: fields in the document are missing in the target struct` — happened *after* a successful build, at the static-release packaging step.
 
-- **Root cause:** both `pxxl.toml` (root) and `backend/pxxl.toml` used
-  snake_case keys (`install_command`, `build_command`, `start_command`).
-  Checked Pxxl's own docs (docs.pxxl.app/deploy/multiple-services) — the
-  platform's real schema is **camelCase**: `installCommand`, `buildCommand`,
-  `startCommand`, `outputDirectory`, `packageManager`, `port`. Every key in
-  both files was therefore an unrecognized field, which is exactly what
-  strict-mode TOML deserialization rejects.
-- **Fix:** renamed all keys to camelCase in both `pxxl.toml` and
-  `backend/pxxl.toml`, and added an explicit `outputDirectory = "dist"` to
-  the root one (matches the `dist/` output already seen in the build log).
-- Not verified against a live Pxxl deploy (no network access in this
-  session) — the fix is based on Pxxl's documented config schema, not a
-  live redeploy. **Please trigger a redeploy on Pxxl and confirm the
-  packaging step completes** before considering this fully closed.
+- **Root cause:** Root `pxxl.toml` was configured with service keys (`packageManager`, `installCommand`, `buildCommand`, `outputDirectory`) at the document top level. According to official Pxxl docs (`docs.pxxl.app/routing-and-rewrites.md`), static edge releases expect `version = 1`, optional `[build]`, and `[routing]` (`spa = true`), not service-level properties at the root. Go's strict-mode TOML unmarshaler rejected the unrecognized keys.
+- **Fix:** Updated `pxxl.toml` to:
+  ```toml
+  version = 1
+
+  [build]
+  command = "pnpm run build"
+  output = "dist"
+
+  [routing]
+  spa = true
+  ```
+  This satisfies Pxxl's static configuration schema and enables SPA fallback for client-side routing.
+- **Verification:** Verified local build (`pnpm run build`) builds cleanly into `dist/`. Pushed to `dev`, `frontend_dev`, and `backend_dev`.
 
 ---

@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     GOOGLE_API_KEYS: str = ""
     GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
+    # Cencori AI gateway (AIB Ship product). When CENCORI_API_KEY is set, every AI call is
+    # routed through Cencori (logging, security filters, cost tracking) and falls back to
+    # calling Gemini directly if the gateway is down. Leave blank to call Gemini directly.
+    CENCORI_API_KEY: str = ""
+    CENCORI_BASE_URL: str = "https://api.cencori.com"
+    CENCORI_CHAT_PATH: str = "/api/ai/chat"
+    CENCORI_MODEL: str = "gemini-2.5-flash"
+
     # Emails that are treated as admins (can manage AI API keys), in addition
     # to users whose role is "admin". Comma separated.
     ADMIN_EMAILS: str = ""
@@ -82,15 +90,36 @@ class Settings(BaseSettings):
 
     @property
     def effective_smtp_host(self) -> str:
-        return (os.getenv("SMTP_HOST") or self.SMTP_HOST or "").strip().strip("'\" \t\r\n")
+        return (
+            os.getenv("SMTP_HOST")
+            or os.getenv("SMTP_SERVER")
+            or os.getenv("MAIL_HOST")
+            or os.getenv("MAIL_SERVER")
+            or os.getenv("EMAIL_HOST")
+            or os.getenv("EMAIL_SERVER")
+            or self.SMTP_HOST
+            or ""
+        ).strip().strip("'\" \t\r\n")
 
     @property
     def effective_smtp_user(self) -> str:
-        return (os.getenv("SMTP_USER") or self.SMTP_USER or "").strip().strip("'\" \t\r\n")
+        return (
+            os.getenv("SMTP_USER")
+            or os.getenv("SMTP_USERNAME")
+            or os.getenv("SMTP_EMAIL")
+            or os.getenv("MAIL_USER")
+            or os.getenv("MAIL_USERNAME")
+            or os.getenv("EMAIL_USER")
+            or os.getenv("EMAIL_USERNAME")
+            or os.getenv("GMAIL_USER")
+            or os.getenv("GMAIL_USERNAME")
+            or self.SMTP_USER
+            or ""
+        ).strip().strip("'\" \t\r\n")
 
     @property
     def effective_smtp_password(self) -> str:
-        # App passwords often have spaces like "abcd efgh ijkl mnop", keep or remove spaces as needed
+        # App passwords often have spaces like "abcd efgh ijkl mnop", remove spaces
         raw = (
             os.getenv("SMTP_PASSWORD")
             or os.getenv("SMTP_PASS")
@@ -106,17 +135,179 @@ class Settings(BaseSettings):
             or self.SMTP_PASSWORD
             or ""
         ).strip().strip("'\" \t\r\n")
-        # Remove spaces in case Google 16-char app password was copied with spaces
         return raw.replace(" ", "")
 
+    @property
+    def effective_smtp_port(self) -> int:
+        raw = (
+            os.getenv("SMTP_PORT")
+            or os.getenv("MAIL_PORT")
+            or os.getenv("EMAIL_PORT")
+            or str(self.SMTP_PORT)
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+        # Check if user explicitly set secure/SSL (e.g. SMTP_SECURE=true or SMTP_SSL=true)
+        raw_secure = (
+            os.getenv("SMTP_SECURE")
+            or os.getenv("MAIL_SECURE")
+            or os.getenv("EMAIL_SECURE")
+            or os.getenv("SMTP_SSL")
+            or os.getenv("SMTP_USE_SSL")
+            or ""
+        ).strip().lower()
+        is_secure = raw_secure in ("true", "1", "yes", "on")
+
+        try:
+            port = int(raw) if raw else (465 if is_secure else 587)
+        except (ValueError, TypeError):
+            port = 465 if is_secure else 587
+
+        # If secure/SSL is explicitly requested (e.g. SMTP_SECURE=true) and port was set to 587,
+        # automatically normalize to 465, because direct SSL on port 587 fails with WRONG_VERSION_NUMBER.
+        if is_secure and port == 587:
+            return 465
+
+        # If host is Gmail and port was not explicitly specified or secure is true, default to 465 SSL
+        if "gmail.com" in self.effective_smtp_host.lower() and (not raw or is_secure):
+            return 465
+
+        return port
+
+    @property
+    def effective_smtp_use_ssl(self) -> bool:
+        raw = (
+            os.getenv("SMTP_USE_SSL")
+            or os.getenv("SMTP_SSL")
+            or os.getenv("SMTP_SECURE")
+            or os.getenv("MAIL_USE_SSL")
+            or os.getenv("MAIL_SSL")
+            or os.getenv("MAIL_SECURE")
+            or os.getenv("EMAIL_USE_SSL")
+            or os.getenv("EMAIL_SECURE")
+        )
+        if raw is not None:
+            return str(raw).strip().lower() in ("true", "1", "yes", "on")
+        # Automatically use SSL if port is 465
+        return self.effective_smtp_port == 465
+
+    @property
+    def effective_smtp_use_tls(self) -> bool:
+        raw = (
+            os.getenv("SMTP_USE_TLS")
+            or os.getenv("SMTP_TLS")
+            or os.getenv("MAIL_USE_TLS")
+            or os.getenv("MAIL_TLS")
+            or os.getenv("EMAIL_USE_TLS")
+        )
+        if raw is not None:
+            return str(raw).strip().lower() in ("true", "1", "yes", "on")
+        # If not SSL and port is 587 or 25, default to STARTTLS True
+        return not self.effective_smtp_use_ssl
 
     @property
     def effective_smtp_from(self) -> str:
-        raw = (os.getenv("SMTP_FROM") or self.SMTP_FROM or "").strip().strip("'\" \t\r\n")
+        raw = (
+            os.getenv("SMTP_FROM")
+            or os.getenv("MAIL_FROM")
+            or os.getenv("EMAIL_FROM")
+            or os.getenv("DEFAULT_FROM_EMAIL")
+            or os.getenv("MAIL_SENDER")
+            or self.SMTP_FROM
+            or ""
+        ).strip().strip("'\" \t\r\n")
         if raw:
             return raw
         user = self.effective_smtp_user
-        return f"MoiDoctar <{user}>" if user else ""
+        if user and "@" in user:
+            return f"MoiDoctar <{user}>"
+        return "MoiDoctar <noreply@moidoctar.com>"
+
+    @property
+    def effective_brevo_api_key(self) -> str:
+        return (
+            os.getenv("BREVO_API_KEY")
+            or os.getenv("BREVO_KEY")
+            or os.getenv("SENDINBLUE_API_KEY")
+            or os.getenv("SIB_API_KEY")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_brevo_from_email(self) -> str:
+        raw = (
+            os.getenv("BREVO_FROM_EMAIL")
+            or os.getenv("BREVO_FROM")
+            or os.getenv("SENDINBLUE_FROM")
+            or self.effective_smtp_user
+            or ""
+        ).strip().strip("'\" \t\r\n")
+        if "@" in raw:
+            import email.utils
+            _, addr = email.utils.parseaddr(raw)
+            if addr:
+                return addr
+        return self.effective_smtp_user or "feromarkethub@gmail.com"
+
+    @property
+    def effective_brevo_from_name(self) -> str:
+        return (
+            os.getenv("BREVO_FROM_NAME")
+            or "MoiDoctar"
+        ).strip()
+
+    @property
+    def effective_emailjs_service_id(self) -> str:
+        return (
+            os.getenv("EMAILJS_SERVICE_ID")
+            or os.getenv("EMAIL_JS_SERVICE_ID")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_emailjs_template_id(self) -> str:
+        return (
+            os.getenv("EMAILJS_TEMPLATE_ID")
+            or os.getenv("EMAIL_JS_TEMPLATE_ID")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_emailjs_public_key(self) -> str:
+        return (
+            os.getenv("EMAILJS_PUBLIC_KEY")
+            or os.getenv("EMAILJS_USER_ID")
+            or os.getenv("EMAIL_JS_PUBLIC_KEY")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def effective_emailjs_private_key(self) -> str:
+        return (
+            os.getenv("EMAILJS_PRIVATE_KEY")
+            or os.getenv("EMAILJS_ACCESS_TOKEN")
+            or os.getenv("EMAIL_JS_PRIVATE_KEY")
+            or ""
+        ).strip().strip("'\" \t\r\n")
+
+    @property
+    def email_provider_preference(self) -> str:
+        """Returns 'emailjs', 'brevo', 'smtp', 'resend', or 'auto'."""
+        provider = (
+            os.getenv("EMAIL_PROVIDER")
+            or os.getenv("MAIL_PROVIDER")
+            or os.getenv("EMAIL_BACKEND")
+            or ""
+        ).strip().lower()
+        if provider in ("emailjs", "email_js"):
+            return "emailjs"
+        if provider in ("brevo", "sendinblue", "sib"):
+            return "brevo"
+        if provider in ("smtp", "mail"):
+            return "smtp"
+        if provider == "resend":
+            return "resend"
+        return "auto"
 
 
     @property

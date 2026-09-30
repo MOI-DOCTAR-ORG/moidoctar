@@ -13,9 +13,10 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 import App from './App'
 import { queryClient } from './lib/queryClient'
 import { GOOGLE_CLIENT_ID } from './lib/constants'
-import '@fontsource-variable/quicksand/wght.css'
-import '@fontsource-variable/nunito-sans/wght.css'
+import { initAnalytics } from './lib/analytics'
 import './index.css'
+
+initAnalytics()
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

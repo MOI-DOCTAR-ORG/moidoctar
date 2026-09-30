@@ -14,6 +14,8 @@
 }
 
 :root {
+  /* Height of the phone bottom navigation bar, not counting the safe-area inset below it. */
+  --mobile-nav-height: 4rem;
   --icon-xs: 12px;
   --icon-sm: 16px;
   --icon-md: 20px;
@@ -314,6 +316,41 @@ body.dark .card-shadow {
 
 .safe-area-top {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ===== App shell: fixed header (3.5rem / 4rem) + phone bottom nav ===== */
+@media (max-width: 767px) {
+  .app-content {
+    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Triage fills exactly the space between the header and the bottom nav, so the
+   conversation is the only thing that scrolls and the composer sits just above the nav. */
+.triage-shell {
+  height: calc(100dvh - 3.5rem - var(--mobile-nav-height) - env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .triage-shell {
+    height: calc(100dvh - 4rem);
+  }
+}
+
+/* While typing in the triage composer on a phone, the on-screen keyboard needs the room:
+   hand the bottom nav's space to the chat until the composer loses focus. */
+@media (max-width: 767px) {
+  body:has(.chat-composer textarea:focus) .mobile-bottom-nav {
+    display: none;
+  }
+
+  body:has(.chat-composer textarea:focus) .app-content {
+    padding-bottom: 0;
+  }
+
+  body:has(.chat-composer textarea:focus) .triage-shell {
+    height: calc(100dvh - 3.5rem);
+  }
 }
 
 @media (hover: none) and (pointer: coarse) {

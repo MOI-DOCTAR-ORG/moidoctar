@@ -18,10 +18,11 @@ export default function OtpVerification() {
   const { verifyEmail, resendVerificationCode, isAuthenticated } = useAuth()
   const { addToast } = useToastContext()
 
-  const state = location.state as { email?: string; emailDelivered?: boolean } | null
+  const state = location.state as { email?: string; emailDelivered?: boolean; devCode?: string } | null
   const email = state?.email || 'your email'
   // If the backend explicitly told us email_delivered=false, warn the user
-  const emailDelivered = state?.emailDelivered !== false // undefined = assume delivered
+  const [emailDelivered, setEmailDelivered] = useState<boolean>(state?.emailDelivered !== false)
+  const [devCode, setDevCode] = useState<string | undefined>(state?.devCode)
 
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''))
   const [isVerifying, setIsVerifying] = useState(false)
@@ -103,8 +104,11 @@ export default function OtpVerification() {
     const res = await resendVerificationCode(email !== 'your email' ? email : undefined)
     setIsResending(false)
     if (res && res.email_delivered === false) {
+      setEmailDelivered(false)
+      if (res.dev_code) setDevCode(res.dev_code)
       addToast('Code generated, but email delivery is restricted — see note below.', 'info')
     } else if (res && res.email_delivered) {
+      setEmailDelivered(true)
       addToast('A new code has been sent to your email.', 'success')
     } else {
       addToast('Code resent — check your inbox.', 'success')
@@ -138,18 +142,26 @@ export default function OtpVerification() {
         <>
           {emailDelivered
             ? <>Enter the verification code sent to <span className="font-semibold text-on-surface">{email}</span>.</>
-            : <>A code was generated for <span className="font-semibold text-on-surface">{email}</span>. Email delivery is currently limited — click <strong>Resend Code</strong> to try again.</>
+            : <>A code was generated for <span className="font-semibold text-on-surface">{email}</span>. Outbound delivery is currently unconfirmed — click <strong>Resend Code</strong> to try again.</>
           }
         </>
       }
     >
       <div className={`${authFormStack} gap-6`}>
         {!emailDelivered && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-3 text-sm leading-5 text-amber-800 dark:bg-amber-900/20 dark:border-amber-500/30 dark:text-amber-300" role="alert">
-            <Icon icon="warning" size="lg" className="mt-0.5 shrink-0" aria-hidden="true" />
-            <p className="flex-1">
-              Email delivery is restricted on the free Resend domain — only the registered Resend account can receive test emails. Click <strong>Resend Code</strong> to retry, or ask your admin to verify a custom domain on <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline font-semibold">resend.com/domains</a>.
-            </p>
+          <div className="flex flex-col gap-2 rounded-xl border border-amber-300/60 bg-amber-50 p-4 text-sm leading-5 text-amber-800 dark:bg-amber-900/20 dark:border-amber-500/30 dark:text-amber-300" role="alert">
+            <div className="flex items-start gap-3">
+              <Icon icon="warning" size="lg" className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p className="flex-1">
+                Outbound email could not be delivered to this address. If using the free Resend sandbox, only the account owner can receive emails. Please configure SMTP credentials (<code className="rounded bg-amber-200/50 px-1 py-0.5 font-mono text-xs dark:bg-amber-800/40">SMTP_HOST</code>, <code className="rounded bg-amber-200/50 px-1 py-0.5 font-mono text-xs dark:bg-amber-800/40">SMTP_USER</code>, <code className="rounded bg-amber-200/50 px-1 py-0.5 font-mono text-xs dark:bg-amber-800/40">SMTP_PASSWORD</code>) on your backend or verify a custom domain on <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline font-semibold">resend.com/domains</a>.
+              </p>
+            </div>
+            {devCode && (
+              <div className="mt-1 flex items-center justify-between rounded-lg border border-amber-400/40 bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:border-amber-600/40 dark:text-amber-200">
+                <span>Testing verification code:</span>
+                <span className="font-mono text-base font-bold tracking-widest select-all">{devCode}</span>
+              </div>
+            )}
           </div>
         )}
 

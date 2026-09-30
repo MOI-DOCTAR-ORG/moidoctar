@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import Icon from './Icon'
 
 type SessionCardProps = {
+  id: string
   severity: 'Urgent' | 'Moderate' | 'Stable'
   condition: string
   description: string
@@ -23,6 +24,7 @@ const severityBadgeStyles: Record<string, string> = {
 }
 
 export default function SessionCard({
+  id,
   severity,
   condition,
   description,
@@ -53,7 +55,10 @@ export default function SessionCard({
           <Icon icon={statusIcon} size="sm" />
           {statusLabel}
         </span>
-        <button onClick={() => navigate('/care-details')} className="min-h-[44px] text-primary font-label-md hover:underline flex items-center px-2">
+        <button
+          onClick={() => navigate(`/care-details?id=${id}`)}
+          className="min-h-[44px] text-primary font-label-md hover:underline flex items-center px-2"
+        >
           View Details
         </button>
       </div>

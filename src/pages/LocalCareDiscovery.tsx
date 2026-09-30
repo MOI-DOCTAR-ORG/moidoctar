@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { SkeletonLine } from '../components/Skeleton'
+import { getCachedLocation, setCachedLocation, fetchIpLocation } from '../utils/permissions'
 
 interface Facility {
   id: string
@@ -16,6 +17,8 @@ interface Facility {
   openNow: boolean | null
   dataProvenance: 'current' | 'prototype'
   specialties?: string[]
+  lat?: number
+  lng?: number
 }
 
 // Fallback demo data — only shown when we don't have (or couldn't use) the
@@ -79,14 +82,90 @@ function classifyType(tags: Record<string, string>): Facility['type'] {
   return 'clinic'
 }
 
-function formatAddress(tags: Record<string, string>): string {
-  const parts = [
+// Quick-jump shortcuts for popular Nigerian metropolitan areas
+export interface QuickArea {
+  name: string
+  lat: number
+  lng: number
+}
+
+export const POPULAR_NIGERIAN_AREAS: QuickArea[] = [
+  { name: 'Ikeja', lat: 6.6018, lng: 3.3515 },
+  { name: 'Lekki / VI', lat: 6.4311, lng: 3.4682 },
+  { name: 'Yaba', lat: 6.5168, lng: 3.3857 },
+  { name: 'Surulere', lat: 6.4969, lng: 3.3578 },
+  { name: 'Lagos Island', lat: 6.4549, lng: 3.3986 },
+  { name: 'Abuja (CBD)', lat: 9.0579, lng: 7.4951 },
+  { name: 'Ibadan', lat: 7.3775, lng: 3.9470 },
+  { name: 'Port Harcourt', lat: 4.8156, lng: 7.0498 },
+  { name: 'Enugu', lat: 6.4584, lng: 7.5464 },
+  { name: 'Kano', lat: 12.0022, lng: 8.5920 },
+]
+
+// Reverse geocode lat/lng to human-readable neighborhood/city name via Nominatim
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) return ''
+    const data = (await res.json()) as {
+      display_name?: string
+      address?: Record<string, string>
+    }
+    if (data && data.address) {
+      const a = data.address
+      const neighborhood = a.suburb || a.neighbourhood || a.village || a.residential || a.district
+      const city = a.city || a.town || a.county || a.state
+      if (neighborhood && city) return `${neighborhood}, ${city}`
+      if (city) return city
+    }
+    if (data.display_name) {
+      return data.display_name.split(',').slice(0, 2).join(', ')
+    }
+  } catch {
+    // fallback gracefully
+  }
+  return ''
+}
+
+function formatAddress(tags: Record<string, string>, areaContext?: string): string {
+  // 1. Look for explicit full address
+  if (tags['addr:full']) return tags['addr:full']
+
+  // 2. Look for street + number
+  const streetPart =
     tags['addr:housenumber'] && tags['addr:street']
       ? `${tags['addr:housenumber']} ${tags['addr:street']}`
-      : tags['addr:street'],
-    tags['addr:city'] || tags['addr:suburb'],
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join(', ') : 'Address not listed'
+      : tags['addr:street'] || tags['contact:street']
+
+  const areaPart =
+    tags['addr:suburb'] ||
+    tags['suburb'] ||
+    tags['addr:neighbourhood'] ||
+    tags['neighbourhood'] ||
+    tags['addr:place'] ||
+    tags['addr:district']
+
+  const cityPart = tags['addr:city'] || tags['city'] || tags['addr:state']
+
+  const parts = [streetPart, areaPart, cityPart].filter(Boolean)
+  if (parts.length > 0) {
+    return parts.join(', ')
+  }
+
+  // 3. Fallback to operator name if given
+  if (tags.operator) {
+    return `Operated by ${tags.operator}`
+  }
+
+  // 4. Fallback to searched/current neighborhood context
+  if (areaContext) {
+    const cleanArea = areaContext.replace(/\s*\((Approximate|GPS)\)/i, '').trim()
+    return `${cleanArea} area • Coordinates mapped`
+  }
+
+  return 'Location mapped (tap Directions)'
 }
 
 // OSM opening_hours can be arbitrarily complex; we only confidently detect
@@ -106,7 +185,7 @@ interface OverpassElement {
   tags?: Record<string, string>
 }
 
-async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility[]> {
+async function fetchNearbyFacilities(lat: number, lng: number, areaContext?: string): Promise<Facility[]> {
   const query = `
     [out:json][timeout:20];
     (
@@ -140,7 +219,7 @@ async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility
             id: `osm-${el.type}-${el.id}`,
             name: tags.name,
             type: classifyType(tags),
-            address: formatAddress(tags),
+            address: formatAddress(tags, areaContext),
             phone,
             distance: distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`,
             distanceKm,
@@ -148,6 +227,8 @@ async function fetchNearbyFacilities(lat: number, lng: number): Promise<Facility
             openNow: detectOpenNow(tags.opening_hours),
             dataProvenance: 'current' as const,
             specialties: tags.healthcare_speciality ? tags.healthcare_speciality.split(';') : undefined,
+            lat: elLat,
+            lng: elLon,
           }
         })
         .sort((a, b) => a.distanceKm - b.distanceKm)
@@ -177,7 +258,7 @@ const provenanceLabels = {
 // Geolocation permission states we distinguish in the UI. `navigator.permissions` isn't
 // available everywhere (notably Safari for the geolocation permission itself), so we treat
 // 'unknown' as "haven't asked yet, browser support unclear" rather than assuming denial.
-type LocationPermissionState = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported' | 'requesting'
+type LocationPermissionState = 'unknown' | 'prompt' | 'granted' | 'approximate' | 'denied' | 'unsupported' | 'requesting'
 
 export default function LocalCareDiscovery() {
   const navigate = useNavigate()
@@ -185,17 +266,20 @@ export default function LocalCareDiscovery() {
   const [facilities, setFacilities] = useState<Facility[]>(sampleFacilities)
   const [filter, setFilter] = useState<'all' | 'hospital' | 'clinic' | 'pharmacy' | 'emergency'>('all')
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [locationName, setLocationName] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(false)
   const [locationPermission, setLocationPermission] = useState<LocationPermissionState>('unknown')
 
-  const loadNearby = useCallback((lat: number, lng: number) => {
+  const loadNearby = useCallback((lat: number, lng: number, areaContext?: string) => {
     setIsLoadingFacilities(true)
     setLocationError('')
-    fetchNearbyFacilities(lat, lng)
+    fetchNearbyFacilities(lat, lng, areaContext)
       .then((results) => {
         if (results.length === 0) {
-          setLocationError('No listed facilities found nearby. Showing sample facilities instead.')
+          setLocationError('No listed facilities found nearby in OpenStreetMap. Showing sample facilities instead.')
           setFacilities(sampleFacilities)
         } else {
           setFacilities(results)
@@ -208,61 +292,130 @@ export default function LocalCareDiscovery() {
       .finally(() => setIsLoadingFacilities(false))
   }, [])
 
-  // Triggers the browser's native location prompt. Must be called from a user gesture (a
-  // button click) for reliable behavior — some browsers silently suppress or auto-dismiss a
-  // geolocation prompt fired automatically on page load, which is why this was previously
-  // failing quietly instead of ever showing the "Allow location?" dialog.
-  const requestLocation = useCallback(() => {
-    if (!('geolocation' in navigator)) {
-      setLocationPermission('unsupported')
-      setLocationError('Location is not available on this device. Showing sample facilities.')
-      return
+  // Geocode an entered city or neighborhood name using OpenStreetMap Nominatim
+  const handleSearchCity = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const query = searchQuery.trim()
+    if (!query) return
+    setIsSearchingLocation(true)
+    setLocationError('')
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) throw new Error('Location lookup failed')
+      const results = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>
+      if (!results || results.length === 0) {
+        setLocationError(`No locations found matching "${query}". Try searching by a larger city or nearby town.`)
+        return
+      }
+      const lat = parseFloat(results[0].lat)
+      const lng = parseFloat(results[0].lon)
+      setUserLocation({ lat, lng })
+      const name = results[0].display_name.split(',').slice(0, 2).join(', ')
+      setLocationName(name)
+      setLocationPermission('approximate')
+      setCachedLocation({ lat, lng, city: name, source: 'ip', timestamp: Date.now() })
+      loadNearby(lat, lng, name)
+    } catch {
+      setLocationError('Could not reach the location search service. Please try again.')
+    } finally {
+      setIsSearchingLocation(false)
     }
+  }
+
+  // Quick-select preset Nigerian cities / metropolitan areas
+  const handleSelectArea = (area: QuickArea) => {
+    setUserLocation({ lat: area.lat, lng: area.lng })
+    setLocationName(area.name)
+    setSearchQuery(area.name)
+    setLocationPermission('approximate')
+    setCachedLocation({ lat: area.lat, lng: area.lng, city: area.name, source: 'ip', timestamp: Date.now() })
+    loadNearby(area.lat, area.lng, area.name)
+  }
+
+  // High-accuracy GPS request with reverse geocoding
+  const requestPreciseGps = useCallback(() => {
     setLocationPermission('requesting')
     setLocationError('')
+
+    if (!('geolocation' in navigator)) {
+      setLocationError('Geolocation is not supported by your browser. Please select an area below.')
+      setLocationPermission('approximate')
+      return
+    }
+
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords
-        setLocationPermission('granted')
         setUserLocation({ lat: latitude, lng: longitude })
-        loadNearby(latitude, longitude)
+        setLocationPermission('granted')
+
+        let areaLabel = 'Precise GPS'
+        try {
+          const resolved = await reverseGeocode(latitude, longitude)
+          if (resolved) {
+            areaLabel = `${resolved} (GPS)`
+          }
+        } catch {
+          // ignore
+        }
+
+        setLocationName(areaLabel)
+        const cleanName = areaLabel.replace(/\s*\(GPS\)$/, '')
+        setCachedLocation({
+          lat: latitude,
+          lng: longitude,
+          city: cleanName,
+          source: 'gps',
+          timestamp: Date.now(),
+        })
+        loadNearby(latitude, longitude, cleanName)
       },
       (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
-          setLocationPermission('denied')
-          setLocationError('Location access is blocked for this site. Enable it in your browser\u2019s site settings, then tap Retry.')
-        } else {
-          setLocationPermission('prompt')
-          setLocationError('Could not get your location. Showing sample facilities.')
+        let msg = 'Could not acquire precise GPS. Showing approximate area. Tap an area chip below to choose your neighborhood.'
+        if (err.code === 1) {
+          msg = 'Location permission was denied. Tap any popular area below to view local care.'
+        } else if (err.code === 3) {
+          msg = 'GPS acquisition timed out. Tap an area chip below to choose your neighborhood.'
         }
+        setLocationError(msg)
+        setLocationPermission('approximate')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
       }
     )
   }, [loadNearby])
 
-  // On mount: only auto-request location if the browser can tell us permission was already
-  // granted in a previous visit (so we don't re-prompt someone who already said yes). If the
-  // browser can't tell us (no Permissions API support, e.g. Safari), or the state is 'prompt'/
-  // 'denied', we hold off and show an explicit "Enable Location" card with a button instead of
-  // silently calling getCurrentPosition with no user gesture behind it.
+  // Triggers location request, falling back automatically to IP location
+  const requestLocation = useCallback(() => {
+    requestPreciseGps()
+  }, [requestPreciseGps])
+
+  // On mount: check cached location first, or auto-fetch IP location so the page is populated
   useEffect(() => {
-    if (!('geolocation' in navigator)) {
-      setLocationPermission('unsupported')
-      setLocationError('Location is not available on this device. Showing sample facilities.')
+    const cached = getCachedLocation()
+    if (cached) {
+      setUserLocation({ lat: cached.lat, lng: cached.lng })
+      setLocationName(cached.city ? `${cached.city} (${cached.source === 'gps' ? 'GPS' : 'Approximate'})` : '')
+      setLocationPermission(cached.source === 'gps' ? 'granted' : 'approximate')
+      loadNearby(cached.lat, cached.lng, cached.city)
       return
     }
-    if (!('permissions' in navigator) || !navigator.permissions?.query) {
-      setLocationPermission('prompt')
-      return
-    }
-    navigator.permissions
-      .query({ name: 'geolocation' as PermissionName })
-      .then((status) => {
-        setLocationPermission(status.state as LocationPermissionState)
-        if (status.state === 'granted') requestLocation()
-        status.onchange = () => setLocationPermission(status.state as LocationPermissionState)
-      })
-      .catch(() => setLocationPermission('prompt'))
-  }, [requestLocation])
+
+    // Auto-detect location via IP so the user immediately gets real care listings
+    fetchIpLocation().then((ip) => {
+      if (ip) {
+        setUserLocation({ lat: ip.lat, lng: ip.lng })
+        setLocationName(ip.city ? `${ip.city} (Approximate)` : 'Approximate')
+        setLocationPermission('approximate')
+        loadNearby(ip.lat, ip.lng, ip.city)
+      }
+    })
+  }, [loadNearby])
 
   const filtered = filter === 'all' ? facilities : facilities.filter(f => f.type === filter)
 
@@ -279,20 +432,81 @@ export default function LocalCareDiscovery() {
           <p className="text-body-md text-secondary mt-1">Locate healthcare facilities and resources near you</p>
         </div>
         {userLocation && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-caption text-green-600 dark:text-green-400">
-            <Icon icon="my_location" size="sm" />
-            Location Active
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-caption text-green-600 dark:text-green-400 font-bold">
+              <Icon icon={locationPermission === 'granted' ? 'gps_fixed' : 'my_location'} size="sm" />
+              {locationName || 'Location Active'}
+            </div>
+            {locationPermission === 'approximate' && (
+              <button
+                type="button"
+                onClick={requestPreciseGps}
+                className="px-3 py-1 bg-surface border border-outline-variant hover:border-primary/40 rounded-full text-caption text-secondary hover:text-primary transition-colors flex items-center gap-1 font-medium"
+              >
+                <Icon icon="gps_fixed" size="sm" />
+                Use Precise GPS
+              </button>
+            )}
           </div>
         )}
       </header>
+
+      {/* City / Area Search Form */}
+      <form onSubmit={handleSearchCity} className="mb-3 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Icon icon="search" size="md" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search facilities by city or neighborhood (e.g. Ikeja, Lagos, Abuja)..."
+            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-outline-variant rounded-xl text-body-sm text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary transition-colors"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isSearchingLocation || !searchQuery.trim()}
+          className="px-4 min-h-[44px] bg-primary text-on-primary rounded-xl text-label-md font-label-md font-bold hover:opacity-90 disabled:opacity-50 transition-all shrink-0 flex items-center gap-1.5"
+        >
+          <Icon icon={isSearchingLocation ? 'hourglass_top' : 'near_me'} size="sm" />
+          {isSearchingLocation ? 'Searching…' : 'Find Care'}
+        </button>
+      </form>
+
+      {/* Quick Select Popular Nigerian Areas */}
+      <div className="mb-5">
+        <p className="text-caption text-secondary mb-2 flex items-center gap-1.5 font-medium">
+          <Icon icon="explore" size="sm" className="text-primary" />
+          Quick areas:
+        </p>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none no-scrollbar">
+          {POPULAR_NIGERIAN_AREAS.map((area) => {
+            const isSelected = locationName.toLowerCase().includes(area.name.toLowerCase().split('/')[0].trim())
+            return (
+              <button
+                key={area.name}
+                type="button"
+                onClick={() => handleSelectArea(area)}
+                className={`px-3 py-1.5 rounded-full text-caption font-medium shrink-0 transition-all ${
+                  isSelected
+                    ? 'bg-primary text-on-primary font-bold shadow-sm'
+                    : 'bg-surface border border-outline-variant text-secondary hover:border-primary/40 hover:text-on-surface'
+                }`}
+              >
+                {area.name}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
       {(locationPermission === 'prompt' || locationPermission === 'unknown' || locationPermission === 'requesting') && !userLocation && (
         <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <Icon icon="location_on" size="lg" className="text-primary shrink-0" />
             <div>
-              <p className="text-body-sm text-on-surface font-bold">Allow location access</p>
-              <p className="text-caption text-secondary">See real hospitals, clinics and pharmacies sorted by distance from you.</p>
+              <p className="text-body-sm text-on-surface font-bold">Use GPS location</p>
+              <p className="text-caption text-secondary">Find hospitals, clinics, and pharmacies closest to your current spot.</p>
             </div>
           </div>
           <button
@@ -300,18 +514,18 @@ export default function LocalCareDiscovery() {
             disabled={locationPermission === 'requesting'}
             className="px-4 min-h-[44px] bg-primary text-on-primary rounded-xl text-label-md font-label-md font-bold hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-60 disabled:hover:translate-y-0"
           >
-            {locationPermission === 'requesting' ? 'Requesting\u2026' : 'Enable Location'}
+            {locationPermission === 'requesting' ? 'Requesting…' : 'Enable Location'}
           </button>
         </div>
       )}
 
-      {locationPermission === 'denied' && (
+      {locationPermission === 'denied' && !userLocation && (
         <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <Icon icon="warning" size="lg" className="text-amber-500 shrink-0" />
             <div>
               <p className="text-body-sm text-on-surface font-bold">Location access blocked</p>
-              <p className="text-caption text-secondary">Enable it for this site in your browser settings, then retry.</p>
+              <p className="text-caption text-secondary">Enable it for this site in your browser settings, or use the city search above.</p>
             </div>
           </div>
           <button
@@ -449,7 +663,13 @@ export default function LocalCareDiscovery() {
                   </span>
                 )}
                 <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facility.address)}`}
+                  href={
+                    facility.lat && facility.lng
+                      ? `https://www.google.com/maps/dir/?api=1&destination=${facility.lat},${facility.lng}`
+                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          `${facility.name} ${facility.address !== 'Location mapped (tap Directions)' ? facility.address : ''}`
+                        )}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-outline-variant rounded-xl text-secondary font-label-md text-label-md font-bold hover:border-primary/30 hover:text-on-surface transition-all min-h-[44px]"
@@ -471,16 +691,25 @@ export default function LocalCareDiscovery() {
           </div>
           <div>
             <p className="font-label-md text-label-md text-red-600 dark:text-red-400 font-bold">Emergency?</p>
-            <p className="text-caption text-secondary">Call emergency services immediately</p>
+            <p className="text-caption text-secondary">Dial toll-free national or state emergency dispatch immediately</p>
           </div>
         </div>
-        <a
-          href="tel:911"
-          className="w-full sm:w-auto sm:ml-auto px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-2 min-h-[44px]"
-        >
-          <Icon icon="call" size="md" />
-          Call 911
-        </a>
+        <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
+          <a
+            href="tel:112"
+            className="flex-1 sm:flex-initial px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-2 min-h-[44px]"
+          >
+            <Icon icon="call" size="md" />
+            Call 112
+          </a>
+          <a
+            href="tel:767"
+            className="flex-1 sm:flex-initial px-4 py-2.5 bg-surface border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-xl font-label-md text-label-md font-bold transition-all flex items-center justify-center gap-1.5 min-h-[44px]"
+          >
+            <Icon icon="phone_in_talk" size="sm" />
+            767 (Lagos)
+          </a>
+        </div>
       </div>
     </main>
   )

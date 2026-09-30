@@ -5,17 +5,13 @@ import Icon from '../components/Icon'
 import SessionGrid from '../components/SessionGrid'
 import QuickActions from '../components/QuickActions'
 import { scopeKey } from '../utils/storage'
-
-const greeting = () => {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 16) return 'Good afternoon'
-  return 'Good evening'
-}
+import { getGreeting } from '../lib/greeting'
+import { getDisplayName, getFirstName } from '../lib/userIdentity'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { sessions } = useAuth()
+  const { sessions, user } = useAuth()
+  const greeting = getGreeting(getFirstName(getDisplayName(user)))
 
   const medCount = useMemo(() => {
     try {
@@ -49,7 +45,7 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen p-4 sm:p-5 md:p-gutter max-w-[1400px] mx-auto flex flex-col gap-4 md:gap-6">
       <header>
-        <h2 className="font-headline-lg-mobile sm:font-headline-lg text-headline-lg text-on-surface">{greeting()}</h2>
+        <h2 className="font-headline-lg-mobile sm:font-headline-lg text-headline-lg-mobile sm:text-headline-lg text-on-surface break-words">{greeting}</h2>
         <p className="font-body-md text-secondary">Here is your health overview for today.</p>
       </header>
 

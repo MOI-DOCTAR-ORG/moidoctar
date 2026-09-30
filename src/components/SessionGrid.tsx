@@ -24,6 +24,7 @@ export default function SessionGrid() {
       {sessions.map((session) => (
         <SessionCard
           key={session.id}
+          id={session.id}
           severity={session.severity}
           condition={session.condition}
           description={session.description}

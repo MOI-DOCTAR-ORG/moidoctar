@@ -97,7 +97,13 @@ export default function SignUp() {
     const result = await signUp(fullName.trim(), email.trim(), password)
     setIsSubmitting(false)
     if (result.success) {
-      navigate('/verify-email', { state: { email: email.trim() } })
+      navigate('/verify-email', {
+        state: {
+          email: email.trim(),
+          emailDelivered: result.emailDelivered,
+          devCode: result.devCode,
+        },
+      })
     } else {
       setError(result.error)
       setShakeKey(k => k + 1)
@@ -280,7 +286,17 @@ export default function SignUp() {
             />
             <span className="font-body-md text-sm text-on-surface group-hover:text-primary transition-colors">
               I agree to the{' '}
-              <a href="#" className={authLink} onClick={(e) => e.preventDefault()}>Terms of Service</a>
+              {/* Opens in a new tab so reading the Terms doesn't discard the half-filled
+                  form; stopPropagation keeps the surrounding label from toggling the box. */}
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={authLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Terms of Service
+              </Link>
               {' '}and{' '}
               <a href="#" className={authLink} onClick={(e) => e.preventDefault()}>Privacy Policy</a>
             </span>

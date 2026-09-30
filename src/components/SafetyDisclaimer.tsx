@@ -70,7 +70,7 @@ export default function SafetyDisclaimer({ onAccept }: SafetyDisclaimerProps) {
                   </h3>
                   <p className="text-body-sm text-on-surface-variant leading-relaxed">
                     If you are experiencing a medical emergency, please <strong>call your local emergency number immediately</strong>
-                    (e.g., 911 in the US, 112 in Europe, 199 in Nigeria).
+                    (112 in Nigeria, on any network).
                     Do not rely on this application for emergency medical guidance.
                   </p>
                 </div>

@@ -15,9 +15,12 @@ export type BackendUser = {
     age?: string
     currentCondition?: string
     bloodType?: string
+    genotype?: string
+    dateOfBirth?: string
     country?: string
   }
   phone?: string
+  photo?: string | null
   preference?: {
     emailNotification: boolean
     smsAlert: boolean
@@ -47,13 +50,13 @@ export type TriageSession = {
   rationale?: string
 }
 
-type AuthTokens = { authorization: string; refreshToken: string; email_delivered?: boolean; email_error?: string }
+type AuthTokens = { authorization: string; refreshToken: string; email_delivered?: boolean; email_error?: string; dev_code?: string }
 type VerifyResponse = { msg: string; authorization?: string; refreshToken?: string }
 
 type LoginResult =
   | { success: true }
-  | { success: false; error: string; needsVerification?: true; pendingEmail?: string; emailDelivered?: boolean }
-type SignUpResult = { success: true; emailDelivered?: boolean } | { success: false; error: string }
+  | { success: false; error: string; needsVerification?: true; pendingEmail?: string; emailDelivered?: boolean; devCode?: string }
+type SignUpResult = { success: true; emailDelivered?: boolean; devCode?: string } | { success: false; error: string }
 
 
 type AuthState = {
@@ -73,6 +76,8 @@ type AuthContextValue = AuthState & {
   addSession: (session: TriageSession) => void
   removeSession: (id: string) => void
   refreshSessions: () => Promise<void>
+  /** Replace the signed-in user with the copy the backend returned after a profile update. */
+  updateUser: (user: BackendUser) => void
   userChangeKey: number
 }
 
@@ -98,7 +103,6 @@ async function fetchUser(): Promise<BackendUser | null> {
 
 function seedLocalStorage(user: BackendUser) {
   try { localStorage.setItem('doctarr_current_user_email', user.email) } catch {}
-  try { localStorage.setItem(scopeKey('doctarr_name'), user.userName) } catch {}
 }
 
 function mapApiError(err: unknown): string {
@@ -214,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void refreshSessions()
       return { success: true }
     } catch (err) {
-      const e = err as { err?: string; authorization?: string; msg?: string; email_delivered?: boolean }
+      const e = err as { err?: string; authorization?: string; msg?: string; email_delivered?: boolean; dev_code?: string }
       if (e?.err === 'account_not_verified' && e.authorization) {
         // Store the temp token so the verify page can call /auth/verify
         setTokens(e.authorization, '')
@@ -226,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           needsVerification: true,
           pendingEmail: email.toLowerCase().trim(),
           emailDelivered: e.email_delivered ?? false,
+          devCode: e.dev_code,
         }
       }
       return { success: false, error: mapApiError(err) }
@@ -241,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName,
       }, null)
       setTokens(res.authorization, res.refreshToken)
-      return { success: true, emailDelivered: res.email_delivered ?? false }
+      return { success: true, emailDelivered: res.email_delivered ?? false, devCode: res.dev_code }
     } catch (err) {
       return { success: false, error: mapApiError(err) }
     }
@@ -311,8 +316,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessions(prev => prev.filter(s => s.id !== id))
   }, [])
 
+  const updateUser = useCallback((next: BackendUser) => {
+    // Only accept an update for the account that is signed in right now; a late
+    // response after logout or an account switch must not resurrect the old user.
+    setState(prev => (prev.user && prev.user._id === next._id ? { ...prev, user: { ...prev.user, ...next } } : prev))
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, signInWithGoogle, verifyEmail, resendVerificationCode, signOut, sessions, addSession, removeSession, refreshSessions, userChangeKey }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, signInWithGoogle, verifyEmail, resendVerificationCode, signOut, sessions, addSession, removeSession, refreshSessions, updateUser, userChangeKey }}>
       {children}
     </AuthContext.Provider>
   )

@@ -4,6 +4,44 @@ export interface Medication {
   frequency: string
 }
 
+export function calculateAge(dobString?: string | null): number | undefined {
+  if (!dobString || typeof dobString !== 'string' || !dobString.trim()) return undefined
+
+  let d = new Date(dobString)
+
+  if (isNaN(d.getTime())) {
+    const parts = dobString.split(/[-/.]/)
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+      } else if (parts[2].length === 4) {
+        // MM/DD/YYYY or DD/MM/YYYY
+        const p0 = parseInt(parts[0], 10)
+        const p1 = parseInt(parts[1], 10)
+        const year = parseInt(parts[2], 10)
+        if (p0 > 12) {
+          // DD/MM/YYYY
+          d = new Date(year, p1 - 1, p0)
+        } else {
+          // MM/DD/YYYY
+          d = new Date(year, p0 - 1, p1)
+        }
+      }
+    }
+  }
+
+  if (isNaN(d.getTime())) return undefined
+
+  const today = new Date()
+  let age = today.getFullYear() - d.getFullYear()
+  const monthDiff = today.getMonth() - d.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) {
+    age--
+  }
+  return age >= 0 && age < 125 ? age : undefined
+}
+
 export interface AppointmentRecord {
   date: string
   doctor: string
@@ -75,32 +113,37 @@ export function createDefaultProfile(): PatientProfile {
   }
 }
 
+/**
+ * Share of the profile the person has filled in, as a whole percentage (0–100).
+ * The sign-in email isn't counted: it comes with the account and can't be edited here.
+ * Any chosen answer counts as filled — including "Don't know" and "Prefer not to say".
+ */
 export function calculateCompletion(profile: PatientProfile): number {
+  const filled = (v: unknown) => typeof v === 'string' ? v.trim().length > 0 : !!v
+  const listed = (v: unknown) => Array.isArray(v) && v.length > 0
   const fields: boolean[] = [
-    !!profile.photo,
-    !!profile.fullName,
-    !!profile.dateOfBirth,
-    !!profile.gender,
-    !!profile.bloodGroup,
-    !!profile.genotype,
-    !!profile.phoneNumber,
-    !!profile.email,
-    !!profile.homeAddress,
-    !!profile.state,
-    !!profile.city,
-    profile.knownAllergies.length > 0,
-    profile.chronicConditions.length > 0,
-    profile.currentMedications.length > 0,
-    !!profile.pastSurgeries,
-    !!profile.disabilities,
-    !!profile.emergencyName,
-    !!profile.emergencyRelationship,
-    !!profile.emergencyPhone,
-    !!profile.preferredDoctor,
-    !!profile.preferredHospital,
+    filled(profile.photo),
+    filled(profile.fullName),
+    filled(profile.dateOfBirth),
+    filled(profile.gender),
+    filled(profile.bloodGroup),
+    filled(profile.genotype),
+    filled(profile.phoneNumber),
+    filled(profile.homeAddress),
+    filled(profile.state),
+    filled(profile.city),
+    listed(profile.knownAllergies),
+    listed(profile.chronicConditions),
+    listed(profile.currentMedications),
+    filled(profile.pastSurgeries),
+    filled(profile.disabilities),
+    filled(profile.emergencyName),
+    filled(profile.emergencyRelationship),
+    filled(profile.emergencyPhone),
+    filled(profile.preferredDoctor),
+    filled(profile.preferredHospital),
   ]
-  const filled = fields.filter(Boolean).length
-  return Math.round((filled / fields.length) * 100)
+  return Math.round((fields.filter(Boolean).length / fields.length) * 100)
 }
 
 export function loadProfile(key: string): PatientProfile | null {

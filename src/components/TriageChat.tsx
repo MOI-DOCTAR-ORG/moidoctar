@@ -5,11 +5,13 @@ import LianaAvatar from './LianaAvatar'
 import { TriageResultSkeleton } from './Skeleton'
 import EmergencyEscalation from './EmergencyEscalation'
 import TriageFeedback from './TriageFeedback'
+import PatientCard, { BAND_LABEL, bandOf } from './PatientCard'
 import { useAuth, type TriageSession } from '../context/AuthContext'
 import { useBodyMap } from '../context/BodyMapContext'
 import { useTriageChat, type ChatMsg, type Severity } from '../context/TriageChatContext'
-import { getUserInitials } from '../utils/getUserInitials'
-import type { TriageChatResponse } from '../types/triage'
+import { getDisplayName, getInitials } from '../lib/userIdentity'
+import type { FollowUpQuestion, TriageChatResponse, Urgency } from '../types/triage'
+import { URGENCY_DISPLAY, legacySeverity, usesContract } from '../lib/triageDisplay'
 
 const urgencyStyle = (level: string) => {
   switch (level?.toLowerCase()) {
@@ -44,8 +46,9 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
   ]
 
   const saveAndOpen = () => {
+    const sessionId = result.assessment_id || ('sess-' + Date.now())
     addSession({
-      id: result.assessment_id || ('sess-' + Date.now()),
+      id: sessionId,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       condition: result.possible_conditions?.length ? result.possible_conditions[0] : 'Self-reported symptoms',
@@ -59,7 +62,7 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
       rationale: result.rationale,
       tags: result.possible_conditions?.slice(0, 2),
     })
-    navigate('/care-details')
+    navigate(`/care-details?id=${sessionId}`)
   }
 
   const [showAnswerBox, setShowAnswerBox] = useState(false)
@@ -222,7 +225,7 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
       )}
 
       {result.urgency_level === 'Urgent' && (
-        <div className="mt-3"><EmergencyEscalation urgencyLevel={result.urgency_level} redFlags={result.red_flags_to_watch} /></div>
+        <div className="mt-3"><EmergencyEscalation urgencyLevel={result.urgency_level} redFlags={result.red_flags_to_watch} sessionId={result.assessment_id} /></div>
       )}
 
       <p className="mt-3 text-[11px] leading-snug text-on-surface-variant">{result.disclaimer}</p>
@@ -237,11 +240,135 @@ function ResultCard({ result, onAsk, severity }: { result: TriageChatResponse; o
   )
 }
 
-function Bubble({ msg, severity, onAsk, isLatest }: { msg: ChatMsg; severity: Severity | null; onAsk: (q: string) => void; isLatest: boolean }) {
+/**
+ * The result screen from the AI Engineer Handoff: urgency badge and action from fixed copy,
+ * the validated summary and reason, at most three next steps, escalation, and the safety note.
+ * Nothing here is inferred from the model's prose.
+ */
+function ContractResultCard({ result, severity }: { result: TriageChatResponse & { urgency: Urgency }; severity: Severity | null }) {
+  const navigate = useNavigate()
+  const { addSession } = useAuth()
+  const display = URGENCY_DISPLAY[result.urgency]
+  const steps = result.next_steps ?? []
+  const escalation = result.escalation?.required ? result.escalation.message : null
+
+  const saveAndOpen = () => {
+    const level = legacySeverity(result.urgency)
+    const sessionId = result.assessment_id || ('sess-' + Date.now())
+    addSession({
+      id: sessionId,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      condition: 'Self-reported symptoms',
+      description: result.summary || display.action,
+      severity: level,
+      statusLabel: severity ? `Self-rated ${severity.toLowerCase()}` : display.label,
+      statusIcon: level === 'Urgent' ? 'warning' : 'clinical_notes',
+      conditions: [],
+      recommendedActions: steps,
+      redFlags: escalation ? [escalation] : [],
+      rationale: result.reason || result.summary || '',
+      tags: [display.label],
+    })
+    navigate(`/care-details?id=${sessionId}`)
+  }
+
+  return (
+    <div className={`mt-3 rounded-xl border-2 p-4 text-sm ${display.panel}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${display.badge}`}>
+          <Icon icon={display.icon} size="xs" />
+          {display.label}
+        </span>
+        {result.profile && (
+          <span className="rounded-md border border-outline-variant px-2 py-1 text-[11px] font-semibold text-on-surface-variant">
+            Profile: {result.profile.label}{result.profile.age ? ` · ${result.profile.age}` : ''}
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-xs font-semibold text-on-surface">
+        {result.ai_source === 'offline' ? "We can't assess this while offline." : display.action}
+      </p>
+
+      {result.reason && <p className="mt-2 text-on-surface-variant">{result.reason}</p>}
+
+      {escalation && (
+        <p role="alert" className="mt-3 rounded-lg bg-red-600/15 px-3 py-2 text-sm font-semibold text-red-700 dark:text-red-300">
+          {escalation}
+        </p>
+      )}
+
+      {steps.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">What to do now</p>
+          <ol className="mt-1.5 space-y-1.5">
+            {steps.map((step, i) => (
+              <li key={step} className="flex items-start gap-2 text-on-surface">
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-container text-[11px] font-bold">{i + 1}</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {result.medication_notice && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs text-on-surface">
+          <Icon icon="medication" size="sm" className="mt-px shrink-0" />
+          {result.medication_notice}
+        </p>
+      )}
+
+      {(result.urgency === 'EMERGENCY' || result.ai_source === 'offline') && (
+        <div className="mt-3"><EmergencyEscalation urgencyLevel="emergency" redFlags={[]} title="Emergency numbers" subtitle="Tap a number to call" sessionId={result.assessment_id} /></div>
+      )}
+
+      <p className="mt-3 text-[11px] leading-snug text-on-surface-variant">{result.safety_note || result.disclaimer}</p>
+
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button type="button" onClick={saveAndOpen} className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary hover:opacity-90">
+          {result.urgency === 'EMERGENCY' || result.urgency === 'URGENT' ? 'Find care near me' : 'Save and view care options'}
+        </button>
+        <div className="sm:ml-auto"><TriageFeedback assessmentId={result.assessment_id} /></div>
+      </div>
+    </div>
+  )
+}
+
+/** One question at a time, answered by tapping an option or typing (handoff section 3). */
+function QuestionPrompt({ question, onAnswer, active }: { question: FollowUpQuestion; onAnswer: (a: string) => void; active: boolean }) {
+  return (
+    <div className="mt-2 rounded-xl border border-outline-variant bg-surface px-4 py-3">
+      <p className="text-[15px] font-semibold leading-relaxed text-on-surface">{question.text}</p>
+      {question.options.length > 0 && (
+        // Approved-table options are whole sentences: stack them so each reads in full.
+        <div className={`mt-2 ${question.options.some((o) => o.length > 28) ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2'}`}>
+          {question.options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              disabled={!active}
+              onClick={() => onAnswer(opt)}
+              className={`min-h-10 border border-primary/40 px-4 py-2 text-sm text-on-surface transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-on-surface ${
+                question.options.some((o) => o.length > 28) ? 'rounded-xl text-left' : 'rounded-full'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+      {active && <p className="mt-2 text-[11px] text-on-surface-variant">Tap an answer, or type your own below.</p>}
+    </div>
+  )
+}
+
+function Bubble({ msg, severity, onAsk, isLatest, isLast }: { msg: ChatMsg; severity: Severity | null; onAsk: (q: string) => void; isLatest: boolean; isLast?: boolean }) {
+  const { user } = useAuth()
   if (msg.role === 'user') {
     return (
       <div className="flex flex-row-reverse items-end gap-2">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary-container text-xs font-bold text-on-secondary-container">{getUserInitials()}</div>
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary-container text-xs font-bold text-on-secondary-container">{getInitials(getDisplayName(user))}</div>
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-on-primary sm:max-w-[75%]">
           <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{msg.text}</p>
           {msg.imageName && <p className="mt-1 flex items-center gap-1 text-xs opacity-80"><Icon icon="attach_file" size="sm" /> {msg.imageName}</p>}
@@ -257,7 +384,8 @@ function Bubble({ msg, severity, onAsk, isLatest }: { msg: ChatMsg; severity: Se
         <div className="rounded-2xl rounded-tl-md border border-outline-variant bg-surface-container-low px-4 py-2.5">
           <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-on-surface">{msg.text}</p>
         </div>
-        {result && result.ai_source !== 'gemini' && (
+        {/* New-contract answers carry their own notice; the rules deciding is not a failure. */}
+        {result && result.ai_source !== 'gemini' && (!usesContract(result) || Boolean(result.ai_notice)) && (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs text-on-warning-container">
             <Icon icon="info" size="sm" className="mt-px shrink-0" />
             {result.ai_notice || (result.ai_source === 'offline' ? "We can't reach the server right now, so here's an offline safety check." : "We couldn't reach Liana's online assessment, so here's a basic safety check.")}
@@ -269,7 +397,16 @@ function Bubble({ msg, severity, onAsk, isLatest }: { msg: ChatMsg; severity: Se
             {result.memory_notes.join(' · ')}
           </p>
         )}
-        {result && isLatest && <ResultCard result={result} onAsk={onAsk} severity={severity} />}
+        {msg.question && <QuestionPrompt question={msg.question} onAnswer={onAsk} active={Boolean(isLast)} />}
+        {msg.notice && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-on-surface-variant">
+            <Icon icon="info" size="sm" className="mt-px shrink-0" />
+            {msg.notice}
+          </p>
+        )}
+        {result && isLatest && (usesContract(result)
+          ? <ContractResultCard result={result} severity={severity} />
+          : <ResultCard result={result} onAsk={onAsk} severity={severity} />)}
         <p className="mt-1 text-[11px] text-on-surface-variant">{msg.time}</p>
       </div>
     </div>
@@ -287,7 +424,7 @@ function PastTriageModal({
 }) {
   const navigate = useNavigate()
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-lg rounded-2xl border border-outline-variant bg-surface p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-outline-variant pb-3">
           <div className="flex items-center gap-2">
@@ -373,7 +510,7 @@ function PastTriageModal({
             type="button"
             onClick={() => {
               onClose()
-              navigate('/care-details')
+              navigate(`/care-details?id=${session.id}`)
             }}
             className="w-full sm:w-auto flex-1 min-h-10 rounded-lg bg-primary text-on-primary px-4 text-xs font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
           >
@@ -454,6 +591,25 @@ export default function TriageChat() {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [chat.messages.length, chat.pending, chat.error])
 
+  // Stay pinned to the latest message when the conversation area resizes (the bottom nav
+  // coming back after the keyboard closes, the severity row appearing) or a reply grows —
+  // unless the person has scrolled up to read something.
+  const logRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const log = logRef.current
+    if (!log || typeof ResizeObserver === 'undefined') return
+    let atBottom = true
+    const onScroll = () => { atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 32 }
+    const ro = new ResizeObserver(() => { if (atBottom) log.scrollTop = log.scrollHeight })
+    log.addEventListener('scroll', onScroll, { passive: true })
+    ro.observe(log)
+    if (log.firstElementChild) ro.observe(log.firstElementChild)
+    return () => {
+      ro.disconnect()
+      log.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+
   const submit = () => {
     if (chat.send(input)) setInput('')
   }
@@ -496,13 +652,13 @@ export default function TriageChat() {
       </div>
       <div>
         <dt className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Assistant</dt>
-        <dd className="mt-0.5 text-on-surface-variant">Uses your profile, medications and saved preferences. <Link className="text-primary underline underline-offset-2" to="/ai-settings">Review what it remembers</Link></dd>
+        <dd className="mt-0.5 text-on-surface-variant">Follows your Assistant Settings (length, tone, language, units, emergency number) and your long-term conditions. <Link className="text-primary underline underline-offset-2" to="/ai-settings">Review what it remembers</Link></dd>
       </div>
     </dl>
   )
 
   return (
-    <main className="flex h-[calc(100dvh-3.5rem)] md:h-[calc(100dvh-4rem)]">
+    <main className="triage-shell flex">
       {/* Desktop Sidebar: Session details + Previous Triages list */}
       <aside className="hidden w-80 shrink-0 flex-col justify-between border-r border-outline-variant bg-surface-container-low p-4 lg:flex">
         <div className="flex flex-col min-h-0 flex-1">
@@ -608,7 +764,7 @@ export default function TriageChat() {
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-background">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
         {/* Mobile top bar */}
         <div className="border-b border-outline-variant lg:hidden bg-surface-container-low px-3 py-2">
           <div className="flex items-center justify-between gap-2">
@@ -616,7 +772,7 @@ export default function TriageChat() {
               <button
                 type="button"
                 onClick={() => setShowPastTriagesMobile(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface hover:border-primary transition-colors shadow-xs"
+                className="flex min-h-10 items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface hover:border-primary transition-colors shadow-xs"
               >
                 <Icon icon="history" size="xs" className="text-primary" />
                 <span>Previous Triages</span>
@@ -628,8 +784,9 @@ export default function TriageChat() {
               <button
                 type="button"
                 onClick={() => setShowDetails(v => !v)}
-                className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2 py-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+                className="flex min-h-10 items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2 py-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
                 title="Session Details"
+                aria-expanded={showDetails}
               >
                 <Icon icon="info" size="xs" />
                 <span>{hasAreas ? `${selectedAreas.length} marked` : 'Details'}</span>
@@ -640,7 +797,8 @@ export default function TriageChat() {
             <button
               type="button"
               onClick={handleStartNewTriage}
-              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90 transition-opacity"
+              className="flex min-h-10 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90 transition-opacity"
+              aria-label="Start a new triage"
             >
               <Icon icon="add" size="xs" />
               <span>New</span>
@@ -654,10 +812,20 @@ export default function TriageChat() {
           )}
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-6" role="log" aria-live="polite">
+        <div ref={logRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6" role="log" aria-live="polite">
           <div className="mx-auto w-full max-w-3xl space-y-5">
-            {chat.messages.map((m) => (
-              <Bubble key={m.id} msg={m} severity={chat.severity} onAsk={(q) => chat.send(q)} isLatest={m.id === latestId} />
+            {!chat.hasStarted ? (
+              <PatientCard value={chat.patient} onChange={chat.setPatient} />
+            ) : (
+              <p className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                <Icon icon="person" size="xs" />
+                Checking for {chat.patient.for === 'self' ? 'you' : chat.patient.for === 'child' ? 'your child' : 'someone else'}
+                {(() => { const b = bandOf(chat.patient); return b ? ` · ${BAND_LABEL[b]}` : '' })()}
+              </p>
+            )}
+            {chat.messages.map((m, i) => (
+              <Bubble key={m.id} msg={m} severity={chat.severity} onAsk={(q) => chat.send(q)} isLatest={m.id === latestId}
+                isLast={i === chat.messages.length - 1 && !chat.pending} />
             ))}
             {chat.pending && <TriageResultSkeleton />}
             {chat.error && (
@@ -679,7 +847,7 @@ export default function TriageChat() {
           </div>
         </div>
 
-        <div className="border-t border-outline-variant bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
+        <div className="chat-composer border-t border-outline-variant bg-surface px-3 pb-3 pt-2 sm:px-6 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto w-full max-w-3xl">
             {userTurns > 0 && chat.latest?.has_symptoms && (
               <div className="mb-2 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs text-on-surface-variant">
@@ -736,8 +904,8 @@ export default function TriageChat() {
 
       {/* Mobile Past Triages Drawer */}
       {showPastTriagesMobile && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs lg:hidden">
-          <div className="w-full max-h-[85vh] rounded-t-2xl border-t border-outline-variant bg-surface p-4 flex flex-col space-y-3 shadow-2xl animate-in slide-in-from-bottom duration-200">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-xs lg:hidden">
+          <div className="w-full max-h-[85vh] rounded-t-2xl border-t border-outline-variant bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col space-y-3 shadow-2xl animate-in slide-in-from-bottom duration-200">
             <div className="flex items-center justify-between pb-2 border-b border-outline-variant">
               <div className="flex items-center gap-2">
                 <Icon icon="history" size="sm" className="text-primary" />

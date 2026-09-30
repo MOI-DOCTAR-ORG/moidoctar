@@ -1,4 +1,4 @@
-"""Gemini REST client with key rotation and model fallback."""
+"""AI client: Cencori gateway first (if configured), then Gemini REST with key rotation and model fallback."""
 import json
 import logging
 import time
@@ -19,6 +19,65 @@ TOTAL_BUDGET_SECONDS = 28
 
 class GeminiUnavailable(RuntimeError):
     """No key configured, or every key/model combination failed."""
+
+
+def _cencori_enabled() -> bool:
+    return bool((settings.CENCORI_API_KEY or "").strip())
+
+
+def _has_image(contents: List[Dict[str, Any]]) -> bool:
+    return any("inlineData" in p or "inline_data" in p for c in contents for p in (c.get("parts") or []))
+
+
+def _to_chat_messages(contents: List[Dict[str, Any]], system_instruction: Optional[str], json_mode: bool) -> List[Dict[str, str]]:
+    """Gemini turns -> chat messages ({"role": system|user|assistant, "content": str})."""
+    system = (system_instruction or "").strip()
+    if json_mode:
+        system += ("\n\n" if system else "") + "Respond with a single valid JSON object only. No markdown fences, no commentary."
+    messages: List[Dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    for c in contents:
+        text = "".join(p.get("text", "") for p in (c.get("parts") or []))
+        if text:
+            messages.append({"role": "user" if c.get("role") == "user" else "assistant", "content": text})
+    return messages
+
+
+def _cencori_post(payload: Dict[str, Any], timeout: float) -> Dict[str, Any]:
+    key = settings.CENCORI_API_KEY.strip()
+    req = urllib.request.Request(
+        settings.CENCORI_BASE_URL.rstrip("/") + "/" + settings.CENCORI_CHAT_PATH.lstrip("/"),
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", "CENCORI_API_KEY": key, "Authorization": f"Bearer {key}"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.load(resp)
+
+
+def _cencori_text(data: Dict[str, Any]) -> str:
+    if isinstance(data.get("content"), str):  # native Cencori shape
+        return data["content"].strip()
+    choices = data.get("choices") or []  # OpenAI-compatible shape
+    if choices:
+        return str((choices[0].get("message") or {}).get("content") or "").strip()
+    return ""
+
+
+def _generate_via_cencori(contents, system_instruction, json_mode, temperature, max_output_tokens) -> Tuple[str, Dict[str, str]]:
+    payload: Dict[str, Any] = {
+        "model": settings.CENCORI_MODEL,
+        "messages": _to_chat_messages(contents, system_instruction, json_mode),
+        "temperature": temperature,
+    }
+    if max_output_tokens:
+        payload["maxTokens"] = int(max_output_tokens)
+    data = _cencori_post(payload, timeout=14)
+    text = _cencori_text(data)
+    if not text:
+        raise GeminiUnavailable("Cencori returned an empty response")
+    return text, {"model": str(data.get("model") or settings.CENCORI_MODEL), "key_id": "cencori", "via": "cencori"}
 
 
 def candidate_models(key_model: str = "") -> List[str]:
@@ -49,17 +108,31 @@ def generate(
     json_mode: bool = True,
     temperature: float = 0.2,
     only_key_id: Optional[str] = None,
+    max_output_tokens: Optional[int] = None,
 ) -> Tuple[str, Dict[str, str]]:
     """Return (text, {"model":..., "key_id":...}). Raises GeminiUnavailable."""
     body: Dict[str, Any] = {
         "contents": contents,
         "generationConfig": {"temperature": temperature},
     }
+    if max_output_tokens:
+        # Flash models spend part of this on internal "thinking", so it caps the whole
+        # call, not just the visible JSON (which is usually 150-300 tokens).
+        body["generationConfig"]["maxOutputTokens"] = int(max_output_tokens)
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
     if system_instruction:
         body["systemInstruction"] = {"parts": [{"text": system_instruction}]}
     payload = json.dumps(body).encode()
+
+    # Route through the Cencori gateway when configured. Image turns and admin key tests
+    # (only_key_id) go straight to Gemini. Any gateway failure falls through to Gemini so
+    # triage never goes down because of a third party.
+    if _cencori_enabled() and not only_key_id and not _has_image(contents):
+        try:
+            return _generate_via_cencori(contents, system_instruction, json_mode, temperature, max_output_tokens)
+        except Exception as exc:  # network, HTTP error, empty reply
+            logger.warning("Cencori gateway failed (%s: %s); falling back to direct Gemini.", type(exc).__name__, exc)
 
     if only_key_id:
         k = ai_keys.get_key(only_key_id)
@@ -116,7 +189,8 @@ def parse_json_object(text: str) -> Dict[str, Any]:
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if not m:
             raise ValueError("no JSON object in model output")
-        obj = json.loads(m.group(0))
+        # The model now and then leaves a trailing comma before a closing bracket.
+        obj = json.loads(re.sub(r",\s*([}\]])", r"\1", m.group(0)))
     if not isinstance(obj, dict):
         raise ValueError("model output is not an object")
     return obj

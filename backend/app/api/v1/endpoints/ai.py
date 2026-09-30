@@ -58,10 +58,34 @@ def put_health_context(body: HealthContextIn, user: Dict[str, Any] = Depends(get
     return ai_memory.sync_health_context(_uid(user), body.model_dump(exclude_none=True), source="user")
 
 
+class FactIn(BaseModel):
+    text: str
+
+
+class HealthItemDelete(BaseModel):
+    field: str
+    value: str
+
+
+@router.post("/memory/facts")
+def add_fact(body: FactIn, user: Dict[str, Any] = Depends(get_current_user)):
+    try:
+        return ai_memory.add_user_fact(_uid(user), body.text)
+    except ValueError as e:
+        raise HTTPException(400, detail={"err": "invalid_fact", "msg": str(e)})
+
+
 @router.delete("/memory/facts/{fact_id}")
 def delete_fact(fact_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     if not ai_memory.delete_fact(_uid(user), fact_id):
         raise HTTPException(404, detail={"err": "not_found", "msg": "That memory no longer exists."})
+    return ai_memory.load(_uid(user))
+
+
+@router.delete("/memory/health-item")
+def delete_health_item(field: str, value: str, user: Dict[str, Any] = Depends(get_current_user)):
+    if not ai_memory.remove_health_item(_uid(user), field, value):
+        raise HTTPException(404, detail={"err": "not_found", "msg": "That health item was not found."})
     return ai_memory.load(_uid(user))
 
 
