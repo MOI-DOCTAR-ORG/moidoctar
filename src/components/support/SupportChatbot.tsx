@@ -8,6 +8,7 @@ import {
   searchTokens,
   weightedScore,
 } from '../../data/supportContent'
+import { askSupportAssistant } from '../../lib/supportAssistant'
 
 type ChatMessage = {
   id: number
@@ -110,6 +111,50 @@ const OPENING: ChatMessage = {
   offerHuman: true,
 }
 
+/** The keyword answer: used at once for the instant intents, and whenever the online assistant can't reply. */
+function localReply(query: string): { instant: boolean; message: Omit<ChatMessage, 'id' | 'from'> } {
+  const tokens = searchTokens(query)
+
+  if (GREETING.test(query) && tokens.length <= 3) {
+    return {
+      instant: true,
+      message: {
+        text: 'Hello! Ask me anything about how MoiDoctar works — triage, tracking, reminders, your data — or say "talk to a person" to reach the team.',
+        offerHuman: true,
+      },
+    }
+  }
+
+  const intent = INTENTS.find((i) => i.test.test(query))
+  if (intent) return { instant: INTENTS.indexOf(intent) < 2, message: intent.reply }
+
+  if (THANKS.test(query) && tokens.length <= 3) {
+    return { instant: true, message: { text: 'Any time. If something is still unclear, I can take you to a person.', offerHuman: true } }
+  }
+
+  // A guide is the better answer for "how do I…", a FAQ for "is/does/can…".
+  // Without this, "how do I set a medication reminder" gets the FAQ about
+  // reminders not showing up, which answers a question nobody asked.
+  const wantsHowTo = HOW_TO.test(query)
+  const article = bestMatch(SUPPORT_ARTICLES, tokens, articleFields, 4)
+  const faq = bestMatch(SUPPORT_FAQ, tokens, faqFields, 4)
+
+  if (article && (wantsHowTo || !faq)) {
+    return { instant: false, message: { text: `Here's a guide that covers it: ${article.summary}`, articleId: article.id, offerHuman: true } }
+  }
+  if (faq) {
+    return { instant: false, message: { text: `${faq.question}\n\n${faq.answer}`, offerHuman: true } }
+  }
+  return {
+    instant: false,
+    message: {
+      text:
+        "I couldn't find a guide that matches that yet. Try rephrasing it with a feature name (triage, symptom tracker, medication, history, nearby care) — or send a request and a person will pick it up.",
+      offerHuman: true,
+    },
+  }
+}
+
 export default function SupportChatbot({ onOpenArticle, onRequestHuman }: Props) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING])
@@ -118,8 +163,15 @@ export default function SupportChatbot({ onOpenArticle, onRequestHuman }: Props)
   const nextId = useRef(2)
   const logRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mounted = useRef(true)
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const el = logRef.current
@@ -132,75 +184,27 @@ export default function SupportChatbot({ onOpenArticle, onRequestHuman }: Props)
 
   const answer = (raw: string) => {
     const query = raw.trim()
-    if (!query) return
+    if (!query || typing) return
 
+    const history = messages.slice(-6).map((m) => ({ role: m.from === 'user' ? ('user' as const) : ('model' as const), text: m.text }))
     push({ from: 'user', text: query })
     setTyping(true)
 
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
+    const local = localReply(query)
+    const reply = (msg: Omit<ChatMessage, 'id' | 'from'>) => {
+      if (!mounted.current) return
       setTyping(false)
-      const tokens = searchTokens(query)
+      push({ from: 'bot', ...msg })
+    }
 
-      if (GREETING.test(query) && tokens.length <= 3) {
-        push({
-          from: 'bot',
-          text: 'Hello! Ask me anything about how MoiDoctar works — triage, tracking, reminders, your data — or say "talk to a person" to reach the team.',
-          offerHuman: true,
-        })
-        return
-      }
-
-      const intent = INTENTS.find((i) => i.test.test(query))
-      if (intent) {
-        push({ from: 'bot', ...intent.reply })
-        return
-      }
-
-      if (THANKS.test(query) && tokens.length <= 3) {
-        push({ from: 'bot', text: 'Any time. If something is still unclear, I can take you to a person.' , offerHuman: true })
-        return
-      }
-
-      // A guide is the better answer for "how do I…", a FAQ for "is/does/can…".
-      // Without this, "how do I set a medication reminder" gets the FAQ about
-      // reminders not showing up, which answers a question nobody asked.
-      const wantsHowTo = HOW_TO.test(query)
-      const article = bestMatch(SUPPORT_ARTICLES, tokens, articleFields, 4)
-      const faq = bestMatch(SUPPORT_FAQ, tokens, faqFields, 4)
-
-      if (article && (wantsHowTo || !faq)) {
-        push({
-          from: 'bot',
-          text: `Here's a guide that covers it: ${article.summary}`,
-          articleId: article.id,
-          offerHuman: true,
-        })
-        return
-      }
-
-      if (faq) {
-        push({ from: 'bot', text: `${faq.question}\n\n${faq.answer}`, offerHuman: true })
-        return
-      }
-
-      if (article) {
-        push({
-          from: 'bot',
-          text: `Here's a guide that covers it: ${article.summary}`,
-          articleId: article.id,
-          offerHuman: true,
-        })
-        return
-      }
-
-      push({
-        from: 'bot',
-        text:
-          "I couldn't find a guide that matches that yet. Try rephrasing it with a feature name (triage, symptom tracker, medication, history, nearby care) — or send a request and a person will pick it up.",
-        offerHuman: true,
-      })
-    }, 550)
+    // Emergencies, "talk to a person", greetings and thanks are answered here at once.
+    if (local.instant) {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => reply(local.message), 400)
+      return
+    }
+    // Everything else: the online assistant first, the keyword answer if it can't reply.
+    void askSupportAssistant(query, history).then((online) => reply(online ?? local.message))
   }
 
   const handleQuickReply = (text: string) => {
@@ -359,7 +363,7 @@ export default function SupportChatbot({ onOpenArticle, onRequestHuman }: Props)
               />
               <button
                 type="submit"
-                disabled={!input.trim()}
+                disabled={!input.trim() || typing}
                 aria-label="Send message"
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-on-primary transition-opacity disabled:opacity-40"
               >
