@@ -17,8 +17,6 @@ import { initAnalytics } from './lib/analytics'
 import './index.css'
 
 initAnalytics()
-import './index.css'
-
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
