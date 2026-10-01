@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 from typing import Tuple
 
 from app.core.config import settings
@@ -487,6 +488,61 @@ def send_otp_email(to_email: str, code: str, purpose: str) -> Tuple[bool, str]:
     ok, detail = send_email(recipient, subject, html_body, text_body, code=code, heading=heading)
     if not ok:
         logger.warning(f"[OTP Fallback] Email delivery not completed for {recipient}. Code: {code}. Reason: {detail}")
+    return ok, detail
+
+
+def send_support_reply_email(
+    to_email: str,
+    ticket_id: str,
+    subject_line: str,
+    reply_body: str,
+    app_url: str = "",
+) -> Tuple[bool, str]:
+    """Notify a user that support replied to their ticket.
+
+    Outbound only. There is no inbound path here, so a reply the user sends by
+    email would land on RESEND_FROM and be lost. The mail therefore carries the
+    reply text and points back to the app, where the canonical thread lives.
+    """
+    recipient = to_email.strip().lower()
+    subject = f"Re: {subject_line} [{ticket_id}]"
+    heading = "Support replied to your request"
+
+    link_line = f"\n\nView the full conversation: {app_url}" if app_url else ""
+    text_body = (
+        f"{heading}\n\nTicket {ticket_id}\n\n{reply_body}{link_line}\n\n"
+        "Please reply from inside MoiDoctar rather than to this email address, "
+        "which is not monitored."
+    )
+
+    safe_reply = escape(reply_body).replace("\n", "<br />")
+    button = (
+        f'<a href="{app_url}" style="display: inline-block; padding: 12px 24px; background: #2563eb; '
+        f'color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px;">'
+        f'Open in MoiDoctar</a>'
+        if app_url
+        else ""
+    )
+
+    html_body = f"""\
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb;">
+  <div style="margin-bottom: 24px;">
+    <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.5px;">Moi<span style="color: #2563eb;">Doctar</span></span>
+  </div>
+  <h2 style="color: #111827; margin: 0 0 8px 0; font-size: 22px; font-weight: 700;">{heading}</h2>
+  <p style="color: #6b7280; font-size: 13px; margin: 0 0 20px 0;">Ticket <strong>{escape(ticket_id)}</strong> &middot; {escape(subject_line)}</p>
+  <div style="margin: 20px 0; padding: 18px 20px; background: #f9fafb; border-radius: 12px; border-left: 3px solid #2563eb;">
+    <p style="color: #111827; font-size: 15px; line-height: 1.6; margin: 0;">{safe_reply}</p>
+  </div>
+  <div style="margin: 24px 0;">{button}</div>
+  <p style="color: #6b7280; font-size: 13px; line-height: 1.5; margin: 0 0 24px 0;">Replies to this address are not monitored. Please respond from inside MoiDoctar so your message reaches the support team.</p>
+  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+  <p style="color: #9ca3af; font-size: 12px; margin: 0;">MoiDoctar &middot; Guidance and triage information, not a medical diagnosis.</p>
+</div>
+"""
+    ok, detail = send_email(recipient, subject, html_body, text_body, heading=heading)
+    if not ok:
+        logger.warning(f"[Support] Reply email not delivered for {ticket_id} to {recipient}: {detail}")
     return ok, detail
 
 

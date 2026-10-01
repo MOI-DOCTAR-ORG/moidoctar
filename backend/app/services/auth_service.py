@@ -65,6 +65,19 @@ def _admin_emails() -> List[str]:
     return settings.admin_emails_list
 
 
+def _effective_role(u: Dict[str, Any]) -> str:
+    """Stored role, normalized, with the ADMIN_EMAILS bootstrap applied.
+
+    Takes a raw store row (snake_case), unlike permissions.effective_role which
+    takes an already-formatted user.
+    """
+    from app.core.permissions import ROLE_ADMIN, normalize_role
+
+    if str(u.get("email") or "").strip().lower() in _admin_emails():
+        return ROLE_ADMIN
+    return normalize_role(u.get("role"))
+
+
 def _format_user_out(u: Any) -> Dict[str, Any]:
     if not isinstance(u, dict):
         return {}
@@ -75,7 +88,9 @@ def _format_user_out(u: Any) -> Dict[str, Any]:
         "userName": u.get("user_name", "User"),
         "email": u.get("email", ""),
         "isVerified": bool(u.get("is_verified", True)),
-        "role": "admin" if (u.get("role") == "admin" or str(u.get("email", "")).strip().lower() in _admin_emails()) else u.get("role", "user"),
+        # One source of truth for the role, including the ADMIN_EMAILS bootstrap.
+        "role": _effective_role(u),
+        "isBlacklisted": bool(u.get("is_blacklisted", False)),
         "phone": u.get("phone"),
         "photo": photo_url,
         "demographics": demo,
@@ -545,3 +560,98 @@ def reset_user_password(email: str, new_password: str) -> bool:
         return True
     return False
 
+
+
+# ---------------------------------------------------------------------------
+# Admin-facing store access
+#
+# These read and write through the same Supabase-then-local fallback as the
+# rest of this module. The previous admin endpoints read `_local_users`
+# directly, so in any deployment with Supabase configured they returned the
+# in-memory demo account instead of real users.
+# ---------------------------------------------------------------------------
+
+
+def list_all_users(limit: int = 200, offset: int = 0) -> List[Dict[str, Any]]:
+    """Every user, formatted for the API, newest first where the store allows."""
+    limit = max(1, min(limit, 500))
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = (
+                supabase.table("users")
+                .select("*")
+                .order("created_at", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+            rows = safe_supabase_rows(res)
+            return [_format_user_out(r) for r in rows]
+        except Exception as e:
+            logger.error("Supabase user listing failed, falling back to local: %s", e)
+
+    users = [_format_user_out(u) for u in _local_users.values()]
+    return users[offset:offset + limit]
+
+
+def count_users_with_role(role: str) -> int:
+    """How many accounts currently hold `role`.
+
+    Counts the stored role only. ADMIN_EMAILS admins are deliberately excluded:
+    they are the recovery path, so they must not make the last stored admin
+    look replaceable.
+    """
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = supabase.table("users").select("id, role").eq("role", role).execute()
+            return len(safe_supabase_rows(res))
+        except Exception as e:
+            logger.error("Supabase role count failed, falling back to local: %s", e)
+
+    return sum(1 for u in _local_users.values() if str(u.get("role") or "user") == role)
+
+
+def set_user_role(user_id: str, role: str) -> Dict[str, Any]:
+    """Persist a role change. Raises ValueError('user_not_found') if absent."""
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = supabase.table("users").update({"role": role}).eq("id", user_id).execute()
+            rows = safe_supabase_rows(res)
+            if rows:
+                return _format_user_out(rows[0])
+        except Exception as e:
+            logger.error("Supabase role update failed, falling back to local: %s", e)
+
+    for u in _local_users.values():
+        if str(u.get("id")) == str(user_id):
+            u["role"] = role
+            return _format_user_out(u)
+
+    raise ValueError("user_not_found")
+
+
+def set_user_blacklisted(user_id: str, blacklisted: bool) -> Dict[str, Any]:
+    """Block or restore an account. Raises ValueError('user_not_found')."""
+    supabase = get_supabase_client()
+    if supabase:
+        try:
+            res = (
+                supabase.table("users")
+                .update({"is_blacklisted": blacklisted})
+                .eq("id", user_id)
+                .execute()
+            )
+            rows = safe_supabase_rows(res)
+            if rows:
+                return _format_user_out(rows[0])
+        except Exception as e:
+            logger.error("Supabase blacklist update failed, falling back to local: %s", e)
+
+    for u in _local_users.values():
+        if str(u.get("id")) == str(user_id):
+            u["is_blacklisted"] = blacklisted
+            return _format_user_out(u)
+
+    raise ValueError("user_not_found")

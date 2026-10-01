@@ -114,3 +114,38 @@ create table if not exists app_settings (
   value jsonb not null,
   updated_at timestamptz default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Admin console: roles, audit trail, and support tickets.
+-- ---------------------------------------------------------------------------
+
+-- Roles are 'user', 'staff' or 'admin' (see backend/app/core/permissions.py).
+-- Existing rows already default to 'user'; this only widens what is allowed
+-- and adds the blacklist flag the console toggles.
+ALTER TABLE public.users
+    ADD COLUMN IF NOT EXISTS is_blacklisted BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE public.users
+    DROP CONSTRAINT IF EXISTS users_role_check;
+
+ALTER TABLE public.users
+    ADD CONSTRAINT users_role_check CHECK (role IN ('user', 'staff', 'admin'));
+
+-- Append-only record of privileged actions: role changes, blacklists, cache
+-- clears, AI key changes, and every read of a user's consented triage history.
+CREATE TABLE IF NOT EXISTS public.admin_audit (
+    id UUID PRIMARY KEY,
+    actor_id TEXT NOT NULL,
+    actor_email TEXT,
+    action TEXT NOT NULL,
+    target_id TEXT,
+    detail JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON public.admin_audit (created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_audit_target_idx ON public.admin_audit (target_id);
+-- Support tickets are NOT a dedicated table: they live in app_settings under
+-- the keys "support_tickets" and "support_ticket_messages", via kv_store.
+-- That store already handles Supabase-or-local itself, so support keeps
+-- working in a deployment with no Supabase configured.
