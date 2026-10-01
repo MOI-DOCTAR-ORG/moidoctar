@@ -1,6 +1,9 @@
 version = 1
 
 [build]
+# CI=true stops pnpm aborting with ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY on Pxxl's
+# non-interactive build server (verified: frozen-lockfile install + build succeed locally).
+install_command = "CI=true pnpm install --frozen-lockfile"
 command = "pnpm run build"
 output = "dist"
 
