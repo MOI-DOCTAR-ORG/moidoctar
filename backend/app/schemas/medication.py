@@ -11,7 +11,8 @@ class MedicationCreate(BaseModel):
 
 
 class MedicationStop(BaseModel):
-    id: str
+    id: Optional[str] = None
+    medicationId: Optional[str] = None
 
 
 class MedicationOut(BaseModel):

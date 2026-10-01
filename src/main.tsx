@@ -13,6 +13,10 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 import App from './App'
 import { queryClient } from './lib/queryClient'
 import { GOOGLE_CLIENT_ID } from './lib/constants'
+import { initAnalytics } from './lib/analytics'
+import './index.css'
+
+initAnalytics()
 import './index.css'
 
 

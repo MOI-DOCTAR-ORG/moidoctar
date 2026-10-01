@@ -36,6 +36,11 @@ class TriageResponse(BaseModel):
     flow: Optional[Dict[str, Any]] = None
     profile: Optional[Dict[str, Any]] = None
     pathway: Optional[str] = None
+    # Behavior spec, sections 2 and 11: the message's intent and what informal words were read as.
+    intent: Optional[str] = None
+    normalized_terms: List[str] = []
+    off_topic: bool = False
+    confidence: Optional[float] = None
 
 
 class TriageChatRequest(BaseModel):
@@ -81,6 +86,11 @@ class TriageChatResponse(BaseModel):
     flow: Optional[Dict[str, Any]] = None
     profile: Optional[Dict[str, Any]] = None
     pathway: Optional[str] = None
+    # Behavior spec, sections 2 and 11: the message's intent and what informal words were read as.
+    intent: Optional[str] = None
+    normalized_terms: List[str] = []
+    off_topic: bool = False
+    confidence: Optional[float] = None
 
 
 class BackendTriageStatus(BaseModel):

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth, type BackendUser } from '../context/AuthContext'
 import { useToastContext } from '../context/ToastContext'
 import Icon from '../components/Icon'
@@ -7,7 +7,7 @@ import { PremiumDateInput, PremiumSelect, premiumControlClass } from '../compone
 import { scopeKey } from '../utils/storage'
 import { api } from '../services/api'
 import modelClient from '../lib/modelAxios'
-import { uploadImageToCloudinary } from '../services/cloudinary'
+import { uploadProfilePhoto } from '../services/upload'
 import { getPermissionState, requestLocationPermission, requestNotificationPermission, type PermissionResult } from '../utils/permissions'
 import { resetTourCompleted, REPLAY_TOUR_EVENT } from '../components/OnboardingTour'
 import { getAccountEmail, getDisplayName, getInitials, getProfileImage, isPlaceholderName } from '../lib/userIdentity'
@@ -329,7 +329,7 @@ export default function Profile() {
 
     setIsUploadingPhoto(true)
     try {
-      const url = await uploadImageToCloudinary(file)
+      const url = await uploadProfilePhoto(file)
       // Saved to the account right away — no separate Save step.
       updateField('photo', url, IMMEDIATE_SAVE_DELAY_MS)
     } catch {
@@ -904,7 +904,7 @@ export default function Profile() {
           </div>
           <div className="flex gap-stack-lg">
             <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Privacy Policy</a>
-            <a className="text-caption text-secondary hover:text-primary transition-colors" href="#">Terms of Service</a>
+            <Link className="text-caption text-secondary hover:text-primary transition-colors" to="/terms">Terms of Service</Link>
           </div>
         </footer>
       </div>

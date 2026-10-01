@@ -1,41 +1,59 @@
 """Support tickets: storage, replies, and the consent gate on medical history.
 
-Before this existed, `POST /support/requests` was unimplemented. The Support
-page posted, got no acknowledgement, and queued the request in the browser's
-localStorage forever. Tickets never reached anyone.
+This merges two implementations. The storage layer and the public
+`create_support_ticket` / `list_support_tickets` contract come from the version
+already wired to the Support page, including its category normalisation and the
+confirmation email on submission. Layered on top are the pieces the admin
+console needs: staff replies, assignment and status, an audit trail, and a
+consent gate on the reporter's triage history.
 
-Two details matter for that history:
+Storage is `kv_store`, which already handles Supabase-or-local itself, rather
+than dedicated tables - one less thing to provision, and it keeps working in a
+deployment with no Supabase configured.
+
+Two details matter for the client:
 
   - The response MUST carry `ticket_id`. src/lib/supportRequests.ts treats a
     response without one as undelivered and re-queues it, so a bare 200 leaves
     tickets stuck on devices.
-  - Devices may still hold queued tickets that flush all at once the moment
-    this goes live. `queued_at` from the client sets `created_at`, so an old
-    request does not masquerade as new.
+  - Devices may hold queued tickets that flush all at once. `queued_at` from
+    the client sets `created_at`, so an old request does not look new.
 """
+import datetime
 import logging
+import random
 import re
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.supabase import get_supabase_client, safe_supabase_rows
+from app.core.email import send_support_ticket_email
 from app.services import audit_service
+from app.services.kv_store import kv_get, kv_set
 
 logger = logging.getLogger("moidoctar.support")
 
-TICKETS_TABLE = "support_tickets"
-MESSAGES_TABLE = "support_ticket_messages"
+TICKETS_KEY = "support_tickets"
+MESSAGES_KEY = "support_ticket_messages"
+
+# Keep at most this many tickets in the store.
+MAX_TICKETS = 200
+
+CATEGORIES = [
+    'Triage',
+    'Tracking',
+    'Reminders',
+    'Care & safety',
+    'Account & privacy',
+    'Bug report',
+    'Billing',
+    'Something else',
+]
 
 STATUS_OPEN = "open"
 STATUS_PENDING = "pending"
 STATUS_RESOLVED = "resolved"
 VALID_STATUSES = (STATUS_OPEN, STATUS_PENDING, STATUS_RESOLVED)
 VALID_PRIORITIES = ("normal", "urgent")
-
-# Local fallback, mirroring the rest of the backend's Supabase-or-memory shape.
-_local_tickets: Dict[str, Dict[str, Any]] = {}
-_local_messages: Dict[str, List[Dict[str, Any]]] = {}
 
 # Matches the client's generator in src/lib/supportRequests.ts (SUP-XXXXXX).
 _TICKET_ID_RE = re.compile(r"^SUP-[A-Z0-9]{4,12}$")
@@ -49,70 +67,121 @@ class TicketError(Exception):
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def _mint_ticket_id() -> str:
-    return f"SUP-{uuid.uuid4().hex[:6].upper()}"
+def generate_ticket_id() -> str:
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    suffix = ''.join(random.choice(alphabet) for _ in range(6))
+    return f"SUP-{suffix}"
 
 
-def _valid_client_id(value: Optional[str]) -> bool:
-    return bool(value and _TICKET_ID_RE.match(value.strip().upper()))
+def _read_tickets() -> List[Dict[str, Any]]:
+    tickets = kv_get(TICKETS_KEY, [])
+    return tickets if isinstance(tickets, list) else []
 
 
-def create_ticket(payload: Dict[str, Any], user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Store an incoming support request and return it."""
-    raw_id = str(payload.get("ticket_id") or "").strip().upper()
-    ticket_id = raw_id if _valid_client_id(raw_id) else _mint_ticket_id()
+def _write_tickets(tickets: List[Dict[str, Any]]) -> None:
+    kv_set(TICKETS_KEY, tickets[:MAX_TICKETS])
 
-    # A request that waited in the browser queue keeps the time it was written.
-    created_at = str(payload.get("queued_at") or "").strip() or _now()
 
-    priority = str(payload.get("priority") or "normal").lower()
-    if priority not in VALID_PRIORITIES:
-        priority = "normal"
+def _read_messages() -> Dict[str, List[Dict[str, Any]]]:
+    messages = kv_get(MESSAGES_KEY, {})
+    return messages if isinstance(messages, dict) else {}
+
+
+def _write_messages(messages: Dict[str, List[Dict[str, Any]]]) -> None:
+    kv_set(MESSAGES_KEY, messages)
+
+
+def create_support_ticket(
+    name: str,
+    email: str,
+    category: str,
+    subject: str,
+    message: str,
+    priority: str = "normal",
+    ticket_id: Optional[str] = None,
+    consent_share_history: bool = False,
+    queued_at: Optional[str] = None,
+    user: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Store an incoming support request and send its confirmation email."""
+    raw_id = (ticket_id or "").strip().upper()
+    tid = raw_id if _TICKET_ID_RE.match(raw_id) else generate_ticket_id()
+
+    clean_cat = category if category in CATEGORIES else "Something else"
+    clean_name = name.strip()
+    clean_email = email.strip().lower()
+    clean_subj = subject.strip()
+    clean_msg = message.strip()
+
+    clean_priority = (priority or "normal").lower()
+    if clean_priority not in VALID_PRIORITIES:
+        clean_priority = "normal"
 
     ticket = {
-        "ticket_id": ticket_id,
+        "ticket_id": tid,
         "user_id": str(user.get("_id")) if user else None,
-        "name": str(payload.get("name") or "").strip(),
-        "email": str(payload.get("email") or "").strip().lower(),
-        "category": str(payload.get("category") or "General").strip(),
-        "subject": str(payload.get("subject") or "").strip(),
-        "message": str(payload.get("message") or "").strip(),
-        "priority": priority,
+        "name": clean_name,
+        "email": clean_email,
+        "category": clean_cat,
+        "subject": clean_subj,
+        "message": clean_msg,
+        "priority": clean_priority,
         "status": STATUS_OPEN,
         "assigned_to": None,
-        "consent_share_history": bool(payload.get("consent_share_history", False)),
-        "created_at": created_at,
+        "consent_share_history": bool(consent_share_history),
+        # A request that waited in the browser queue keeps the time it was written.
+        "created_at": (queued_at or "").strip() or _now(),
         "updated_at": _now(),
     }
 
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            # A re-sent ticket from a device queue must not create a duplicate.
-            existing = (
-                supabase.table(TICKETS_TABLE)
-                .select("*")
-                .eq("ticket_id", ticket_id)
-                .execute()
-            )
-            existing_rows = safe_supabase_rows(existing)
-            if existing_rows:
-                # Return the stored row, not the one just built: a re-send must
-                # not report back values the database never accepted.
-                return existing_rows[0]
-            res = supabase.table(TICKETS_TABLE).insert(ticket).execute()
-            rows = safe_supabase_rows(res)
-            return rows[0] if rows else ticket
-        except Exception as e:
-            logger.error("Supabase ticket insert failed, storing locally: %s", e)
+    tickets = _read_tickets()
+    # A ticket re-sent from a device queue replaces rather than duplicates.
+    tickets = [t for t in tickets if t.get("ticket_id") != tid]
+    tickets.insert(0, ticket)
+    _write_tickets(tickets)
 
-    if ticket_id not in _local_tickets:
-        _local_tickets[ticket_id] = ticket
-        _local_messages[ticket_id] = []
-    return _local_tickets[ticket_id]
+    logger.info("Support ticket created: %s (%s) for %s", tid, clean_cat, clean_email)
+
+    email_delivered = False
+    try:
+        ok, detail = send_support_ticket_email(
+            to_email=clean_email,
+            name=clean_name,
+            ticket_id=tid,
+            category=clean_cat,
+            subject=clean_subj,
+            message=clean_msg,
+            priority=clean_priority,
+        )
+        email_delivered = ok
+        logger.info("Support email for ticket %s sent result: %s (%s)", tid, ok, detail)
+    except Exception as exc:
+        logger.warning("Support email trigger exception for ticket %s: %s", tid, exc)
+
+    return {
+        "ticket_id": tid,
+        "msg": "Support request received successfully.",
+        "status": "received",
+        "delivered": True,
+        "email_delivered": email_delivered,
+    }
+
+
+def list_support_tickets(email: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Every ticket, or just those filed from one address."""
+    tickets = _read_tickets()
+    if email:
+        email_clean = email.strip().lower()
+        return [t for t in tickets if t.get("email") == email_clean]
+    return tickets
+
+
+# ---------------------------------------------------------------------------
+# Admin console
+# ---------------------------------------------------------------------------
 
 
 def list_tickets(
@@ -121,31 +190,9 @@ def list_tickets(
     limit: int = 50,
     offset: int = 0,
 ) -> Tuple[List[Dict[str, Any]], int]:
-    """Tickets newest first, with the unfiltered total for pagination."""
-    limit = max(1, min(limit, 200))
-
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            q = supabase.table(TICKETS_TABLE).select("*")
-            if status:
-                q = q.eq("status", status)
-            if assigned_to:
-                q = q.eq("assigned_to", assigned_to)
-            res = q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
-            rows = safe_supabase_rows(res)
-
-            count_q = supabase.table(TICKETS_TABLE).select("ticket_id")
-            if status:
-                count_q = count_q.eq("status", status)
-            if assigned_to:
-                count_q = count_q.eq("assigned_to", assigned_to)
-            total = len(safe_supabase_rows(count_q.execute()))
-            return rows, total
-        except Exception as e:
-            logger.error("Supabase ticket listing failed, falling back to local: %s", e)
-
-    rows = list(_local_tickets.values())
+    """Tickets newest first, with the filtered total for pagination."""
+    limit = max(1, min(limit, MAX_TICKETS))
+    rows = _read_tickets()
     if status:
         rows = [t for t in rows if t.get("status") == status]
     if assigned_to:
@@ -155,85 +202,39 @@ def list_tickets(
 
 
 def get_ticket(ticket_id: str) -> Optional[Dict[str, Any]]:
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            res = supabase.table(TICKETS_TABLE).select("*").eq("ticket_id", ticket_id).execute()
-            rows = safe_supabase_rows(res)
-            if rows:
-                return rows[0]
-        except Exception as e:
-            logger.error("Supabase ticket read failed, falling back to local: %s", e)
-
-    return _local_tickets.get(ticket_id)
+    for t in _read_tickets():
+        if t.get("ticket_id") == ticket_id:
+            return t
+    return None
 
 
 def list_messages(ticket_id: str) -> List[Dict[str, Any]]:
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            res = (
-                supabase.table(MESSAGES_TABLE)
-                .select("*")
-                .eq("ticket_id", ticket_id)
-                .order("created_at", desc=False)
-                .execute()
-            )
-            return safe_supabase_rows(res)
-        except Exception as e:
-            logger.error("Supabase message read failed, falling back to local: %s", e)
-
-    return list(_local_messages.get(ticket_id, []))
+    return list(_read_messages().get(ticket_id, []))
 
 
 def list_tickets_for_user(user_id: str, email: str) -> List[Dict[str, Any]]:
     """A user's own tickets, matched on account id or the address they used."""
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            by_id = safe_supabase_rows(
-                supabase.table(TICKETS_TABLE).select("*").eq("user_id", user_id).execute()
-            )
-            by_email = safe_supabase_rows(
-                supabase.table(TICKETS_TABLE).select("*").eq("email", email.lower()).execute()
-            )
-            merged = {t["ticket_id"]: t for t in by_id + by_email}
-            rows = list(merged.values())
-            rows.sort(key=lambda t: str(t.get("created_at") or ""), reverse=True)
-            return rows
-        except Exception as e:
-            logger.error("Supabase user ticket read failed, falling back to local: %s", e)
-
+    email_clean = (email or "").strip().lower()
     rows = [
-        t for t in _local_tickets.values()
-        if str(t.get("user_id") or "") == str(user_id) or str(t.get("email") or "") == email.lower()
+        t for t in _read_tickets()
+        if (user_id and str(t.get("user_id") or "") == str(user_id))
+        or (email_clean and str(t.get("email") or "") == email_clean)
     ]
     rows.sort(key=lambda t: str(t.get("created_at") or ""), reverse=True)
     return rows
 
 
-def _touch(ticket_id: str, changes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    changes = {**changes, "updated_at": _now()}
-    supabase = get_supabase_client()
-    if supabase:
-        try:
-            res = (
-                supabase.table(TICKETS_TABLE)
-                .update(changes)
-                .eq("ticket_id", ticket_id)
-                .execute()
-            )
-            rows = safe_supabase_rows(res)
-            if rows:
-                return rows[0]
-        except Exception as e:
-            logger.error("Supabase ticket update failed, falling back to local: %s", e)
-
-    ticket = _local_tickets.get(ticket_id)
-    if ticket:
-        ticket.update(changes)
-        return ticket
-    return None
+def _apply(ticket_id: str, changes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    tickets = _read_tickets()
+    updated = None
+    for t in tickets:
+        if t.get("ticket_id") == ticket_id:
+            t.update({**changes, "updated_at": _now()})
+            updated = t
+            break
+    if updated:
+        _write_tickets(tickets)
+    return updated
 
 
 def update_ticket(actor: Dict[str, Any], ticket_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
@@ -263,14 +264,17 @@ def update_ticket(actor: Dict[str, Any], ticket_id: str, patch: Dict[str, Any]) 
     if not changes:
         return ticket
 
-    updated = _touch(ticket_id, changes) or ticket
+    updated = _apply(ticket_id, changes) or ticket
     audit_service.record(actor, "ticket.updated", target_id=ticket_id, detail=changes)
     return updated
 
 
 def add_reply(actor: Dict[str, Any], ticket_id: str, body: str) -> Dict[str, Any]:
-    """Store a staff reply. Storage is what makes the reply real; email is a
-    notification, and a send failure must never lose it."""
+    """Store a staff reply.
+
+    Storage is what makes the reply real; the email is a notification, and a
+    send failure must never lose it. The caller sends the mail afterwards.
+    """
     ticket = get_ticket(ticket_id)
     if not ticket:
         raise TicketError("ticket_not_found", "No ticket with that reference.")
@@ -285,23 +289,14 @@ def add_reply(actor: Dict[str, Any], ticket_id: str, body: str) -> Dict[str, Any
         "created_at": _now(),
     }
 
-    supabase = get_supabase_client()
-    stored = message
-    if supabase:
-        try:
-            res = supabase.table(MESSAGES_TABLE).insert(message).execute()
-            rows = safe_supabase_rows(res)
-            stored = rows[0] if rows else message
-        except Exception as e:
-            logger.error("Supabase reply insert failed, storing locally: %s", e)
-            _local_messages.setdefault(ticket_id, []).append(message)
-    else:
-        _local_messages.setdefault(ticket_id, []).append(message)
+    messages = _read_messages()
+    messages.setdefault(ticket_id, []).append(message)
+    _write_messages(messages)
 
     # A replied ticket is awaiting the user, not sitting in the open queue.
-    _touch(ticket_id, {"status": STATUS_PENDING})
+    _apply(ticket_id, {"status": STATUS_PENDING})
     audit_service.record(actor, "ticket.replied", target_id=ticket_id)
-    return stored
+    return message
 
 
 def get_ticket_history(actor: Dict[str, Any], ticket_id: str) -> Dict[str, Any]:
@@ -334,8 +329,10 @@ def get_ticket_history(actor: Dict[str, Any], ticket_id: str) -> Dict[str, Any]:
         detail={"subject_user_id": user_id},
     )
 
-    supabase = get_supabase_client()
+    from app.core.supabase import get_supabase_client, safe_supabase_rows
+
     sessions: List[Dict[str, Any]] = []
+    supabase = get_supabase_client()
     if supabase:
         try:
             res = (

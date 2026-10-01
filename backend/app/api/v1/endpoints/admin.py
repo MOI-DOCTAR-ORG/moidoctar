@@ -1,15 +1,20 @@
 """Admin console endpoints.
 
-Every handler here previously returned a success message without writing
-anything - demoting a user reported "Role updated successfully" and left them
-an admin. These now write for real, through the same store the rest of the
-backend uses, and refuse changes that would lock the team out.
+Routes declare the permission they need rather than the role they expect, so
+staff get the limited subset and admins get everything. Every write goes
+through admin_service, which holds the guards that stop an organisation
+locking itself out, and every privileged action is audited.
+
+Targets can be named by `userId` or by `email`, since an operator usually has
+the address in front of them rather than an id.
 """
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import require
+from app.core.config import settings
+from app.core.email import send_support_reply_email
 from app.core.permissions import (
     P_ADMIN_ACCESS,
     P_AUDIT_READ,
@@ -20,15 +25,13 @@ from app.core.permissions import (
     P_TICKETS_VIEW_HISTORY,
     P_USERS_BLACKLIST,
     P_USERS_READ,
-    permissions_for,
     effective_role,
+    permissions_for,
 )
-from app.core.config import settings
-from app.core.email import send_support_reply_email
 from app.schemas.support import ReplyIn, TicketPatchIn
 from app.services import admin_service, audit_service, support_service
 from app.services.admin_service import AdminActionError
-from app.services.auth_service import get_user_by_id
+from app.services.auth_service import get_user_by_email, get_user_by_id
 from app.services.support_service import TicketError
 
 router = APIRouter()
@@ -47,6 +50,24 @@ def _refuse_ticket(err: TicketError) -> HTTPException:
     else:
         code = status.HTTP_400_BAD_REQUEST
     return HTTPException(status_code=code, detail={"err": err.code, "msg": err.message})
+
+
+def _target_id(payload: Dict[str, Any]) -> str:
+    """Resolve the user a payload is aimed at, by id or by email."""
+    user_id = str(payload.get("userId") or payload.get("user_id") or "").strip()
+    if user_id:
+        return user_id
+
+    email = str(payload.get("email") or "").strip().lower()
+    if email:
+        found = get_user_by_email(email)
+        if found:
+            return str(found.get("_id") or found.get("id") or "")
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={"err": "missing_user", "msg": "A userId or email is required."},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +109,8 @@ def list_all_users(
 
 @router.get("/user/{user_id}")
 def get_user_details(user_id: str, user: Dict[str, Any] = Depends(require(P_USERS_READ))):
+    # get_user_by_id already returns the formatted shape; formatting again
+    # would blank every field.
     found = get_user_by_id(user_id)
     if not found:
         raise HTTPException(
@@ -102,18 +125,13 @@ def update_user_role(
     payload: Dict[str, Any],
     user: Dict[str, Any] = Depends(require(P_STAFF_MANAGE)),
 ):
-    user_id = str(payload.get("userId") or payload.get("user_id") or "").strip()
+    target = _target_id(payload)
     new_role = str(payload.get("role") or "").strip()
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"err": "missing_user", "msg": "A userId is required."},
-        )
     try:
-        updated = admin_service.change_user_role(user, user_id, new_role)
+        updated = admin_service.change_user_role(user, target, new_role)
     except AdminActionError as e:
         raise _refuse(e)
-    return {"msg": "Role updated successfully", "data": updated}
+    return {"msg": f"Role updated to {new_role} successfully", "data": updated}
 
 
 @router.put("/user/blacklist")
@@ -121,18 +139,13 @@ def blacklist_user(
     payload: Dict[str, Any],
     user: Dict[str, Any] = Depends(require(P_USERS_BLACKLIST)),
 ):
-    user_id = str(payload.get("userId") or payload.get("user_id") or "").strip()
+    target = _target_id(payload)
     blacklisted = bool(payload.get("blacklisted", True))
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"err": "missing_user", "msg": "A userId is required."},
-        )
     try:
-        updated = admin_service.set_blacklist(user, user_id, blacklisted)
+        updated = admin_service.set_blacklist(user, target, blacklisted)
     except AdminActionError as e:
         raise _refuse(e)
-    verb = "blacklisted" if blacklisted else "restored"
+    verb = "restricted" if blacklisted else "restored"
     return {"msg": f"User {verb} successfully", "data": updated}
 
 
@@ -151,15 +164,10 @@ def add_staff(
     payload: Dict[str, Any],
     user: Dict[str, Any] = Depends(require(P_STAFF_MANAGE)),
 ):
-    user_id = str(payload.get("userId") or payload.get("user_id") or "").strip()
+    target = _target_id(payload)
     role = str(payload.get("role") or "staff").strip()
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"err": "missing_user", "msg": "A userId is required."},
-        )
     try:
-        updated = admin_service.change_user_role(user, user_id, role)
+        updated = admin_service.change_user_role(user, target, role)
     except AdminActionError as e:
         raise _refuse(e)
     return {"msg": "Staff member added", "data": updated}
