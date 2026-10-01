@@ -49,7 +49,15 @@ def _cencori_post(payload: Dict[str, Any], timeout: float) -> Dict[str, Any]:
     req = urllib.request.Request(
         settings.CENCORI_BASE_URL.rstrip("/") + "/" + settings.CENCORI_CHAT_PATH.lstrip("/"),
         data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "CENCORI_API_KEY": key, "Authorization": f"Bearer {key}"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            # urllib's default "Python-urllib" User-Agent is blocked (HTTP 403) by many CDN/WAF
+            # layers, so send a normal one.
+            "User-Agent": "MoiDoctar/1.0 (+https://moidoctar8.pxxlspace.cv)",
+            "CENCORI_API_KEY": key,
+            "Authorization": f"Bearer {key}",
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -132,7 +140,13 @@ def generate(
         try:
             return _generate_via_cencori(contents, system_instruction, json_mode, temperature, max_output_tokens)
         except Exception as exc:  # network, HTTP error, empty reply
-            logger.warning("Cencori gateway failed (%s: %s); falling back to direct Gemini.", type(exc).__name__, exc)
+            detail = ""
+            if isinstance(exc, urllib.error.HTTPError):
+                try:  # the response body says WHY (bad key, model not enabled, no credit, blocked...)
+                    detail = " body=" + exc.read().decode("utf-8", "replace")[:300].replace("\n", " ")
+                except Exception:
+                    pass
+            logger.warning("Cencori gateway failed (%s: %s)%s; falling back to direct Gemini.", type(exc).__name__, exc, detail)
 
     if only_key_id:
         k = ai_keys.get_key(only_key_id)
