@@ -300,7 +300,15 @@ export default function SignUp() {
                 Terms of Service
               </Link>
               {' '}and{' '}
-              <a href="#" className={authLink} onClick={(e) => e.preventDefault()}>Privacy Policy</a>
+              <Link
+                to="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={authLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Privacy Policy
+              </Link>
             </span>
           </label>
 

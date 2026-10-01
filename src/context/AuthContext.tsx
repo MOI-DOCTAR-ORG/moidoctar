@@ -9,7 +9,9 @@ export type BackendUser = {
   userName: string
   email: string
   isVerified: boolean
-  role: 'user' | 'admin'
+  // 'staff' is the limited operator tier; see src/lib/permissions.ts.
+  role: 'user' | 'staff' | 'admin'
+  isBlacklisted?: boolean
   demographics?: {
     gender?: string
     age?: string

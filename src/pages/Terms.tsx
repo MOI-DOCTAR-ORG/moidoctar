@@ -12,21 +12,28 @@ import { APP_NAME } from '../lib/constants'
  *
  * Everything the service provider still has to supply lives in TERMS_META.
  * Any value left in "[Insert ...]" form renders as a highlighted placeholder
- * so an unfinished field is impossible to miss on the live page. Fill these
- * in — and set IS_DRAFT to false — before public launch.
+ * so it reads as a field still being settled rather than as broken text, and
+ * a metadata row with no value is left out entirely instead of showing a gap.
+ *
+ * Two values are still outstanding: the governing-law jurisdiction and the
+ * dispute-resolution venue. Both are decisions for the service provider and
+ * its lawyer, not defaults worth guessing at.
  */
-const IS_DRAFT = true
-
 const TERMS_META = {
-  lastUpdated: '[Insert date]',
-  legalEntity: '[Insert legal entity or organization name]',
-  contactEmail: '[Insert contact email]',
-  supportChannel: '[Insert support channel]',
-  supportContact: '[Insert support contact]',
-  privacyPolicy: '[Insert privacy-policy link]',
-  governingLaw: '[Insert country and state]',
-  disputeLocation: '[Insert location]',
+  lastUpdated: 'September 30, 2026',
+  legalEntity: 'Moi Doctar Project Team',
+  contactEmail: 'Moidoctar@gmail.com',
+  supportChannel: '08121678176',
+  supportContact: 'Moidoctar@gmail.com',
+  governingLaw: '',
+  disputeLocation: '',
 }
+
+/** Shown wherever a value in TERMS_META is still blank. */
+const PENDING_LABEL = 'to be confirmed'
+
+/** A blank value becomes a marker LegalText renders as PENDING_LABEL. */
+const orPending = (value: string) => value || '[pending]'
 
 type Block =
   | { kind: 'p'; text: string }
@@ -346,7 +353,7 @@ const sections: Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: `Use of Moi Doctar is also governed by the Privacy Policy at ${TERMS_META.privacyPolicy}. The Privacy Policy should explain what information is collected, why it is used, how it is stored, retention periods, service providers, user rights, and how users can make privacy requests.`,
+        text: 'Use of Moi Doctar is also governed by the Privacy Policy, which explains what information is collected, why it is used, how it is stored, retention periods, service providers, user rights, and how users can make privacy requests.',
       },
       {
         kind: 'p',
@@ -410,11 +417,11 @@ const sections: Section[] = [
     blocks: [
       {
         kind: 'p',
-        text: `These Terms are governed by the laws of ${TERMS_META.governingLaw}, unless mandatory consumer-protection law provides otherwise.`,
+        text: `These Terms are governed by the laws of ${orPending(TERMS_META.governingLaw)}, unless mandatory consumer-protection law provides otherwise.`,
       },
       {
         kind: 'p',
-        text: `Users should first contact ${TERMS_META.supportContact} to try to resolve a concern. If the issue cannot be resolved, it may be referred to the courts or dispute-resolution forum located in ${TERMS_META.disputeLocation}, subject to applicable law.`,
+        text: `Users should first contact ${TERMS_META.supportContact} to try to resolve a concern. If the issue cannot be resolved, it may be referred to the courts or dispute-resolution forum located in ${orPending(TERMS_META.disputeLocation)}, subject to applicable law.`,
       },
     ],
   },
@@ -460,8 +467,11 @@ const sections: Section[] = [
 ]
 
 /**
- * Renders text, marking any "[Insert ...]" placeholder so an unfilled legal
- * field is visually obvious rather than reading as ordinary prose.
+ * Renders legal text, marking any value still being settled.
+ *
+ * An outstanding field reads as "to be confirmed" in quiet, underlined text —
+ * visible to anyone reviewing the page, but not shouting at the reader the way
+ * a bracketed placeholder in an alert colour does.
  */
 function LegalText({ text }: { text: string }) {
   const parts = text.split(/(\[[^\]]+\])/g)
@@ -471,9 +481,9 @@ function LegalText({ text }: { text: string }) {
         /^\[[^\]]+\]$/.test(part) ? (
           <span
             key={i}
-            className="rounded border border-dashed border-error/60 bg-error-container/40 px-1 py-0.5 text-error"
+            className="text-on-surface-variant underline decoration-dotted underline-offset-4"
           >
-            {part}
+            {PENDING_LABEL}
           </span>
         ) : (
           part
@@ -594,47 +604,42 @@ export default function Terms() {
         </h1>
         <p className="mt-2 font-label-md text-label-md text-primary">User and Beta-Testing Terms</p>
 
-        <dl className="mt-6 flex flex-col gap-2">
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-            <dt className="font-label-md text-label-md shrink-0 text-on-surface sm:w-40">Last updated</dt>
-            <dd className="font-body-md text-body-md text-on-surface-variant">
-              <LegalText text={TERMS_META.lastUpdated} />
+        <dl className="mt-6 grid gap-x-6 gap-y-3 rounded-2xl border border-outline-variant bg-surface-container-low p-4 sm:grid-cols-2 sm:p-5">
+          <div>
+            <dt className="font-label-md text-label-md text-on-surface-variant">Last updated</dt>
+            <dd className="mt-0.5 font-body-md text-body-md text-on-surface">{TERMS_META.lastUpdated}</dd>
+          </div>
+          <div>
+            <dt className="font-label-md text-label-md text-on-surface-variant">Service name</dt>
+            <dd className="mt-0.5 font-body-md text-body-md text-on-surface">Moi Doctar</dd>
+          </div>
+          <div>
+            <dt className="font-label-md text-label-md text-on-surface-variant">Service provider</dt>
+            <dd className="mt-0.5 font-body-md text-body-md text-on-surface">{TERMS_META.legalEntity}</dd>
+          </div>
+          <div>
+            <dt className="font-label-md text-label-md text-on-surface-variant">Contact</dt>
+            <dd className="mt-0.5 font-body-md text-body-md text-on-surface">
+              <a
+                href={`mailto:${TERMS_META.contactEmail}`}
+                className="rounded text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                {TERMS_META.contactEmail}
+              </a>
             </dd>
           </div>
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-            <dt className="font-label-md text-label-md shrink-0 text-on-surface sm:w-40">Service provider</dt>
-            <dd className="font-body-md text-body-md text-on-surface-variant">
-              <LegalText text={TERMS_META.legalEntity} />
-            </dd>
-          </div>
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-            <dt className="font-label-md text-label-md shrink-0 text-on-surface sm:w-40">Service name</dt>
-            <dd className="font-body-md text-body-md text-on-surface-variant">Moi Doctar</dd>
-          </div>
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-            <dt className="font-label-md text-label-md shrink-0 text-on-surface sm:w-40">Contact</dt>
-            <dd className="font-body-md text-body-md text-on-surface-variant">
-              <LegalText text={TERMS_META.contactEmail} />
-            </dd>
-          </div>
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-            <dt className="font-label-md text-label-md shrink-0 text-on-surface sm:w-40">Privacy Policy</dt>
-            <dd className="font-body-md text-body-md text-on-surface-variant">
-              <LegalText text={TERMS_META.privacyPolicy} />
+          <div>
+            <dt className="font-label-md text-label-md text-on-surface-variant">Privacy Policy</dt>
+            <dd className="mt-0.5 font-body-md text-body-md text-on-surface">
+              <Link
+                to="/privacy"
+                className="rounded text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                Read the Privacy Policy
+              </Link>
             </dd>
           </div>
         </dl>
-
-        {IS_DRAFT && (
-          <div className="mt-6 flex gap-3 rounded-2xl border border-dashed border-outline bg-surface-container-low p-4">
-            <Icon icon="clinical_notes" size="md" aria-hidden="true" className="shrink-0 text-on-surface-variant" />
-            <p className="font-body-md text-sm leading-6 text-on-surface-variant">
-              This is a working product draft for review. It is not legal advice. Before public
-              launch, the service provider should have these Terms reviewed by a qualified lawyer in
-              the countries where Moi Doctar will be offered.
-            </p>
-          </div>
-        )}
 
         <nav aria-labelledby="toc-heading" className="mt-8 rounded-2xl border border-outline-variant bg-surface p-4 sm:p-5">
           <h2 id="toc-heading" className="font-label-md text-label-md text-on-surface">
@@ -675,9 +680,27 @@ export default function Terms() {
           ))}
         </div>
 
-        <p className="mt-12 border-t border-outline-variant pt-6 font-label-md text-label-md text-on-surface-variant">
-          End of Terms and Conditions
-        </p>
+        <div className="mt-12 border-t border-outline-variant pt-6">
+          <p className="font-label-md text-label-md text-on-surface-variant">
+            End of Terms and Conditions
+          </p>
+          <p className="mt-3 font-caption text-caption leading-5 text-on-surface-variant">
+            Questions about these Terms?{' '}
+            <a
+              href={`mailto:${TERMS_META.contactEmail}`}
+              className="rounded text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {TERMS_META.contactEmail}
+            </a>
+            {' · '}
+            <Link
+              to="/privacy"
+              className="rounded text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              Privacy Policy
+            </Link>
+          </p>
+        </div>
       </main>
     </div>
   )
