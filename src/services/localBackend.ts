@@ -372,7 +372,7 @@ export async function handleLocalRequest(config: InternalAxiosRequestConfig): Pr
 
   // 14. Medications: Stop
   if (url === '/medication/stop' && method === 'put') {
-    const targetId = body?.id
+    const targetId = body?.id || body?.medicationId
     const updated = currentMeds.map(m =>
       m.id === targetId ? { ...m, status: false, stoppedAt: new Date().toISOString() } : m
     )

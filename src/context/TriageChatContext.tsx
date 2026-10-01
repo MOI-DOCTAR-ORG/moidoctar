@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext'
 import { scopeKey } from '../utils/storage'
 import type { FollowUpQuestion, PatientInfo, TriageChatResponse } from '../types/triage'
 import { usesContract } from '../lib/triageDisplay'
+import { trackEvent } from '../lib/analytics'
 
 export type ChatMsg = {
   id: string
@@ -234,6 +235,7 @@ export function TriageChatProvider({ children }: { children: ReactNode }) {
       if (!clean || chat.isPending) return false
       const userMsg: ChatMsg = { id: nextId(), role: 'user', text: clean, time: nowLabel(), imageName: image?.name }
       const history = [...messages, userMsg]
+      trackEvent(history.filter((m) => m.role === 'user').length === 1 ? 'triage_started' : 'triage_followup')
       setMessages(history)
       const img = image
       setImage(null)

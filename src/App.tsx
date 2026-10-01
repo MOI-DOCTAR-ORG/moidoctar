@@ -19,6 +19,7 @@ import NewTriageInterface from './pages/NewTriageInterface'
 import NewTriageBodyMap from './pages/NewTriageBodyMap'
 import SymptomTrackerBodyMap from './pages/SymptomTrackerBodyMap'
 import AdminCache from './pages/AdminCache'
+import AdminDashboard from './pages/AdminDashboard'
 import AISettings from './pages/AISettings'
 import Theme from './pages/Theme'
 import NotFound from './pages/NotFound'
@@ -67,6 +68,8 @@ export default function App() {
         <Route path="/ai-settings" element={<AISettings />} />
         <Route path="/theme" element={<Theme />} />
         <Route path="/support" element={<Support />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/users" element={<AdminDashboard />} />
         <Route path="/admin/cache" element={<AdminCache />} />
       </Route>
 
