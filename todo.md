@@ -28,13 +28,19 @@ gitignore does not help. Check and untrack:
    Empty log = backend fell back to Gemini. Check Pxxl backend logs for "Cencori gateway failed".
 
 ## 2. Sabilytics (AIB product)  ~5 min. NO env var needed
-Site ID (45js3fu9vug6) and domain (moidoctar8.pxxlspace.cv) are hardcoded in src/lib/analytics.ts.
-1. Confirm in your Sabilytics dashboard that the site ID and domain match those two values.
-   If your domain changes, set VITE_SABILYTICS_DOMAIN / VITE_SABILYTICS_SITE_ID on the Pxxl
-   FRONTEND project (build-time) and redeploy.
-2. Redeploy frontend, open the live site, DevTools > Network: script.js from sabilytics.com = 200.
-3. Browse a few pages, wait a minute, screenshot the visit in the dashboard.
-Note: it only loads on the exact domain, so localhost never pollutes your stats.
+The snippet is now written literally into the BUILT index.html by vite.config.ts (so Sabilytics'
+"verify installation" can see it), with the same values as your dashboard:
+    <script async src="https://www.sabilytics.com/script.js" data-site="45js3fu9vug6" data-domain="moidoctar8.pxxlspace.cv"></script>
+1. Redeploy the FRONTEND (the tag only exists after a fresh build).
+2. Open the live site > right-click > View Page Source: you must see the script tag in <head>.
+3. DevTools > Network, filter "sabilytics": `script.js` = 200 AND a POST to `/api/e` = 200/204.
+   - script.js blocked/red = ad blocker or Brave Shields. Test in a clean/incognito window.
+   - /api/e fails with a CORS or redirect error = tell me the exact error text.
+4. Dashboard: click "verify installation", browse a few pages, wait ~1 min, screenshot the visit.
+5. Custom events now sent: signup_submitted, triage_started, triage_followup (no health data).
+   They show under events in the dashboard. Screenshot those too for the judges.
+Notes: localhost (npm run dev) sends nothing on purpose. If your domain changes (e.g. the free
+.cv domain), set VITE_SABILYTICS_DOMAIN on the Pxxl frontend (build-time) and redeploy.
 
 ## 3. Byteship (AIB product, safe extra)  ~10 min
 1. Sign up at https://byteship.dev, create project, copy `bship_...` key.

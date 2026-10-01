@@ -4,6 +4,7 @@ import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import GoogleButton from '../components/auth/GoogleButton'
 import AuthShell from '../components/auth/AuthShell'
+import { trackEvent } from '../lib/analytics'
 import {
   authDivider,
   authErrorBanner,
@@ -97,6 +98,7 @@ export default function SignUp() {
     const result = await signUp(fullName.trim(), email.trim(), password)
     setIsSubmitting(false)
     if (result.success) {
+      trackEvent('signup_submitted')
       navigate('/verify-email', {
         state: {
           email: email.trim(),
